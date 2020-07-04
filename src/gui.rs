@@ -1,5 +1,6 @@
 use crate::{render::GraphicId, GUIRender};
 use std::any::{Any, TypeId};
+use std::collections::VecDeque;
 use winit::event::{ElementState, Event, WindowEvent};
 
 pub mod event {
@@ -20,7 +21,7 @@ pub mod event {
         pub value: f32,
     }
 
-    pub struct ToogleChanged{ 
+    pub struct ToogleChanged {
         pub id: Id,
         pub value: bool,
     }
@@ -43,7 +44,7 @@ pub enum MouseEvent {
 }
 
 #[derive(Default)]
-struct Hierarchy {
+pub struct Hierarchy {
     /// Map each Id to a vector of childs
     childs: Vec<Vec<Id>>,
     /// Map each Id to its parent
@@ -58,7 +59,7 @@ impl Hierarchy {
     }
 
     #[inline]
-    fn get_childs(& self, id: Id) -> Vec<Id> {
+    fn get_childs(&self, id: Id) -> Vec<Id> {
         self.childs[id.index]
             .iter()
             .filter(|x| self.active[x.index])
@@ -67,17 +68,20 @@ impl Hierarchy {
     }
 
     fn active(&mut self, id: Id) {
-        self.active[id.index] = true
+        self.active[id.index] = true;
     }
 
     fn deactive(&mut self, id: Id) {
-        self.active[id.index] = false
+        self.active[id.index] = false;
     }
 
     fn set_child(&mut self, parent: Id, child: Id) {
         self.childs[parent.index].push(child);
         if let Some(parent) = self.parents[child.index] {
-            let pos = self.childs[parent.index].iter().position(|x| *x == child).unwrap();
+            let pos = self.childs[parent.index]
+                .iter()
+                .position(|x| *x == child)
+                .unwrap();
             self.childs[parent.index].remove(pos);
         }
         self.parents[child.index] = Some(parent);
@@ -105,15 +109,29 @@ impl Widget {
 
 // contains a reference to all the widgets, except the behaviour of one widget
 pub struct Widgets<'a> {
-    widgets: &'a mut [Widget],
     this: Id,
+    widgets: &'a mut [Widget],
+    hierarchy: &'a mut Hierarchy,
+    events: Vec<Box<dyn Any>>,
 }
 impl<'a> Widgets<'a> {
-    pub fn new(this: Id, widgets: &'a mut [Widget]) -> Option<(&'a mut dyn Behaviour, Self)> {
+    pub fn new(
+        this: Id,
+        widgets: &'a mut [Widget],
+        hierarchy: &'a mut Hierarchy,
+    ) -> Option<(&'a mut dyn Behaviour, Self)> {
         let this_one = unsafe {
             &mut *(widgets[this.index].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
         };
-        Some((this_one, Self { widgets, this }))
+        Some((
+            this_one,
+            Self {
+                this,
+                widgets,
+                hierarchy,
+                events: Vec::new(),
+            },
+        ))
     }
 
     pub fn get_behaviour<T: Behaviour>(&mut self, id: Id) -> Option<&mut T> {
@@ -130,18 +148,37 @@ impl<'a> Widgets<'a> {
     pub fn get_rect(&mut self, id: Id) -> &mut Rect {
         &mut self.widgets[id.index].rect
     }
+
+    pub fn active(&mut self, id: Id) {
+        self.hierarchy.active(id);
+        self.events.push(Box::new(event::InvalidadeLayout));
+        self.events.push(Box::new(event::Redraw));
+    }
+
+    pub fn deactive(&mut self, id: Id) {
+        self.hierarchy.deactive(id);
+        self.events.push(Box::new(event::InvalidadeLayout));
+        self.events.push(Box::new(event::Redraw));
+    }
 }
 
 #[derive(Default)]
 pub struct EventHandler {
     events: Vec<Box<dyn Any>>,
+    events_to: Vec<(Id, Box<dyn Any>)>,
 }
 impl EventHandler {
     pub fn new() -> Self {
-        Self { events: Vec::new() }
+        Self {
+            events: Vec::new(),
+            events_to: Vec::new(),
+        }
     }
     pub fn send_event<T: 'static>(&mut self, event: T) {
         self.events.push(Box::new(event));
+    }
+    pub fn send_event_to<T: 'static>(&mut self, id: Id, event: T) {
+        self.events_to.push((id, Box::new(event)));
     }
 }
 
@@ -186,10 +223,12 @@ impl<R: GUIRender> GUI<R> {
 
     pub fn active_widget(&mut self, id: Id) {
         self.hierarchy.active(id);
+        self.send_event(Box::new(event::InvalidadeLayout));
     }
 
     pub fn deactive_widget(&mut self, id: Id) {
         self.hierarchy.deactive(id);
+        self.send_event(Box::new(event::InvalidadeLayout));
     }
 
     #[inline]
@@ -233,16 +272,43 @@ impl<R: GUIRender> GUI<R> {
         }
     }
 
+    pub fn call_event<F: FnOnce(&mut dyn Behaviour, Id, &mut Widgets, &mut EventHandler)>(
+        &mut self,
+        id: Id,
+        event: F,
+    ) {
+        if let Some((this, mut widgets)) = Widgets::new(id, &mut self.widgets, &mut self.hierarchy)
+        {
+            let mut event_handler = EventHandler::new();
+            event(this, id, &mut widgets, &mut event_handler);
+            let EventHandler { events, events_to } = event_handler;
+            for event in events.into_iter().chain(widgets.events.into_iter()) {
+                self.send_event(event);
+            }
+            //TODO: this keep a non-intuitive order of event calls
+            let mut event_queue = VecDeque::from(events_to);
+            while let Some((id, event)) = event_queue.pop_back() {
+                if let Some((this, mut widgets)) =
+                    Widgets::new(id, &mut self.widgets, &mut self.hierarchy)
+                {
+                    let mut event_handler = EventHandler::new();
+                    this.on_event(event, id, &mut widgets, &mut event_handler);
+                    let EventHandler { events, events_to } = event_handler;
+                    for event in events.into_iter().chain(widgets.events.into_iter()) {
+                        self.send_event(event);
+                    }
+                    event_queue.extend(events_to.into_iter());
+                }
+            }
+        }
+    }
+
     pub fn start(&mut self) {
         let mut parents = vec![ROOT_ID];
         while let Some(id) = parents.pop() {
-            if let Some((this, widgets)) = Widgets::new(id, &mut self.widgets) {
-                let mut event_handler = EventHandler::new();
-                this.on_start(id, widgets, &mut event_handler);
-                for event in event_handler.events {
-                    self.send_event(event);
-                }
-            }
+            self.call_event(id, |this, id, widgets, event_handler| {
+                this.on_start(id, widgets, event_handler)
+            });
             for child in &self.hierarchy.get_childs(id) {
                 parents.push(*child);
             }
@@ -317,18 +383,17 @@ impl<R: GUIRender> GUI<R> {
     }
 
     pub fn listen_mouse(&self, id: Id) -> bool {
-        // self.buttons[id.index].is_some() || self.sliders[id.index].is_some()
-        self.widgets[id.index].behaviour.is_some()
+        self.widgets[id.index]
+            .behaviour
+            .as_ref()
+            .map(|x| x.listen_mouse())
+            .unwrap_or(false)
     }
 
     pub fn send_mouse_event_to(&mut self, id: Id, event: MouseEvent) {
-        if let Some((this, widgets)) = Widgets::new(id, &mut self.widgets) {
-            let mut event_handler = EventHandler::new();
-            this.on_mouse_event(event, id, widgets, &mut event_handler);
-            for event in event_handler.events {
-                self.send_event(event);
-            }
-        }
+        self.call_event(id, |this, id, widgets, event_handler| {
+            this.on_mouse_event(event, id, widgets, event_handler)
+        });
     }
 
     pub fn update_layouts(&mut self, id: Id) {
@@ -413,21 +478,33 @@ impl Rect {
     }
 }
 
+#[allow(unused_variables)]
 pub trait Behaviour: 'static {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
 
-    #[allow(unused_variables)]
-    fn on_start(&mut self, this: Id, widgets: Widgets, event_handler: &mut EventHandler) {}
+    fn listen_mouse(&self) -> bool;
+
+    fn on_start(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {}
+
+    fn on_event(
+        &mut self,
+        event: Box<dyn Any>,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+    }
 
     fn on_mouse_event(
         &mut self,
         event: MouseEvent,
         this: Id,
-        widgets: Widgets,
+        widgets: &mut Widgets,
         event_handler: &mut EventHandler,
-    );
+    ) {
+    }
 }
 impl dyn Behaviour {
     fn downcast_mut<T: Behaviour>(&mut self) -> Option<&mut T> {

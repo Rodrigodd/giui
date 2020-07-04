@@ -234,8 +234,14 @@ impl Painel {
     }
     #[inline]
     pub fn set_rect(&mut self, rect: &[f32; 4]) {
-        let width = (rect[2]-rect[0]).round().max(0.0);
-        let height = (rect[3]-rect[1]).round().max(0.0);
+        let rect = [
+            rect[0].round(),
+            rect[1].round(),
+            rect[2].round(),
+            rect[3].round(),
+        ];
+        let width = (rect[2]-rect[0]).max(0.0);
+        let height = (rect[3]-rect[1]).max(0.0);
         let border = self.border.min(width/2.0).min(height/2.0).round();
         let x1 = rect[0] + border / 2.0;
         let x2 = (rect[0] + rect[2]) / 2.0;

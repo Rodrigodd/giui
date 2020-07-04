@@ -3,7 +3,7 @@ use sprite_render::{Camera, GLSpriteRender, SpriteRender};
 use ui_engine::render::{GUISpriteRender, GraphicId, Painel, Text};
 use ui_engine::{
     event as ui_event,
-    widgets::{Button, Slider, Toggle},
+    widgets::{Button, Slider, Toggle, TabButton, TabGroup},
     GUIRender, Rect, Widget, GUI,
 };
 use winit::{
@@ -43,15 +43,23 @@ fn main() {
         window_size.height as f32 / 2.0,
     );
     let painel = Painel::new(texture, [0.0, 0.0, 1.0, 1.0], 5.0);
+    let page_area = {
+        let rect = Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 45.0, 0.0, 0.0]);
+        gui.add_widget(Widget::new(rect, None, None), None)
+    };
+    let page_1 = {
+        let rect = Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]);
+        gui.add_widget(Widget::new(rect, None, None), Some(page_area))
+    };
     let menu = {
         let graphic = Some(gui.render().add_painel(painel.clone()));
-        let rect = Rect::new([0.0, 0.0, 0.0, 1.0], [10.0, 10.0, 190.0, -10.0]);
-        gui.add_widget(Widget::new(rect, graphic, None), None)
+        let rect = Rect::new([0.0, 0.0, 0.0, 1.0], [10.0, 0.0, 190.0, -10.0]);
+        gui.add_widget(Widget::new(rect, graphic, None), Some(page_1))
     };
     let right_painel = {
         let graphic = Some(gui.render().add_painel(painel.clone()));
-        let rect = Rect::new([0.0, 0.0, 1.0, 1.0], [200.0, 10.0, -10.0, -10.0]);
-        gui.add_widget(Widget::new(rect, graphic, None), None)
+        let rect = Rect::new([0.0, 0.0, 1.0, 1.0], [200.0, 0.0, -10.0, -10.0]);
+        gui.add_widget(Widget::new(rect, graphic, None), Some(page_1))
     };
     let top_text = {
         let graphic = Some(
@@ -229,6 +237,68 @@ fn main() {
             )
         };
         gui.set_behaviour_of(toggle, Some(Box::new(Toggle::new(background, marker))));
+        let page_2 = {
+            let rect = Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]);
+            let page_2 = gui.add_widget(Widget::new(rect, None, None), Some(page_area));
+            let graphic = gui.render().add_text(Text::new(
+                "This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_string(),
+                20.0,
+                (0, -1),
+            ).with_color([255, 255, 255, 255]));
+            gui.add_widget(
+                Widget::new(
+                    Rect::new([0.0, 0.0, 1.0, 1.0], [15.0, 15.0, -15.0, -15.0]),
+                    Some(graphic),
+                    None,
+                ),
+                Some(page_2),
+            );
+            page_2
+        };
+        {
+            let rect = Rect::new([0.0, 0.0, 1.0, 0.0], [5.0, 10.0, -10.0, 40.0]);
+            let header = gui.add_widget(Widget::new(rect, None, None), None);
+            let create_button = |gui: &mut GUI<GUISpriteRender>, i: usize, total: usize| {
+                let graphic = Some(
+                    gui.render()
+                        .add_painel(painel.clone().with_color([200, 200, 200, 255])),
+                );
+                let x = i as f32 / total as f32;
+                let button = gui.add_widget(
+                    Widget::new(
+                        Rect::new([x, 0.0, x + 1.0/total as f32, 1.0], [5.0, 0.0, 0.0, 0.0]),
+                        graphic,
+                        Some(Box::new(TabButton::new(header))),
+                    ),
+                    Some(header),
+                );
+                let graphic = Some(gui.render().add_text(
+                    Text::new(format!("Tab {}", i + 1), 16.0, (0, 0)).with_color([40, 40, 100, 255]),
+                ));
+                gui.add_widget(
+                    Widget::new(
+                        Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]),
+                        graphic,
+                        None,
+                    ),
+                    Some(button),
+                );
+                button
+            };
+            let buttons = vec![
+                create_button(&mut gui, 0, 4),
+                create_button(&mut gui, 1, 4),
+                create_button(&mut gui, 2, 4),
+                create_button(&mut gui, 3, 4),
+            ];
+            let pages = vec![
+                page_1,
+                page_2,
+                page_2,
+                page_2,
+            ];
+            gui.set_behaviour_of(header, Some(Box::new(TabGroup::new(buttons, pages))));
+        }
 
         {
             let graphic = Some(gui.render().add_text(
@@ -248,7 +318,9 @@ fn main() {
     };
     drop(painel);
 
+    println!("Starting");
     gui.start();
+    println!("Started");
 
     fn resize<R: GUIRender>(
         size: PhysicalSize<u32>,

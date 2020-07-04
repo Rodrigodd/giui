@@ -1,4 +1,5 @@
 use crate::{event, Behaviour, EventHandler, Id, MouseEvent, Rect, Widgets};
+use std::any::Any;
 
 #[derive(Default)]
 pub struct Button {
@@ -10,11 +11,22 @@ impl Button {
     }
 }
 impl Behaviour for Button {
+
+    fn listen_mouse(&self) -> bool {
+        true
+    }
+
+    fn on_start(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+        let graphic = widgets.get_graphic(this).unwrap();
+        graphic.set_color([200, 200, 200, 255]);
+        event_handler.send_event(event::Redraw);
+    }
+
     fn on_mouse_event(
         &mut self,
         event: MouseEvent,
         this: Id,
-        mut widgets: Widgets,
+        widgets: &mut Widgets,
         event_handler: &mut EventHandler,
     ) {
         match event {
@@ -93,7 +105,12 @@ impl Slider {
     }
 }
 impl Behaviour for Slider {
-    fn on_start(&mut self, this: Id, mut widgets: Widgets, event_handler: &mut EventHandler) {
+
+    fn listen_mouse(&self) -> bool {
+        true
+    }
+
+    fn on_start(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
         self.set_handle_pos(widgets.get_rect(self.handle), event_handler);
         let value = self.value;
         event_handler.send_event(event::ValueSet { id: this, value });
@@ -103,7 +120,7 @@ impl Behaviour for Slider {
         &mut self,
         event: MouseEvent,
         this: Id,
-        mut widgets: Widgets,
+        widgets: &mut Widgets,
         event_handler: &mut EventHandler,
     ) {
         match event {
@@ -154,7 +171,12 @@ impl Toggle {
     }
 }
 impl Behaviour for Toggle {
-    fn on_start(&mut self, this: Id, mut widgets: Widgets, event_handler: &mut EventHandler) {
+
+    fn listen_mouse(&self) -> bool {
+        true
+    }
+
+    fn on_start(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
         event_handler.send_event(event::ToogleChanged {
             id: this,
             value: self.enable,
@@ -169,7 +191,7 @@ impl Behaviour for Toggle {
         &mut self,
         event: MouseEvent,
         this: Id,
-        mut widgets: Widgets,
+        widgets: &mut Widgets,
         event_handler: &mut EventHandler,
     ) {
         match event {
@@ -205,6 +227,145 @@ impl Behaviour for Toggle {
                     } else {
                         widgets.get_graphic(self.marker).unwrap().set_alpha(0)
                     }
+                }
+            }
+            MouseEvent::Moved { .. } => {}
+        }
+    }
+}
+
+pub struct Unselected;
+pub struct Selected;
+pub struct Select(Id);
+
+pub struct TabGroup {
+    buttons: Vec<Id>,
+    pages: Vec<Id>,
+    selected: usize,
+}
+impl TabGroup {
+    pub fn new(buttons: Vec<Id>, pages: Vec<Id>) -> Self {
+        assert_eq!(buttons.len(), pages.len(), "buttons len need be equal to pages len");
+        Self {
+            buttons,
+            pages,
+            selected: 0,
+        }
+    }
+}
+impl Behaviour for TabGroup {
+
+    fn listen_mouse(&self) -> bool {
+        false
+    }
+
+    fn on_event(&mut self, event: Box<dyn Any>, _this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+        if let Some(Select(id)) = event.downcast_ref::<Select>() {
+            widgets.deactive(self.pages[self.selected]);
+            event_handler.send_event_to(self.buttons[self.selected], Unselected);
+            if let Some(i) = self.buttons.iter().position(|x| x == id) {
+                self.selected = i;
+                widgets.active(self.pages[self.selected]);
+                event_handler.send_event_to(self.buttons[self.selected], Selected);
+            }
+        }
+    }
+
+    fn on_start(&mut self, _this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+        for i in 0..self.pages.len() {
+            if i == self.selected {
+                widgets.active(self.pages[i]);
+                event_handler.send_event_to(self.buttons[i], Selected);
+            } else {
+                widgets.deactive(self.pages[i]);
+                event_handler.send_event_to(self.buttons[i], Unselected);
+            }
+        }
+    }
+}
+
+pub struct TabButton {
+    tab_group: Id,
+    selected: bool,
+    click: bool,
+}
+impl TabButton {
+    pub fn new(tab_group: Id) -> Self {
+        Self {
+            tab_group,
+            selected: false,
+            click: false,
+        }
+    }
+
+    pub fn unselect(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+        self.selected = false;
+        let graphic = widgets.get_graphic(this).unwrap();
+        graphic.set_color([200, 200, 200, 255]);
+        event_handler.send_event(event::Redraw);
+    }
+}
+impl Behaviour for TabButton {
+    fn listen_mouse(&self) -> bool {
+        true
+    }
+
+    fn on_event(&mut self, event: Box<dyn Any>, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+        if event.is::<Unselected>() {
+            let graphic = widgets.get_graphic(this).unwrap();
+            graphic.set_color([200, 200, 200, 255]);
+            event_handler.send_event(event::Redraw);
+            self.selected = false;
+        } else if event.is::<Selected>() {
+            println!("receiving Selected");
+            let graphic = widgets.get_graphic(this).unwrap();
+            graphic.set_color([255, 255, 255, 255]);
+            event_handler.send_event(event::Redraw);
+            self.selected = true;
+        }
+    }
+
+    fn on_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+        match event {
+            MouseEvent::Enter => {
+                if !self.selected {
+                    let graphic = widgets.get_graphic(this).unwrap();
+                    graphic.set_color([180, 180, 180, 255]);
+                    event_handler.send_event(event::Redraw);
+                }
+            }
+            MouseEvent::Exit => {
+                if !self.selected {
+                    self.click = false;
+                    let graphic = widgets.get_graphic(this).unwrap();
+                    graphic.set_color([200, 200, 200, 255]);
+                    event_handler.send_event(event::Redraw);
+                }
+            }
+            MouseEvent::Down => {
+                if !self.selected {
+                    self.click = true;
+                    let graphic = widgets.get_graphic(this).unwrap();
+                    graphic.set_color([128, 128, 128, 255]);
+                    event_handler.send_event(event::Redraw);
+                }
+            }
+            MouseEvent::Up => {
+                if !self.selected {
+                    let graphic = widgets.get_graphic(this).unwrap();
+
+                    if self.click {
+                        event_handler.send_event_to(self.tab_group, Select(this));
+                    } else {
+                        graphic.set_color([180, 180, 180, 255]);
+                    }
+                    event_handler.send_event(event::Redraw);
                 }
             }
             MouseEvent::Moved { .. } => {}
