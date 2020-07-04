@@ -11,7 +11,6 @@ impl Button {
     }
 }
 impl Behaviour for Button {
-
     fn listen_mouse(&self) -> bool {
         true
     }
@@ -105,7 +104,6 @@ impl Slider {
     }
 }
 impl Behaviour for Slider {
-
     fn listen_mouse(&self) -> bool {
         true
     }
@@ -171,7 +169,6 @@ impl Toggle {
     }
 }
 impl Behaviour for Toggle {
-
     fn listen_mouse(&self) -> bool {
         true
     }
@@ -245,7 +242,11 @@ pub struct TabGroup {
 }
 impl TabGroup {
     pub fn new(buttons: Vec<Id>, pages: Vec<Id>) -> Self {
-        assert_eq!(buttons.len(), pages.len(), "buttons len need be equal to pages len");
+        assert_eq!(
+            buttons.len(),
+            pages.len(),
+            "buttons len need be equal to pages len"
+        );
         Self {
             buttons,
             pages,
@@ -254,12 +255,17 @@ impl TabGroup {
     }
 }
 impl Behaviour for TabGroup {
-
     fn listen_mouse(&self) -> bool {
         false
     }
 
-    fn on_event(&mut self, event: Box<dyn Any>, _this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+    fn on_event(
+        &mut self,
+        event: Box<dyn Any>,
+        _this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
         if let Some(Select(id)) = event.downcast_ref::<Select>() {
             widgets.deactive(self.pages[self.selected]);
             event_handler.send_event_to(self.buttons[self.selected], Unselected);
@@ -310,7 +316,13 @@ impl Behaviour for TabButton {
         true
     }
 
-    fn on_event(&mut self, event: Box<dyn Any>, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+    fn on_event(
+        &mut self,
+        event: Box<dyn Any>,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
         if event.is::<Unselected>() {
             let graphic = widgets.get_graphic(this).unwrap();
             graphic.set_color([200, 200, 200, 255]);

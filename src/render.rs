@@ -196,21 +196,16 @@ impl Painel {
         let w = uv_rect[2] / 3.0;
         let h = uv_rect[3] / 3.0;
         let sprite = SpriteInstance::new(0.0, 0.0, 1.0, 1.0, texture, [0.0, 0.0, 1.0, 1.0]);
-        let mut sprites: [SpriteInstance; 9] = unsafe {
-            std::mem::zeroed()
-        };
+        let mut sprites: [SpriteInstance; 9] = unsafe { std::mem::zeroed() };
         for i in 0..9 {
             sprites[i] = sprite.clone().with_uv_rect([
-                uv_rect[0] + w*(i%3) as f32,
-                uv_rect[1] + h*(i/3) as f32,
+                uv_rect[0] + w * (i % 3) as f32,
+                uv_rect[1] + h * (i / 3) as f32,
                 w,
                 h,
             ]);
         }
-        Self {
-            sprites,
-            border,
-        }
+        Self { sprites, border }
     }
     #[inline]
     pub fn set_color(&mut self, color: [u8; 4]) {
@@ -224,7 +219,7 @@ impl Painel {
         self
     }
     #[inline]
-    pub fn set_border(&mut self, border: f32){
+    pub fn set_border(&mut self, border: f32) {
         self.border = border;
     }
     #[inline]
@@ -240,9 +235,9 @@ impl Painel {
             rect[2].round(),
             rect[3].round(),
         ];
-        let width = (rect[2]-rect[0]).max(0.0);
-        let height = (rect[3]-rect[1]).max(0.0);
-        let border = self.border.min(width/2.0).min(height/2.0).round();
+        let width = (rect[2] - rect[0]).max(0.0);
+        let height = (rect[3] - rect[1]).max(0.0);
+        let border = self.border.min(width / 2.0).min(height / 2.0).round();
         let x1 = rect[0] + border / 2.0;
         let x2 = (rect[0] + rect[2]) / 2.0;
         let x3 = rect[2] - border / 2.0;

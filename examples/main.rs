@@ -3,7 +3,7 @@ use sprite_render::{Camera, GLSpriteRender, SpriteRender};
 use ui_engine::render::{GUISpriteRender, GraphicId, Painel, Text};
 use ui_engine::{
     event as ui_event,
-    widgets::{Button, Slider, Toggle, TabButton, TabGroup},
+    widgets::{Button, Slider, TabButton, TabGroup, Toggle},
     GUIRender, Rect, Widget, GUI,
 };
 use winit::{
@@ -220,12 +220,8 @@ fn main() {
         };
         let marker = {
             let graphic = Some(
-                gui.render().add_painel(
-                    painel
-                        .clone()
-                        .with_color([0, 0, 0, 255])
-                        .with_border(0.0),
-                ),
+                gui.render()
+                    .add_painel(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0)),
             );
             gui.add_widget(
                 Widget::new(
@@ -266,15 +262,18 @@ fn main() {
                 let x = i as f32 / total as f32;
                 let button = gui.add_widget(
                     Widget::new(
-                        Rect::new([x, 0.0, x + 1.0/total as f32, 1.0], [5.0, 0.0, 0.0, 0.0]),
+                        Rect::new([x, 0.0, x + 1.0 / total as f32, 1.0], [5.0, 0.0, 0.0, 0.0]),
                         graphic,
                         Some(Box::new(TabButton::new(header))),
                     ),
                     Some(header),
                 );
-                let graphic = Some(gui.render().add_text(
-                    Text::new(format!("Tab {}", i + 1), 16.0, (0, 0)).with_color([40, 40, 100, 255]),
-                ));
+                let graphic = Some(
+                    gui.render().add_text(
+                        Text::new(format!("Tab {}", i + 1), 16.0, (0, 0))
+                            .with_color([40, 40, 100, 255]),
+                    ),
+                );
                 gui.add_widget(
                     Widget::new(
                         Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]),
@@ -291,12 +290,7 @@ fn main() {
                 create_button(&mut gui, 2, 4),
                 create_button(&mut gui, 3, 4),
             ];
-            let pages = vec![
-                page_1,
-                page_2,
-                page_2,
-                page_2,
-            ];
+            let pages = vec![page_1, page_2, page_2, page_2];
             gui.set_behaviour_of(header, Some(Box::new(TabGroup::new(buttons, pages))));
         }
 
@@ -361,7 +355,7 @@ fn main() {
                     }
                     println!("Slide value set!! {}", value);
                 }
-            } else if let Some(ui_event::ToogleChanged{ id, value }) = event.downcast_ref() {
+            } else if let Some(ui_event::ToogleChanged { id, value }) = event.downcast_ref() {
                 if *id == my_toggle {
                     println!("Toogle changed to {}!", value);
                     if *value {
