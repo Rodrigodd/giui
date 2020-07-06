@@ -88,6 +88,55 @@ impl Hierarchy {
     }
 }
 
+pub struct WidgetBuilder<'a, R: GUIRender> {
+    gui: &'a mut GUI<R>,
+    rect: Rect,
+    graphic: Option<GraphicId>,
+    behaviour: Option<Box<dyn Behaviour>>,
+    parent: Option<Id>,
+}
+impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
+    fn new(gui: &'a mut GUI<R>) -> Self {
+        Self {
+            gui,
+            rect: Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]),
+            graphic: None,
+            behaviour: None,
+            parent: None,
+        }
+    }
+    pub fn with_anchors(mut self, anchors: [f32; 4]) -> Self {
+        self.rect.anchors = anchors;
+        self
+    }
+    pub fn with_margins(mut self, margins: [f32; 4]) -> Self {
+        self.rect.margins = margins;
+        self
+    }
+    pub fn with_behaviour(mut self, behaviour: Option<Box<dyn Behaviour>>) -> Self {
+        self.behaviour = behaviour;
+        self
+    }
+    pub fn with_graphic(mut self, graphic: Option<GraphicId>) -> Self {
+        self.graphic = graphic;
+        self
+    }
+    pub fn with_parent(mut self, parent: Option<Id>) -> Self {
+        self.parent = parent;
+        self
+    }
+    pub fn build(self) -> Id {
+        let Self {
+            gui,
+            rect,
+            graphic,
+            behaviour,
+            parent,
+        } = self;
+        gui.add_widget(Widget::new(rect, graphic, behaviour), parent)
+    }
+}
+
 pub struct Widget {
     rect: Rect,
     graphic: Option<GraphicId>,
@@ -208,6 +257,10 @@ impl<R: GUIRender> GUI<R> {
             events: Vec::new(),
             render,
         }
+    }
+
+    pub fn create_widget(&mut self) -> WidgetBuilder<R> {
+        WidgetBuilder::new(self)
     }
 
     pub fn add_widget(&mut self, widget: Widget, parent: Option<Id>) -> Id {

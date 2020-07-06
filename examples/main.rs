@@ -43,18 +43,19 @@ fn main() {
         window_size.height as f32 / 2.0,
     );
     let painel = Painel::new(texture, [0.0, 0.0, 1.0, 1.0], 5.0);
-    let page_area = {
-        let rect = Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 45.0, 0.0, 0.0]);
-        gui.add_widget(Widget::new(rect, None, None), None)
-    };
-    let page_1 = {
-        let rect = Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]);
-        gui.add_widget(Widget::new(rect, None, None), Some(page_area))
-    };
+    let page_area = gui
+        .create_widget()
+        .with_margins([0.0, 45.0, 0.0, 0.0])
+        .build();
+    let page_1 = gui.create_widget().with_parent(Some(page_area)).build();
     let menu = {
         let graphic = Some(gui.render().add_painel(painel.clone()));
-        let rect = Rect::new([0.0, 0.0, 0.0, 1.0], [10.0, 0.0, 190.0, -10.0]);
-        gui.add_widget(Widget::new(rect, graphic, None), Some(page_1))
+        gui.create_widget()
+            .with_anchors([0.0, 0.0, 0.0, 1.0])
+            .with_margins([10.0, 0.0, 190.0, -10.0])
+            .with_graphic(graphic)
+            .with_parent(Some(page_1))
+            .build()
     };
     let right_painel = {
         let graphic = Some(gui.render().add_painel(painel.clone()));
