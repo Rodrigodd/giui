@@ -3,7 +3,7 @@ use sprite_render::{Camera, GLSpriteRender, SpriteRender};
 use ui_engine::render::{GUISpriteRender, GraphicId, Painel, Text};
 use ui_engine::{
     event as ui_event,
-    widgets::{Button, Slider, TabButton, TabGroup, Toggle},
+    widgets::{Button, Hoverable, Slider, TabButton, TabGroup, Toggle},
     GUIRender, Rect, Widget, GUI,
 };
 use winit::{
@@ -235,6 +235,51 @@ fn main() {
         };
         gui.set_behaviour_of(toggle, Some(Box::new(Toggle::new(background, marker))));
         let page_2 = {
+            let graphic = gui.render().add_painel(painel.clone());
+            let page_2 = gui
+                .create_widget()
+                .with_margins([10.0, 0.0, -10.0, -10.0])
+                .with_graphic(Some(graphic))
+                .with_parent(Some(page_area))
+                .build();
+            let graphic = gui.render().add_painel(
+                painel
+                    .clone()
+                    .with_color([50, 50, 50, 255])
+                    .with_border(0.0),
+            );
+            let hover = gui
+                .create_widget()
+                .with_anchors([0.0, 0.0, 0.0, 0.0])
+                .with_margins([3.0, 6.0, 93.0, 24.0])
+                .with_graphic(Some(graphic))
+                .build();
+            let graphic = Some(
+                gui.render().add_text(
+                    Text::new("This is a Hover".to_string(), 12.0, (0, 0))
+                        .with_color([255, 255, 255, 255]),
+                ),
+            );
+            gui.create_widget()
+                .with_graphic(graphic)
+                .with_parent(Some(hover))
+                .build();
+
+            let graphic = gui
+                .render()
+                .add_painel(painel.clone().with_color([200, 200, 200, 255]));
+
+            gui.create_widget()
+                .with_anchors([0.0, 0.0, 0.0, 0.0])
+                .with_margins([10.0, 10.0, 90.0, 50.0])
+                .with_graphic(Some(graphic))
+                .with_behaviour(Some(Box::new(Hoverable::new(hover))))
+                .with_parent(Some(page_2))
+                .build();
+
+            page_2
+        };
+        let page_na = {
             let rect = Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]);
             let page_2 = gui.add_widget(Widget::new(rect, None, None), Some(page_area));
             let graphic = gui.render().add_text(Text::new(
@@ -291,7 +336,7 @@ fn main() {
                 create_button(&mut gui, 2, 4),
                 create_button(&mut gui, 3, 4),
             ];
-            let pages = vec![page_1, page_2, page_2, page_2];
+            let pages = vec![page_1, page_2, page_na, page_na];
             gui.set_behaviour_of(header, Some(Box::new(TabGroup::new(buttons, pages))));
         }
 

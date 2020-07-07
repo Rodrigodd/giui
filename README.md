@@ -16,7 +16,6 @@
   - Fold
   - Text Field
   - Scrollbar?
-- Implement a
 - Add some richtext support?
 
 

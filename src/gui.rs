@@ -67,12 +67,23 @@ impl Hierarchy {
             .collect::<Vec<Id>>()
     }
 
+    #[inline]
     fn active(&mut self, id: Id) {
         self.active[id.index] = true;
     }
 
+    #[inline]
     fn deactive(&mut self, id: Id) {
         self.active[id.index] = false;
+    }
+
+    fn move_to_front(&mut self, id: Id) {
+        if let Some(parent) = self.parents[id.index] {
+            let childs = &mut self.childs[parent.index];
+            let i = childs.iter().position(|x| *x == id).unwrap();
+            childs.remove(i);
+            childs.push(id);
+        }
     }
 
     fn set_child(&mut self, parent: Id, child: Id) {
@@ -209,6 +220,12 @@ impl<'a> Widgets<'a> {
         self.events.push(Box::new(event::InvalidadeLayout));
         self.events.push(Box::new(event::Redraw));
     }
+
+    pub fn move_to_front(&mut self, id: Id) {
+        self.hierarchy.move_to_front(id);
+        self.events.push(Box::new(event::InvalidadeLayout));
+        self.events.push(Box::new(event::Redraw));
+    }
 }
 
 #[derive(Default)]
@@ -338,7 +355,6 @@ impl<R: GUIRender> GUI<R> {
             for event in events.into_iter().chain(widgets.events.into_iter()) {
                 self.send_event(event);
             }
-            //TODO: this keep a non-intuitive order of event calls
             let mut event_queue = VecDeque::from(events_to);
             while let Some((id, event)) = event_queue.pop_back() {
                 if let Some((this, mut widgets)) =
@@ -350,7 +366,7 @@ impl<R: GUIRender> GUI<R> {
                     for event in events.into_iter().chain(widgets.events.into_iter()) {
                         self.send_event(event);
                     }
-                    event_queue.extend(events_to.into_iter());
+                    event_queue.extend(events_to.into_iter().rev());
                 }
             }
         }
@@ -362,10 +378,18 @@ impl<R: GUIRender> GUI<R> {
             self.call_event(id, |this, id, widgets, event_handler| {
                 this.on_start(id, widgets, event_handler)
             });
-            for child in &self.hierarchy.get_childs(id) {
-                parents.push(*child);
+            parents.extend(self.hierarchy.childs[id.index].iter().rev());
+        }
+        fn print_tree(deep: usize, id: Id, hierarchy: &Hierarchy) {
+            let childs = hierarchy.childs[id.index].clone();
+            let len = childs.len();
+            for (i, child) in childs.iter().enumerate() {
+                println!("{}{}━━{:?}", "┃  ".repeat(deep), if i + 1 == len { "┗" } else { "┣" }, child);
+                print_tree(deep + 1, *child, hierarchy)
             }
         }
+        println!("{:?}", ROOT_ID);
+        print_tree(0, ROOT_ID, &self.hierarchy);
     }
 
     pub fn handle_event<T>(&mut self, event: &Event<T>) -> bool {
@@ -382,6 +406,14 @@ impl<R: GUIRender> GUI<R> {
                                 ElementState::Released => MouseEvent::Up,
                             };
                             self.send_mouse_event_to(curr, event);
+                            return true;
+                        }
+                    }
+                }
+                WindowEvent::CursorLeft { .. } => {
+                    if let Some(curr) = self.current_over.take() {
+                        if self.listen_mouse(curr) && !self.over_is_locked {
+                            self.send_mouse_event_to(curr, MouseEvent::Exit);
                             return true;
                         }
                     }
@@ -464,8 +496,8 @@ impl<R: GUIRender> GUI<R> {
                         + size[i % 2] * self.widgets[child.index].rect.anchors[i]
                         + self.widgets[child.index].rect.margins[i];
                 }
-                parents.push(*child);
             }
+            parents.extend(self.hierarchy.get_childs(parent).iter().rev());
         }
     }
 }

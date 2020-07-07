@@ -146,9 +146,7 @@ impl<'a> GUISpriteRender {
                     }
                 }
             }
-            for child in gui.get_childs(parent) {
-                parents.push(child);
-            }
+            parents.extend(gui.get_childs(parent).iter().rev())
         }
     }
 

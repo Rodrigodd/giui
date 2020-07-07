@@ -329,7 +329,6 @@ impl Behaviour for TabButton {
             event_handler.send_event(event::Redraw);
             self.selected = false;
         } else if event.is::<Selected>() {
-            println!("receiving Selected");
             let graphic = widgets.get_graphic(this).unwrap();
             graphic.set_color([255, 255, 255, 255]);
             event_handler.send_event(event::Redraw);
@@ -381,6 +380,62 @@ impl Behaviour for TabButton {
                 }
             }
             MouseEvent::Moved { .. } => {}
+        }
+    }
+}
+
+pub struct Hoverable {
+    is_over: bool,
+    hover: Id,
+}
+impl Hoverable {
+    pub fn new(hover: Id) -> Self {
+        Self {
+            is_over: false,
+            hover,
+        }
+    }
+}
+impl Behaviour for Hoverable {
+    fn listen_mouse(&self) -> bool {
+        true
+    }
+
+    fn on_start(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+        widgets.deactive(self.hover);
+    }
+
+    fn on_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+        match event {
+            MouseEvent::Enter => {
+                widgets.active(self.hover);
+                widgets.move_to_front(self.hover);
+                self.is_over = true;
+            }
+            MouseEvent::Exit => {
+                widgets.deactive(self.hover);
+                self.is_over = false;
+            }
+            MouseEvent::Down => {}
+            MouseEvent::Up => {}
+            MouseEvent::Moved { x, y } => {
+                if self.is_over {
+                    // TODO: this may be buggy, if the layout has not updated yet
+                    let (width, heigth) = widgets.get_rect(crate::ROOT_ID).get_size();
+                    let rect = widgets.get_rect(self.hover);
+                    let x = x / width;
+                    let y = y / heigth;
+                    rect.anchors = [x, y, x, y];
+                    event_handler.send_event(event::InvalidadeLayout);
+                    event_handler.send_event(event::Redraw);
+                }
+            }
         }
     }
 }
