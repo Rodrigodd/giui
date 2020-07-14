@@ -41,6 +41,7 @@ impl<'a> GUISpriteRender {
         let id = GraphicId::Text {
             index: self.texts.len(),
             color: text.color,
+            text: text.text.clone(),
         };
         self.texts.push(text);
         id
@@ -72,9 +73,10 @@ impl<'a> GUISpriteRender {
                             .sprites
                             .extend(render.painels[index].get_sprites().iter().cloned());
                     }
-                    GraphicId::Text { index, color } => {
+                    GraphicId::Text { index, color, text } => {
                         use std::cmp::Ordering;
                         let render: &mut GUISpriteRender = gui.render();
+                        let string: &str = &text;
                         let text = &render.texts[index];
                         let layout = {
                             let hor = match text.align.0.cmp(&0) {
@@ -102,7 +104,6 @@ impl<'a> GUISpriteRender {
                             };
                             (x, y)
                         };
-                        let string: &str = &text.text;
                         let color = [
                             color[0] as f32 / 255.0,
                             color[1] as f32 / 255.0,
@@ -158,7 +159,7 @@ impl<'a> GUISpriteRender {
 #[derive(Clone)]
 pub enum GraphicId {
     Panel { index: usize, color: [u8; 4] },
-    Text { index: usize, color: [u8; 4] },
+    Text { index: usize, color: [u8; 4], text: String },
 }
 impl GraphicId {
     pub fn set_color(&mut self, new_color: [u8; 4]) {
@@ -179,6 +180,11 @@ impl GraphicId {
             GraphicId::Text { ref mut color, .. } => {
                 color[3] = new_alpha;
             }
+        }
+    }
+    pub fn set_text(&mut self, new_text: &str) {
+        if let GraphicId::Text { ref mut text, .. } = self {
+            *text = new_text.to_owned();
         }
     }
 }
@@ -284,9 +290,11 @@ impl Text {
     pub fn set_color(&mut self, color: [u8; 4]) {
         self.color = color;
     }
-
     pub fn set_scale(&mut self, scale: f32) {
         self.scale = scale;
+    }
+    pub fn set_text(&mut self, text: &str) {
+        self.text = text.to_string();
     }
 }
 

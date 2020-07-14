@@ -261,7 +261,7 @@ impl Behaviour for TabGroup {
 
     fn on_event(
         &mut self,
-        event: Box<dyn Any>,
+        event: &dyn Any,
         _this: Id,
         widgets: &mut Widgets,
         event_handler: &mut EventHandler,
@@ -318,7 +318,7 @@ impl Behaviour for TabButton {
 
     fn on_event(
         &mut self,
-        event: Box<dyn Any>,
+        event: &dyn Any,
         this: Id,
         widgets: &mut Widgets,
         event_handler: &mut EventHandler,
@@ -386,13 +386,17 @@ impl Behaviour for TabButton {
 
 pub struct Hoverable {
     is_over: bool,
+    text: String,
     hover: Id,
+    label: Id,
 }
 impl Hoverable {
-    pub fn new(hover: Id) -> Self {
+    pub fn new(hover: Id, label: Id, text: String) -> Self {
         Self {
             is_over: false,
+            text,
             hover,
+            label,
         }
     }
 }
@@ -401,20 +405,21 @@ impl Behaviour for Hoverable {
         true
     }
 
-    fn on_start(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+    fn on_start(&mut self, _this: Id, widgets: &mut Widgets, _event_handler: &mut EventHandler) {
         widgets.deactive(self.hover);
     }
 
     fn on_mouse_event(
         &mut self,
         event: MouseEvent,
-        this: Id,
+        _this: Id,
         widgets: &mut Widgets,
         event_handler: &mut EventHandler,
     ) {
         match event {
             MouseEvent::Enter => {
                 widgets.active(self.hover);
+                widgets.get_graphic(self.label).unwrap().set_text(&self.text);
                 widgets.move_to_front(self.hover);
                 self.is_over = true;
             }
