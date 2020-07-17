@@ -1,5 +1,5 @@
 use crate::{render::GraphicId, GUIRender};
-use std::any::{Any, TypeId};
+use std::any::Any;
 use std::collections::VecDeque;
 use winit::event::{ElementState, Event, WindowEvent};
 
@@ -105,6 +105,7 @@ pub struct WidgetBuilder<'a, R: GUIRender> {
     rect: Rect,
     graphic: Option<GraphicId>,
     behaviours: Vec<Box<dyn Behaviour>>,
+    layout: Option<Box<dyn Layout>>,
     parent: Option<Id>,
 }
 impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
@@ -115,6 +116,7 @@ impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
             rect: Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]),
             graphic: None,
             behaviours: Vec::new(),
+            layout: None,
             parent: None,
         }
     }
@@ -126,9 +128,33 @@ impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
         self.rect.margins = margins;
         self
     }
+    pub fn with_min_size(mut self, min_size: [f32; 2]) -> Self {
+        self.rect.min_size = min_size;
+        self
+    }
+    pub fn with_fill_x(mut self, fill: RectFill) -> Self {
+        self.rect.set_fill_x(fill);
+        self
+    }
+    pub fn with_fill_y(mut self, fill: RectFill) -> Self {
+        self.rect.set_fill_y(fill);
+        self
+    }
+    pub fn with_expand_x(mut self, expand: bool) -> Self {
+        self.rect.expand_x = expand;
+        self
+    }
+    pub fn with_expand_y(mut self, expand: bool) -> Self {
+        self.rect.expand_y = expand;
+        self
+    }
     pub fn with_behaviour(mut self, behaviour: Box<dyn Behaviour>) -> Self {
         self.listen_mouse = self.listen_mouse || behaviour.listen_mouse();
         self.behaviours.push(behaviour);
+        self
+    }
+    pub fn with_layout(mut self, layout: Box<dyn Layout>) -> Self {
+        self.layout = Some(layout);
         self
     }
     pub fn with_graphic(mut self, graphic: Option<GraphicId>) -> Self {
@@ -146,6 +172,7 @@ impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
             rect,
             graphic,
             behaviours,
+            layout,
             parent,
         } = self;
         gui.add_widget(
@@ -153,6 +180,7 @@ impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
                 listen_mouse,
                 rect,
                 graphic,
+                layout,
                 behaviours,
             },
             parent,
@@ -164,6 +192,7 @@ pub struct Widget {
     listen_mouse: bool,
     rect: Rect,
     graphic: Option<GraphicId>,
+    layout: Option<Box<dyn Layout>>,
     behaviours: Vec<Box<dyn Behaviour>>,
 }
 impl Widget {
@@ -173,6 +202,7 @@ impl Widget {
             listen_mouse: false,
             rect,
             graphic,
+            layout: None,
             behaviours: Vec::new(),
         }
     }
@@ -188,6 +218,12 @@ impl Widget {
         self.listen_mouse = self.listen_mouse || behaviour.listen_mouse();
         self.behaviours.push(behaviour);
     }
+
+    /// add one more behaviour to the widget
+    pub fn with_layout(mut self, layout: Box<dyn Layout>) -> Self {
+        self.layout = Some(layout);
+        self
+    }
 }
 
 // contains a reference to all the widgets, except the behaviour of one widget
@@ -197,14 +233,32 @@ pub struct Widgets<'a> {
     events: Vec<Box<dyn Any>>,
 }
 impl<'a> Widgets<'a> {
-    pub fn new(
+    pub fn new_with_mut_layout(
+        this: Id,
+        widgets: &'a mut [Widget],
+        hierarchy: &'a mut Hierarchy,
+    ) -> Option<(&'a mut dyn Layout, Self)> {
+        let this_one =
+            unsafe { &mut *(widgets[this.index].layout.as_mut()?.as_mut() as *mut dyn Layout) };
+        Some((
+            this_one,
+            Self {
+                widgets,
+                hierarchy,
+                events: Vec::new(),
+            },
+        ))
+    }
+
+    pub fn new_with_mut_behaviour(
         this: Id,
         index: usize,
         widgets: &'a mut [Widget],
         hierarchy: &'a mut Hierarchy,
     ) -> Option<(&'a mut dyn Behaviour, Self)> {
-        let this_one =
-            unsafe { &mut *(widgets[this.index].behaviours[index].as_mut() as *mut dyn Behaviour) };
+        let this_one = unsafe {
+            &mut *(widgets[this.index].behaviours.get_mut(index)?.as_mut() as *mut dyn Behaviour)
+        };
         Some((
             this_one,
             Self {
@@ -239,6 +293,10 @@ impl<'a> Widgets<'a> {
         self.hierarchy.move_to_front(id);
         self.events.push(Box::new(event::InvalidadeLayout));
         self.events.push(Box::new(event::Redraw));
+    }
+
+    pub fn get_children(&mut self, id: Id) -> Vec<Id> {
+        self.hierarchy.get_childs(id)
     }
 }
 
@@ -278,9 +336,17 @@ impl<R: GUIRender> GUI<R> {
                 rect: Rect {
                     anchors: [0.0; 4],
                     margins: [0.0; 4],
+                    min_size: [width, height],
                     rect: [0.0, 0.0, width, height],
+                    expand_x: false,
+                    expand_y: false,
+                    fill_x: RectFill::Fill,
+                    fill_y: RectFill::Fill,
+                    ratio_x: 0.0,
+                    ratio_y: 0.0,
                 },
                 graphic: None,
+                layout: None,
                 behaviours: Vec::new(),
             }],
             hierarchy: Hierarchy::default(),
@@ -364,7 +430,7 @@ impl<R: GUIRender> GUI<R> {
     ) {
         for index in 0..self.widgets[id.index].behaviours.len() {
             if let Some((this, mut widgets)) =
-                Widgets::new(id, index, &mut self.widgets, &mut self.hierarchy)
+                Widgets::new_with_mut_behaviour(id, index, &mut self.widgets, &mut self.hierarchy)
             {
                 let mut event_handler = EventHandler::new();
                 event(this, id, &mut widgets, &mut event_handler);
@@ -375,11 +441,13 @@ impl<R: GUIRender> GUI<R> {
                 let mut event_queue = VecDeque::from(events_to);
                 while let Some((id, event)) = event_queue.pop_back() {
                     for index in 0..self.widgets[id.index].behaviours.len() {
-                        if let Some((this, mut widgets)) =
-                            Widgets::new(id, index, &mut self.widgets, &mut self.hierarchy)
-                        {
+                        if let Some((this, mut widgets)) = Widgets::new_with_mut_behaviour(
+                            id,
+                            index,
+                            &mut self.widgets,
+                            &mut self.hierarchy,
+                        ) {
                             let mut event_handler = EventHandler::new();
-                            println!("calling");
                             this.on_event(event.as_ref(), id, &mut widgets, &mut event_handler);
                             let EventHandler { events, events_to } = event_handler;
                             for event in events.into_iter().chain(widgets.events.into_iter()) {
@@ -503,23 +571,53 @@ impl<R: GUIRender> GUI<R> {
 
     pub fn update_layouts(&mut self, id: Id) {
         let mut parents = vec![id];
+        let mut i = 0;
+        // post order traversal
+        while i != parents.len() {
+            parents.extend(self.hierarchy.get_childs(parents[i]).iter().rev());
+            i += 1;
+        }
         while let Some(parent) = parents.pop() {
-            for child in &self.hierarchy.get_childs(parent) {
-                let size = self.widgets[parent.index].rect.get_size();
-                let size = [size.0, size.1];
-                let pos: [f32; 2] = [
-                    self.widgets[parent.index].rect.rect[0],
-                    self.widgets[parent.index].rect.rect[1],
-                ];
-                for i in 0..4 {
-                    self.widgets[child.index].rect.rect[i] = pos[i % 2]
-                        + size[i % 2] * self.widgets[child.index].rect.anchors[i]
-                        + self.widgets[child.index].rect.margins[i];
+            if let Some((layout, mut widgets)) =
+                Widgets::new_with_mut_layout(parent, &mut self.widgets, &mut self.hierarchy)
+            {
+                layout.compute_min_size(parent, &mut widgets);
+            }
+        }
+
+        // inorder traversal
+        parents.push(id);
+        while let Some(parent) = parents.pop() {
+            if let Some((layout, mut widgets)) =
+                Widgets::new_with_mut_layout(parent, &mut self.widgets, &mut self.hierarchy)
+            {
+                layout.update_layouts(parent, &mut widgets);
+            } else {
+                for child in &self.hierarchy.get_childs(parent) {
+                    let size = self.widgets[parent.index].rect.get_size();
+                    let size = [size.0, size.1];
+                    let pos: [f32; 2] = [
+                        self.widgets[parent.index].rect.rect[0],
+                        self.widgets[parent.index].rect.rect[1],
+                    ];
+                    for i in 0..4 {
+                        self.widgets[child.index].rect.rect[i] = pos[i % 2]
+                            + size[i % 2] * self.widgets[child.index].rect.anchors[i]
+                            + self.widgets[child.index].rect.margins[i];
+                    }
                 }
             }
             parents.extend(self.hierarchy.get_childs(parent).iter().rev());
         }
     }
+}
+
+#[derive(Copy, Clone)]
+pub enum RectFill {
+    Fill,
+    ShrinkStart,
+    ShrinkCenter,
+    ShrinkEnd,
 }
 
 /// The basic component of a UI element.
@@ -533,15 +631,108 @@ impl<R: GUIRender> GUI<R> {
 pub struct Rect {
     pub anchors: [f32; 4],
     pub margins: [f32; 4],
-    rect: [f32; 4],
+    pub min_size: [f32; 2],
+    pub rect: [f32; 4],
+    expand_x: bool,
+    expand_y: bool,
+    fill_x: RectFill,
+    fill_y: RectFill,
+    pub ratio_x: f32,
+    pub ratio_y: f32,
 }
 impl Rect {
     pub fn new(anchors: [f32; 4], margins: [f32; 4]) -> Self {
         Self {
             anchors,
             margins,
+            min_size: [0.0; 2],
             rect: [0.0; 4],
+            expand_x: false,
+            expand_y: false,
+            fill_x: RectFill::Fill,
+            fill_y: RectFill::Fill,
+            ratio_x: 1.0,
+            ratio_y: 1.0,
         }
+    }
+
+    /// Set the designed area for this rect. This rect will decide its own size,
+    /// based on its size flags and the designed area.
+    pub fn set_designed_rect(&mut self, rect: [f32; 4]) {
+        if rect[2] - rect[0] <= self.min_size[0] {
+            self.rect[0] = rect[0];
+            self.rect[2] = rect[0] + self.min_size[0];
+        } else {
+            match self.fill_x {
+                RectFill::Fill => {
+                    self.rect[0] = rect[0];
+                    self.rect[2] = rect[2];
+                }
+                RectFill::ShrinkStart => {
+                    self.rect[0] = rect[0];
+                    self.rect[2] = rect[0] + self.min_size[0];
+                }
+                RectFill::ShrinkCenter => {
+                    let x = (rect[2] - rect[0] - self.min_size[0]) / 2.0;
+                    self.rect[0] = rect[0] + x;
+                    self.rect[2] = rect[2] - x;
+                }
+                RectFill::ShrinkEnd => {
+                    self.rect[0] = rect[2] - self.min_size[0];
+                    self.rect[2] = rect[2];
+                }
+            }
+        }
+
+        if rect[3] - rect[1] <= self.min_size[1] {
+            self.rect[1] = rect[1];
+            self.rect[3] = rect[1] + self.min_size[1];
+        } else {
+            match self.fill_y {
+                RectFill::Fill => {
+                    self.rect[1] = rect[1];
+                    self.rect[3] = rect[3];
+                }
+                RectFill::ShrinkStart => {
+                    self.rect[1] = rect[1];
+                    self.rect[3] = rect[1] + self.min_size[1];
+                }
+                RectFill::ShrinkCenter => {
+                    let x = (rect[3] - rect[1] - self.min_size[1]) / 2.0;
+                    self.rect[1] = rect[1] + x;
+                    self.rect[3] = rect[3] - x;
+                }
+                RectFill::ShrinkEnd => {
+                    self.rect[1] = rect[3] - self.min_size[1];
+                    self.rect[3] = rect[3];
+                }
+            }
+        }
+    }
+
+    pub fn set_fill_x(&mut self, fill: RectFill) {
+        self.fill_x = fill;
+    }
+
+    pub fn set_fill_y(&mut self, fill: RectFill) {
+        self.fill_y = fill;
+    }
+
+    #[inline]
+    pub fn set_min_size(&mut self, min_size: [f32; 2]) {
+        self.min_size = min_size;
+    }
+
+    /// Return true if this have the size_flag::EXPAND_X flag.
+    #[inline]
+    pub fn is_expand_x(&mut self) -> bool {
+        self.expand_x
+    }
+
+    /// Return true if this have the size_flag::EXPAND_Y flag.
+    #[inline]
+    pub fn is_expand_y(&mut self) -> bool {
+        self.expand_y
     }
 
     #[inline]
@@ -568,6 +759,11 @@ impl Rect {
     }
 
     #[inline]
+    pub fn get_height(&self) -> f32 {
+        self.rect[3] - self.rect[1]
+    }
+
+    #[inline]
     pub fn get_size(&self) -> (f32, f32) {
         (self.rect[2] - self.rect[0], self.rect[3] - self.rect[1])
     }
@@ -584,11 +780,7 @@ impl Rect {
 }
 
 #[allow(unused_variables)]
-pub trait Behaviour: 'static {
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Self>()
-    }
-
+pub trait Behaviour {
     fn listen_mouse(&self) -> bool;
 
     fn on_start(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {}
@@ -611,12 +803,12 @@ pub trait Behaviour: 'static {
     ) {
     }
 }
-impl dyn Behaviour {
-    pub fn downcast_mut<T: Behaviour>(&mut self) -> Option<&mut T> {
-        if <dyn Behaviour>::type_id(self) == TypeId::of::<T>() {
-            Some(unsafe { &mut *(self as *mut dyn Behaviour as *mut T) })
-        } else {
-            None
-        }
-    }
+
+#[allow(unused_variables)]
+pub trait Layout {
+    /// Cmpute its own min size, based on the min size of its children.
+    fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets);
+
+    /// Update the position and size of its children.
+    fn update_layouts(&mut self, this: Id, widgets: &mut Widgets);
 }

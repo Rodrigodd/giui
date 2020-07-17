@@ -4,7 +4,8 @@ use ui_engine::render::{GUISpriteRender, GraphicId, Painel, Text};
 use ui_engine::{
     event as ui_event,
     widgets::{Button, Hoverable, Slider, TabButton, TabGroup, Toggle},
-    GUIRender, Rect, Widget, GUI,
+    layouts::{VBoxLayout, GridLayout},
+    GUIRender, Rect, Widget, GUI, Id, RectFill
 };
 use winit::{
     dpi::PhysicalSize,
@@ -60,17 +61,15 @@ fn main() {
             .with_margins([3.0, 6.0, 93.0, 24.0])
             .with_graphic(Some(graphic))
             .build();
-        let graphic = Some(
-            gui.render().add_text(
-                Text::new("This is a Hover".to_owned(), 12.0, (0, 0))
-                    .with_color([255, 255, 255, 255]),
-            ),
-        );
-        let label = gui.create_widget()
+        let graphic = Some(gui.render().add_text(
+            Text::new("This is a Hover".to_owned(), 12.0, (0, 0)).with_color([255, 255, 255, 255]),
+        ));
+        let label = gui
+            .create_widget()
             .with_graphic(graphic)
             .with_parent(Some(hover))
             .build();
-        
+
         (hover, label)
     };
     let page_1 = gui.create_widget().with_parent(Some(page_area)).build();
@@ -80,6 +79,7 @@ fn main() {
             .with_anchors([0.0, 0.0, 0.0, 1.0])
             .with_margins([10.0, 0.0, 190.0, -10.0])
             .with_graphic(graphic)
+            .with_layout(Box::new(VBoxLayout::new(5.0, [5.0, 5.0, 5.0, 5.0], -1)))
             .with_parent(Some(page_1))
             .build()
     };
@@ -146,12 +146,18 @@ fn main() {
             gui.render()
                 .add_painel(painel.clone().with_color([200, 200, 200, 255])),
         );
-        let button = gui.create_widget()
-            .with_anchors([0.0, 0.0, 1.0, 0.0])
-            .with_margins([5.0, 5.0, -5.0, 35.0])
+        let button = gui
+            .create_widget()
+            // .with_anchors([0.0, 0.0, 1.0, 0.0])
+            // .with_margins([5.0, 5.0, -5.0, 35.0])
+            .with_min_size([0.0, 30.0])
             .with_graphic(graphic)
             .with_behaviour(Box::new(Button::new()))
-            .with_behaviour(Box::new(Hoverable::new(hover, hover_label, "This is a button".to_owned())))
+            .with_behaviour(Box::new(Hoverable::new(
+                hover,
+                hover_label,
+                "This is a button".to_owned(),
+            )))
             .with_parent(Some(menu))
             .build();
         let graphic = Some(gui.render().add_text(
@@ -167,16 +173,13 @@ fn main() {
         button
     };
     let my_slider = {
-        let slider = {
-            let graphic = None;
-            gui.add_widget(
-                Widget::new(
-                    Rect::new([0.0, 0.0, 1.0, 0.0], [5.0, 40.0, -5.0, 75.0]),
-                    graphic,
-                ),
-                Some(menu),
-            )
-        };
+        let slider = gui
+            .create_widget()
+            // .with_anchors([0.0, 0.0, 1.0, 0.0])
+            // .with_margins([5.0, 40.0, -5.0, 75.0])
+            .with_min_size([0.0, 30.0])
+            .with_parent(Some(menu))
+            .build();
         let slide_area = {
             let graphic = Some(
                 gui.render()
@@ -210,13 +213,13 @@ fn main() {
         slider
     };
     let my_toggle = {
-        let toggle = gui.add_widget(
-            Widget::new(
-                Rect::new([0.0, 0.0, 1.0, 0.0], [5.0, 80.0, -5.0, 115.0]),
-                None,
-            ),
-            Some(menu),
-        );
+        let toggle = gui
+            .create_widget()
+            // .with_anchors([0.0, 0.0, 1.0, 0.0])
+            // .with_margins([5.0, 80.0, -5.0, 115.0])
+            .with_min_size([0.0, 30.0])
+            .with_parent(Some(menu))
+            .build();
 
         let background = {
             let graphic = Some(
@@ -256,19 +259,95 @@ fn main() {
                 .with_margins([10.0, 0.0, -10.0, -10.0])
                 .with_graphic(Some(graphic))
                 .with_parent(Some(page_area))
+                .with_layout(Box::new(GridLayout::new([10.0, 15.0], [10.0, 10.0, 10.0, 10.0], 3)))
                 .build();
 
-            let graphic = gui
-                .render()
-                .add_painel(painel.clone().with_color([200, 200, 200, 255]));
+            let create_vbox = |gui: &mut GUI<GUISpriteRender>, expand: [bool; 2], aling: i8| {
+                let graphic = gui
+                    .render()
+                    .add_painel(painel.clone().with_color([100, 100, 100, 255]));
+                gui
+                    .create_widget()
+                    .with_parent(Some(page_2))
+                    .with_expand_x(expand[0])
+                    .with_expand_y(expand[1])
+                    .with_graphic(Some(graphic))
+                    .with_layout(Box::new(VBoxLayout::new(5.0, [0.0, 0.0, 0.0, 0.0], aling)))
+                    .build()
+            };
 
-            gui.create_widget()
-                .with_anchors([0.0, 0.0, 0.0, 0.0])
-                .with_margins([10.0, 10.0, 90.0, 50.0])
-                .with_graphic(Some(graphic))
-                .with_behaviour(Box::new(Hoverable::new(hover, hover_label, "This is a example Hover".to_owned())))
-                .with_parent(Some(page_2))
-                .build();
+            let create_rect = |gui: &mut GUI<GUISpriteRender>, min_size: [f32; 2], expand: [bool; 2], fill: [RectFill; 2], parent: Id| {
+                let graphic = gui
+                    .render()
+                    .add_painel(painel.clone().with_color([200, 200, 200, 255]));
+
+                let rect = gui.create_widget()
+                    .with_min_size(min_size)
+                    .with_fill_x(fill[0])
+                    .with_fill_y(fill[1])
+                    .with_expand_x(expand[0])
+                    .with_expand_y(expand[1])
+                    .with_graphic(Some(graphic))
+                    .with_behaviour(Box::new(Hoverable::new(
+                        hover,
+                        hover_label,
+                        "1: 30x30".to_owned(),
+                    )))
+                    .with_parent(Some(parent))
+                    .build();
+                let graphic = Some(
+                    gui.render().add_text(
+                        Text::new(format!("{}x{}", min_size[0], min_size[1]), 12.0, (0, 0))
+                            .with_color([40, 40, 100, 255]),
+                    ),
+                );
+                gui.add_widget(
+                    Widget::new(
+                        Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]),
+                        graphic,
+                    ),
+                    Some(rect),
+                );
+                rect
+            };
+
+            {
+                let vbox = create_vbox(&mut gui, [true, true], -1);
+                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
+                create_rect(&mut gui, [75.0, 50.0], [true, true], [RectFill::Fill, RectFill::Fill], vbox);
+                create_rect(&mut gui, [50.0, 75.0], [true, true], [RectFill::Fill, RectFill::Fill], vbox);
+            }
+            {
+                let vbox = create_vbox(&mut gui, [false, true], 0);
+                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
+                create_rect(&mut gui, [75.0, 50.0], [false, false], [RectFill::ShrinkCenter, RectFill::Fill], vbox);
+                create_rect(&mut gui, [50.0, 75.0], [false, false], [RectFill::ShrinkEnd, RectFill::Fill], vbox);
+            }
+            {
+                let vbox = create_vbox(&mut gui, [false, false], 1);
+                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
+                create_rect(&mut gui, [75.0, 50.0], [false, false], [RectFill::ShrinkCenter, RectFill::Fill], vbox);
+                create_rect(&mut gui, [50.0, 75.0], [false, false], [RectFill::ShrinkEnd, RectFill::Fill], vbox);
+            }
+            
+            {
+                let vbox = create_vbox(&mut gui, [true, false], -1);
+                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
+                create_rect(&mut gui, [75.0, 50.0], [false, false], [RectFill::ShrinkCenter, RectFill::Fill], vbox);
+                create_rect(&mut gui, [50.0, 75.0], [false, false], [RectFill::ShrinkEnd, RectFill::Fill], vbox);
+            }
+            {
+                let vbox = create_vbox(&mut gui, [false, false], 0);
+                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
+                create_rect(&mut gui, [75.0, 50.0], [false, false], [RectFill::ShrinkCenter, RectFill::Fill], vbox);
+                create_rect(&mut gui, [50.0, 75.0], [false, false], [RectFill::ShrinkEnd, RectFill::Fill], vbox);
+            }
+            {
+                let vbox = create_vbox(&mut gui, [false, false], 1);
+                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
+                create_rect(&mut gui, [75.0, 50.0], [false, false], [RectFill::ShrinkCenter, RectFill::Fill], vbox);
+                create_rect(&mut gui, [50.0, 75.0], [false, false], [RectFill::ShrinkEnd, RectFill::Fill], vbox);
+            }
 
             page_2
         };
@@ -302,7 +381,8 @@ fn main() {
                     Widget::new(
                         Rect::new([x, 0.0, x + 1.0 / total as f32, 1.0], [5.0, 0.0, 0.0, 0.0]),
                         graphic,
-                    ).with_behaviour(Box::new(TabButton::new(header))),
+                    )
+                    .with_behaviour(Box::new(TabButton::new(header))),
                     Some(header),
                 );
                 let graphic = Some(
