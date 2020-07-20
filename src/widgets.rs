@@ -61,7 +61,7 @@ impl Behaviour for Button {
 
 pub struct Slider {
     handle: Id,
-    slide_area: Id,
+    slide_area: Id, //TODO: I should remove this slide_area
     dragging: bool,
     mouse_x: f32,
     min_value: f32,

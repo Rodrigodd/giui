@@ -1,53 +1,29 @@
 use super::GUI;
-use glyph_brush::{ab_glyph::*, *};
+use glyph_brush_draw_cache::{
+    DrawCache, DrawCacheBuilder,
+    ab_glyph::{FontArc, Font, PxScale},
+};
+use glyph_brush_layout::{ab_glyph::*, *};
 use sprite_render::{Camera, Renderer, SpriteInstance, SpriteRender};
+use std::cmp::Ordering;
 
 pub trait GUIRender: 'static {}
 
 pub struct GUISpriteRender {
-    painels: Vec<Painel>,
-    texts: Vec<Text>,
-    glyph_brush: GlyphBrush<SpriteInstance, Extra, FontVec>,
+    draw_cache: DrawCache,
     font_texture: u32,
     sprites: Vec<SpriteInstance>,
 }
 impl GUIRender for GUISpriteRender {}
 impl<'a> GUISpriteRender {
-    pub fn new(fonts: Vec<Vec<u8>>, font_texture: u32) -> Self {
-        let fonts = fonts
-            .into_iter()
-            .map(|font| FontVec::try_from_vec(font).unwrap())
-            .collect();
-        let mut glyph_brush = GlyphBrushBuilder::using_fonts(fonts).build();
-        glyph_brush.resize_texture(1024, 1024);
+    pub fn new(font_texture: u32) -> Self {
+        //TODO: change this to default dimensions, and allow resizing
+        let draw_cache = DrawCacheBuilder::default().dimensions(1024, 1024).build();
         Self {
-            painels: Vec::new(),
-            texts: Vec::new(),
-            glyph_brush,
+            draw_cache,
             font_texture,
             sprites: Vec::new(),
         }
-    }
-
-    pub fn add_painel(&mut self, painel: Painel) -> GraphicId {
-        let id = GraphicId::Panel {
-            index: self.painels.len(),
-            color: painel.sprites[0].color,
-        };
-        self.painels.push(painel);
-        id
-    }
-    pub fn add_text(&mut self, text: Text) -> GraphicId {
-        let id = GraphicId::Text {
-            index: self.texts.len(),
-            color: text.color,
-            text: text.text.clone(),
-        };
-        self.texts.push(text);
-        id
-    }
-    pub fn get_text(&mut self, index: usize) -> &mut Text {
-        &mut self.texts[index]
     }
 
     pub fn prepare_render(gui: &mut GUI<Self>, renderer: &mut dyn SpriteRender) {
@@ -62,88 +38,115 @@ impl<'a> GUISpriteRender {
                 let center = rect.get_center();
                 let mut size = rect.get_size();
                 let rect = *rect.get_rect();
+                let bounds = Rect {
+                    min: Point { x: rect[0], y: rect[1] },
+                    max: Point { x: rect[2], y: rect[3] },
+                };
                 size.0 = size.0.max(0.0);
                 size.1 = size.1.max(0.0);
                 match graphic {
-                    GraphicId::Panel { index, color } => {
+                    Graphic::Panel {
+                        texture,
+                        uv_rect,
+                        color,
+                        border,
+                    } => {
                         let render = gui.render();
-                        render.painels[index].set_rect(&rect);
-                        render.painels[index].set_color(color);
+                        let mut painel = Painel::new(texture, uv_rect, border);
+                        painel.set_rect(&rect);
+                        painel.set_color(color);
                         render
                             .sprites
-                            .extend(render.painels[index].get_sprites().iter().cloned());
+                            .extend(painel.get_sprites().iter().cloned());
                     }
-                    GraphicId::Text { index, color, text } => {
-                        use std::cmp::Ordering;
+                    Graphic::Text {
+                        color,
+                        text,
+                        font_size,
+                        align
+                    } => {
+                        let fonts = gui.get_fonts();
                         let render: &mut GUISpriteRender = gui.render();
-                        let string: &str = &text;
-                        let text = &render.texts[index];
                         let layout = {
-                            let hor = match text.align.0.cmp(&0) {
+                            let hor = match align.0.cmp(&0) {
                                 Ordering::Less => HorizontalAlign::Left,
                                 Ordering::Equal => HorizontalAlign::Center,
                                 Ordering::Greater => HorizontalAlign::Right,
                             };
-                            let vert = match text.align.1.cmp(&0) {
+                            let vert = match align.1.cmp(&0) {
                                 Ordering::Less => VerticalAlign::Top,
                                 Ordering::Equal => VerticalAlign::Center,
                                 Ordering::Greater => VerticalAlign::Bottom,
                             };
                             Layout::default().h_align(hor).v_align(vert)
                         };
-                        let pos = {
-                            let x = match text.align.0.cmp(&0) {
+                        let screen_position = {
+                            let x = match align.0.cmp(&0) {
                                 Ordering::Less => pos.0,
                                 Ordering::Equal => center.0,
                                 Ordering::Greater => pos.0 + size.0,
                             };
-                            let y = match text.align.1.cmp(&0) {
+                            let y = match align.1.cmp(&0) {
                                 Ordering::Less => pos.1,
                                 Ordering::Equal => center.1,
                                 Ordering::Greater => pos.1 + size.1,
                             };
                             (x, y)
                         };
-                        let color = [
-                            color[0] as f32 / 255.0,
-                            color[1] as f32 / 255.0,
-                            color[2] as f32 / 255.0,
-                            color[3] as f32 / 255.0,
-                        ];
-                        let base_text = glyph_brush::Text::new(string)
-                            .with_scale(text.scale)
-                            .with_color(color);
-                        render.glyph_brush.queue(
-                            Section::default()
-                                .add_text(base_text)
-                                .with_screen_position(pos)
-                                .with_bounds(size)
-                                .with_layout(layout),
-                        );
-                        let texture = render.font_texture;
-                        let brush_action = render.glyph_brush.process_queued(
-                            |rect, tex_data| {
-                                let mut data = Vec::with_capacity(tex_data.len() * 4);
-                                for byte in tex_data.iter() {
-                                    data.push(255);
-                                    data.push(255);
-                                    data.push(255);
-                                    data.push(*byte);
-                                }
-                                renderer.update_texture(
-                                    texture,
-                                    &data,
-                                    Some([rect.min[0], rect.min[1], rect.width(), rect.height()]),
-                                );
+
+                        let glyphs = layout.calculate_glyphs(
+                            &fonts,
+                            &SectionGeometry {
+                                screen_position,
+                                bounds: size,
                             },
-                            to_vertex,
+                            &[
+                                SectionText {
+                                    text: &text,
+                                    scale: PxScale::from(font_size),
+                                    font_id: FontId(0),
+                                },
+                            ],
                         );
-                        match brush_action.unwrap() {
-                            BrushAction::Draw(mut vertices) => {
-                                render.sprites.append(&mut vertices);
-                            }
-                            BrushAction::ReDraw => {}
+
+                        for glyph in &glyphs {
+                            render.draw_cache.queue_glyph(glyph.font_id.0, glyph.glyph.clone());
                         }
+                        let texture = render.font_texture;
+                        //TODO: I should queue all the glyphs, before calling cache_queued
+                        render.draw_cache.cache_queued(&fonts, |rect, tex_data| {
+                            let mut data = Vec::with_capacity(tex_data.len() * 4);
+                            for byte in tex_data.iter() {
+                                data.push(255);
+                                data.push(255);
+                                data.push(255);
+                                data.push(*byte);
+                            }
+                            renderer.update_texture(
+                                texture,
+                                &data,
+                                Some([rect.min[0], rect.min[1], rect.width(), rect.height()]),
+                            );
+                        }).unwrap();
+                        for glyph in &glyphs {
+                            if let Some((tex_coords, pixel_coords)) = render.draw_cache.rect_for(glyph.font_id.0, &glyph.glyph) {
+                                if pixel_coords.min.x as f32 > bounds.max.x
+                                    || pixel_coords.min.y as f32 > bounds.max.y
+                                    || bounds.min.x > pixel_coords.max.x as f32
+                                    || bounds.min.y > pixel_coords.max.y as f32
+                                {
+                                    // glyph is totally outside the bounds
+                                } else {
+                                    render.sprites.push(to_vertex(
+                                        tex_coords,
+                                        pixel_coords,
+                                        bounds,
+                                        color,
+                                    ));
+                                }
+                            }
+                        }
+                        
                     }
                 }
             }
@@ -157,34 +160,138 @@ impl<'a> GUISpriteRender {
 }
 
 #[derive(Clone)]
-pub enum GraphicId {
-    Panel { index: usize, color: [u8; 4] },
-    Text { index: usize, color: [u8; 4], text: String },
+pub enum Graphic {
+    Panel {
+        texture: u32,
+        uv_rect: [f32; 4],
+        color: [u8; 4],
+        border: f32,
+    },
+    Text {
+        color: [u8; 4],
+        text: String,
+        font_size: f32,
+        align: (i8, i8),
+    },
 }
-impl GraphicId {
-    pub fn set_color(&mut self, new_color: [u8; 4]) {
+impl Graphic {
+    pub fn with_color(mut self, new_color: [u8; 4]) -> Self {
         match self {
-            GraphicId::Panel { ref mut color, .. } => {
+            Graphic::Panel { ref mut color, .. } => {
                 *color = new_color;
             }
-            GraphicId::Text { ref mut color, .. } => {
+            Graphic::Text { ref mut color, .. } => {
+                *color = new_color;
+            }
+        }
+        self
+    }
+
+    pub fn set_color(&mut self, new_color: [u8; 4]) {
+        match self {
+            Graphic::Panel { ref mut color, .. } => {
+                *color = new_color;
+            }
+            Graphic::Text { ref mut color, .. } => {
                 *color = new_color;
             }
         }
     }
     pub fn set_alpha(&mut self, new_alpha: u8) {
         match self {
-            GraphicId::Panel { ref mut color, .. } => {
+            Graphic::Panel { ref mut color, .. } => {
                 color[3] = new_alpha;
             }
-            GraphicId::Text { ref mut color, .. } => {
+            Graphic::Text { ref mut color, .. } => {
                 color[3] = new_alpha;
             }
         }
     }
+
+    pub fn with_border(mut self, new_border: f32) -> Self {
+        match self {
+            Graphic::Panel { ref mut border, .. } => {
+                *border = new_border;
+            }
+            _ => {
+                panic!("call 'with_boder' in a non Graphic::Panel variant")
+            }
+        }
+        self
+    }
+
     pub fn set_text(&mut self, new_text: &str) {
-        if let GraphicId::Text { ref mut text, .. } = self {
+        if let Graphic::Text { ref mut text, .. } = self {
             *text = new_text.to_owned();
+        }
+    }
+
+    pub fn compute_min_size(&mut self, fonts: &[FontArc]) -> Option<[f32; 2]> {
+        if let Graphic::Text {
+            text,
+            font_size,
+            align,
+            ..
+        } = self {
+            let layout = {
+                let hor = match align.0.cmp(&0) {
+                    Ordering::Less => HorizontalAlign::Left,
+                    Ordering::Equal => HorizontalAlign::Center,
+                    Ordering::Greater => HorizontalAlign::Right,
+                };
+                let vert = match align.1.cmp(&0) {
+                    Ordering::Less => VerticalAlign::Top,
+                    Ordering::Equal => VerticalAlign::Center,
+                    Ordering::Greater => VerticalAlign::Bottom,
+                };
+                Layout::default().h_align(hor).v_align(vert)
+            };
+
+            let geometry = SectionGeometry::default();
+
+            let glyphs = layout.calculate_glyphs(
+                &fonts,
+                &geometry,
+                &[
+                    SectionText {
+                        text: &text,
+                        scale: PxScale::from(*font_size),
+                        font_id: FontId(0),
+                    },
+                ],
+            );
+
+            glyphs.iter()
+                .fold(None, |b: Option<Rect>, sg| {
+                    let sfont = fonts[sg.font_id.0].as_scaled(sg.glyph.scale);
+                    let pos = sg.glyph.position;
+                    let lbound = Rect {
+                        min: point(
+                            pos.x - sfont.h_side_bearing(sg.glyph.id),
+                            pos.y - sfont.ascent(),
+                        ),
+                        max: point(
+                            pos.x + sfont.h_advance(sg.glyph.id),
+                            pos.y - sfont.descent(),
+                        ),
+                    };
+                    b.map(|b| {
+                        let min_x = b.min.x.min(lbound.min.x);
+                        let max_x = b.max.x.max(lbound.max.x);
+                        let min_y = b.min.y.min(lbound.min.y);
+                        let max_y = b.max.y.max(lbound.max.y);
+                        Rect {
+                            min: point(min_x, min_y),
+                            max: point(max_x, max_y),
+                        }
+                    })
+                    .or_else(|| Some(lbound))
+                })
+                .map(|b| {
+                    [b.width(), b.height()]
+                })
+        } else {
+            None
         }
     }
 }
@@ -267,72 +374,68 @@ impl Painel {
     }
 }
 
-pub struct Text {
-    text: String,
-    scale: f32,
-    align: (i8, i8),
-    color: [u8; 4],
-}
-impl Text {
-    pub fn new(text: String, scale: f32, align: (i8, i8)) -> Self {
-        Self {
-            text,
-            scale,
-            align,
-            color: [0, 0, 0, 255],
-        }
-    }
+// pub struct Text {
+//     text: String,
+//     scale: f32,
+//     align: (i8, i8),
+//     color: [u8; 4],
+// }
+// impl Text {
+//     pub fn new(text: String, scale: f32, align: (i8, i8)) -> Self {
+//         Self {
+//             text,
+//             scale,
+//             align,
+//             color: [0, 0, 0, 255],
+//         }
+//     }
 
-    pub fn with_color(mut self, color: [u8; 4]) -> Self {
-        self.color = color;
-        self
-    }
-    pub fn set_color(&mut self, color: [u8; 4]) {
-        self.color = color;
-    }
-    pub fn set_scale(&mut self, scale: f32) {
-        self.scale = scale;
-    }
-    pub fn set_text(&mut self, text: &str) {
-        self.text = text.to_string();
-    }
-}
+//     pub fn with_color(mut self, color: [u8; 4]) -> Self {
+//         self.color = color;
+//         self
+//     }
+//     pub fn set_color(&mut self, color: [u8; 4]) {
+//         self.color = color;
+//     }
+//     pub fn set_scale(&mut self, scale: f32) {
+//         self.scale = scale;
+//     }
+//     pub fn set_text(&mut self, text: &str) {
+//         self.text = text.to_string();
+//     }
+// }
 
 #[inline]
 pub fn to_vertex(
-    glyph_brush::GlyphVertex {
-        mut tex_coords,
-        pixel_coords,
-        bounds,
-        extra,
-    }: glyph_brush::GlyphVertex,
+    mut tex_coords: Rect,
+    pixel_coords: Rect,
+    bounds: Rect,
+    color: [u8; 4],
 ) -> SpriteInstance {
-    let gl_bounds = bounds;
-
     let mut gl_rect = Rect {
         min: point(pixel_coords.min.x as f32, pixel_coords.min.y as f32),
         max: point(pixel_coords.max.x as f32, pixel_coords.max.y as f32),
     };
 
     // handle overlapping bounds, modify uv_rect to preserve texture aspect
-    if gl_rect.max.x > gl_bounds.max.x {
+    if gl_rect.max.x > bounds.max.x {
         let old_width = gl_rect.width();
-        gl_rect.max.x = gl_bounds.max.x;
+        gl_rect.max.x = bounds.max.x;
         tex_coords.max.x = tex_coords.min.x + tex_coords.width() * gl_rect.width() / old_width;
     }
-    if gl_rect.min.x < gl_bounds.min.x {
+    if gl_rect.min.x < bounds.min.x {
         let old_width = gl_rect.width();
-        gl_rect.min.x = gl_bounds.min.x;
+        gl_rect.min.x = bounds.min.x;
         tex_coords.min.x = tex_coords.max.x - tex_coords.width() * gl_rect.width() / old_width;
     }
-    if gl_rect.max.y > gl_bounds.max.y {
+    if gl_rect.max.y > bounds.max.y {
         let old_height = gl_rect.height();
-        gl_rect.max.y = gl_bounds.max.y;
+        gl_rect.max.y = bounds.max.y;
         tex_coords.max.y = tex_coords.min.y + tex_coords.height() * gl_rect.height() / old_height;
     }
-    if gl_rect.min.y < gl_bounds.min.y {
+    if gl_rect.min.y < bounds.min.y {
         let old_height = gl_rect.height();
-        gl_rect.min.y = gl_bounds.min.y;
+        gl_rect.min.y = bounds.min.y;
         tex_coords.min.y = tex_coords.max.y - tex_coords.height() * gl_rect.height() / old_height;
     }
 
@@ -342,12 +445,7 @@ pub fn to_vertex(
             (gl_rect.min.y + gl_rect.max.y) / 2.0,
         ],
         scale: [gl_rect.width(), gl_rect.height()],
-        color: [
-            (extra.color[0] * 255.0) as u8,
-            (extra.color[1] * 255.0) as u8,
-            (extra.color[2] * 255.0) as u8,
-            (extra.color[3] * 255.0) as u8,
-        ],
+        color,
         angle: 0.0,
         texture: 1,
         uv_rect: [

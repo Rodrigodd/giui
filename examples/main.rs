@@ -1,11 +1,12 @@
 #![allow(clippy::useless_vec)]
+use glyph_brush_layout::ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteRender};
-use ui_engine::render::{GUISpriteRender, GraphicId, Painel, Text};
+use ui_engine::render::{GUISpriteRender, Graphic};
 use ui_engine::{
     event as ui_event,
+    layouts::{FitText, GridLayout, MarginLayout, VBoxLayout},
     widgets::{Button, Hoverable, Slider, TabButton, TabGroup, Toggle},
-    layouts::{VBoxLayout, GridLayout},
-    GUIRender, Rect, Widget, GUI, Id, RectFill
+    GUIRender, Id, RectFill, GUI,
 };
 use winit::{
     dpi::PhysicalSize,
@@ -20,13 +21,15 @@ fn main() {
     let (window, mut render) = GLSpriteRender::new(wb, &event_loop, true);
     let window_size = window.inner_size();
     let font_texture = render.new_texture(1024, 1024, &vec![0; 1024 * 1024 * 4], true);
-    let gui_render = GUISpriteRender::new(
-        vec![include_bytes!("../examples/Comfortaa-Bold.ttf").to_vec()],
-        font_texture,
-    );
+    let gui_render = GUISpriteRender::new(font_texture);
+    let fonts: Vec<FontArc> = [include_bytes!("../examples/Comfortaa-Bold.ttf")]
+        .iter()
+        .map(|&font| FontArc::try_from_slice(font).unwrap())
+        .collect();
     let mut gui = GUI::new(
         window_size.width as f32,
         window_size.height as f32,
+        fonts,
         gui_render,
     );
     let texture = {
@@ -43,169 +46,151 @@ fn main() {
         window_size.width as f32 / 2.0,
         window_size.height as f32 / 2.0,
     );
-    let painel = Painel::new(texture, [0.0, 0.0, 1.0, 1.0], 5.0);
+    let painel = Graphic::Panel {
+        texture,
+        uv_rect: [0.0, 0.0, 1.0, 1.0],
+        color: [255, 255, 255, 255],
+        border: 5.0,
+    };
     let page_area = gui
         .create_widget()
         .with_margins([0.0, 45.0, 0.0, 0.0])
         .build();
     let (hover, hover_label) = {
-        let graphic = gui.render().add_painel(
-            painel
-                .clone()
-                .with_color([50, 50, 50, 255])
-                .with_border(0.0),
-        );
+        let graphic = painel
+            .clone()
+            .with_color([50, 50, 50, 255])
+            .with_border(0.0);
         let hover = gui
             .create_widget()
             .with_anchors([0.0, 0.0, 0.0, 0.0])
-            .with_margins([3.0, 6.0, 93.0, 24.0])
-            .with_graphic(Some(graphic))
+            .with_graphic(graphic)
+            .with_margins([3.0, 6.0, 6.0, 9.0])
+            .with_layout(Box::new(MarginLayout::new([3.0, 3.0, 3.0, 3.0])))
             .build();
-        let graphic = Some(gui.render().add_text(
-            Text::new("This is a Hover".to_owned(), 12.0, (0, 0)).with_color([255, 255, 255, 255]),
-        ));
+        let graphic = Graphic::Text {
+            color: [255, 255, 255, 255],
+            text: "This is a Hover".to_owned(),
+            font_size: 12.0,
+            align: (-1, 0),
+        };
         let label = gui
             .create_widget()
             .with_graphic(graphic)
-            .with_parent(Some(hover))
+            .with_parent(hover)
+            .with_layout(Box::new(FitText))
             .build();
 
         (hover, label)
     };
-    let page_1 = gui.create_widget().with_parent(Some(page_area)).build();
+    let page_1 = gui.create_widget().with_parent(page_area).build();
     let menu = {
-        let graphic = Some(gui.render().add_painel(painel.clone()));
+        let graphic = painel.clone();
         gui.create_widget()
             .with_anchors([0.0, 0.0, 0.0, 1.0])
             .with_margins([10.0, 0.0, 190.0, -10.0])
             .with_graphic(graphic)
             .with_layout(Box::new(VBoxLayout::new(5.0, [5.0, 5.0, 5.0, 5.0], -1)))
-            .with_parent(Some(page_1))
+            .with_parent(page_1)
             .build()
     };
-    let right_painel = {
-        let graphic = Some(gui.render().add_painel(painel.clone()));
-        let rect = Rect::new([0.0, 0.0, 1.0, 1.0], [200.0, 0.0, -10.0, -10.0]);
-        gui.add_widget(Widget::new(rect, graphic), Some(page_1))
-    };
+    let right_painel = gui
+        .create_widget()
+        .with_margins([200.0, 0.0, -10.0, -10.0])
+        .with_graphic(painel.clone())
+        .with_parent(page_1)
+        .build();
     let top_text = {
-        let graphic = Some(
-            gui.render()
-                .add_painel(painel.clone().with_color([200, 200, 200, 255])),
-        );
-        let text_box = gui.add_widget(
-            Widget::new(
-                Rect::new([0.0, 0.0, 1.0, 0.5], [15.0, 15.0, -15.0, -7.5]),
-                graphic,
-            ),
-            Some(right_painel),
-        );
-        let graphic = gui.render().add_text(Text::new(
-            "This is a example text. Please, don't mind me. Continue doing what you need to do. If you cannot ignore this text, I don't mind.".to_owned(),
-            20.0,
-            (0, -1),
-        ));
-        gui.add_widget(
-            Widget::new(
-                Rect::new([0.0, 0.0, 1.0, 1.0], [5.0, 5.0, -5.0, -5.0]),
-                Some(graphic.clone()),
-            ),
-            Some(text_box),
-        );
-        graphic
+        let text_box = gui
+            .create_widget()
+            .with_anchors([0.0, 0.0, 1.0, 0.5])
+            .with_margins([15.0, 15.0, -15.0, -7.5])
+            .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
+            .with_parent(right_painel)
+            .build();
+        let graphic = Graphic::Text {
+            text: "This is a example text. Please, don't mind me. Continue doing what you need to do. If you cannot ignore this text, I don't mind.".to_owned(),
+            color: [0, 0, 0, 255],
+            font_size: 20.0,
+            align: (0, -1),
+        };
+        gui.create_widget()
+            .with_anchors([0.0, 0.0, 1.0, 1.0])
+            .with_margins([5.0, 5.0, -5.0, -5.0])
+            .with_graphic(graphic)
+            .with_parent(text_box)
+            .build()
     };
     let bottom_text = {
-        let graphic = Some(
-            gui.render()
-                .add_painel(painel.clone().with_color([200, 200, 200, 255])),
-        );
-        let text_box = gui.add_widget(
-            Widget::new(
-                Rect::new([0.0, 0.5, 1.0, 1.0], [15.0, 7.5, -15.0, -15.0]),
-                graphic,
-            ),
-            Some(right_painel),
-        );
-        let graphic = Some(gui.render().add_text(Text::new(
-            "This is another example text. Please, also don't mind me. Continue doing what you was doing. If you cannot ignore this text, I don't mind either.".to_owned(),
-            20.0,
-            (-1, 0),
-        )));
-        gui.add_widget(
-            Widget::new(
-                Rect::new([0.0, 0.0, 1.0, 1.0], [5.0, 5.0, -5.0, -5.0]),
-                graphic,
-            ),
-            Some(text_box),
-        );
+        let text_box = gui
+            .create_widget()
+            .with_anchors([0.0, 0.5, 1.0, 1.0])
+            .with_margins([15.0, 7.5, -15.0, -15.0])
+            .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
+            .with_parent(right_painel)
+            .build();
+        let graphic = Graphic::Text {
+            text: "This is another example text. Please, also don't mind me. Continue doing what you was doing. If you cannot ignore this text, I don't mind either.".to_owned(),
+            font_size: 20.0,
+            align: (-1, 0),
+            color: [0, 0, 0, 255],
+        };
+        gui.create_widget()
+            .with_anchors([0.0, 0.0, 1.0, 1.0])
+            .with_margins([5.0, 5.0, -5.0, -5.0])
+            .with_graphic(graphic)
+            .with_parent(text_box)
+            .build();
         text_box
     };
 
     let my_button = {
-        let graphic = Some(
-            gui.render()
-                .add_painel(painel.clone().with_color([200, 200, 200, 255])),
-        );
         let button = gui
             .create_widget()
-            // .with_anchors([0.0, 0.0, 1.0, 0.0])
-            // .with_margins([5.0, 5.0, -5.0, 35.0])
             .with_min_size([0.0, 30.0])
-            .with_graphic(graphic)
+            .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
             .with_behaviour(Box::new(Button::new()))
             .with_behaviour(Box::new(Hoverable::new(
                 hover,
                 hover_label,
-                "This is a button".to_owned(),
+                "This is\na button".to_owned(),
             )))
-            .with_parent(Some(menu))
+            .with_parent(menu)
             .build();
-        let graphic = Some(gui.render().add_text(
-            Text::new("My Button".to_owned(), 16.0, (0, 0)).with_color([40, 40, 100, 255]),
-        ));
-        gui.add_widget(
-            Widget::new(
-                Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]),
-                graphic,
-            ),
-            Some(button),
-        );
+        let graphic = Graphic::Text {
+            text: "My Button".to_owned(),
+            font_size: 16.0,
+            align: (0, 0),
+            color: [40, 40, 100, 255],
+        };
+        gui.create_widget()
+            .with_anchors([0.0, 0.0, 1.0, 1.0])
+            .with_margins([0.0, 0.0, 0.0, 0.0])
+            .with_graphic(graphic)
+            .with_parent(button)
+            .build();
         button
     };
     let my_slider = {
         let slider = gui
             .create_widget()
-            // .with_anchors([0.0, 0.0, 1.0, 0.0])
-            // .with_margins([5.0, 40.0, -5.0, 75.0])
             .with_min_size([0.0, 30.0])
-            .with_parent(Some(menu))
+            .with_parent(menu)
             .build();
-        let slide_area = {
-            let graphic = Some(
-                gui.render()
-                    .add_painel(painel.clone().with_color([170, 170, 170, 255])),
-            );
-            gui.add_widget(
-                Widget::new(
-                    Rect::new([0.0, 0.5, 1.0, 0.5], [10.0, -3.0, -10.0, 3.0]),
-                    graphic,
-                ),
-                Some(slider),
-            )
-        };
-        let handle = {
-            let graphic = Some(
-                gui.render()
-                    .add_painel(painel.clone().with_color([200, 200, 200, 255])),
-            );
-            gui.add_widget(
-                Widget::new(
-                    Rect::new([0.5, 0.5, 0.5, 0.5], [-3.0, -14.0, 3.0, 14.0]),
-                    graphic,
-                ),
-                Some(slide_area),
-            )
-        };
+        let slide_area = gui
+            .create_widget()
+            .with_anchors([0.0, 0.5, 1.0, 0.5])
+            .with_margins([10.0, -3.0, -10.0, 3.0])
+            .with_graphic(painel.clone().with_color([170, 170, 170, 255]))
+            .with_parent(slider)
+            .build();
+        let handle = gui
+            .create_widget()
+            .with_anchors([0.5, 0.5, 0.5, 0.5])
+            .with_margins([-3.0, -14.0, 3.0, 14.0])
+            .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
+            .with_parent(slide_area)
+            .build();
         gui.add_behaviour(
             slider,
             Box::new(Slider::new(handle, slide_area, 10.0, 30.0, 25.0)),
@@ -215,189 +200,288 @@ fn main() {
     let my_toggle = {
         let toggle = gui
             .create_widget()
-            // .with_anchors([0.0, 0.0, 1.0, 0.0])
-            // .with_margins([5.0, 80.0, -5.0, 115.0])
             .with_min_size([0.0, 30.0])
-            .with_parent(Some(menu))
+            .with_parent(menu)
             .build();
 
         let background = {
-            let graphic = Some(
-                gui.render().add_painel(
-                    painel
-                        .clone()
-                        .with_color([200, 200, 200, 255])
-                        .with_border(0.0),
-                ),
-            );
-            gui.add_widget(
-                Widget::new(
-                    Rect::new([0.0, 0.5, 0.0, 0.5], [5.0, -10.0, 25.0, 10.0]),
-                    graphic,
-                ),
-                Some(toggle),
-            )
+            let graphic = painel
+                .clone()
+                .with_color([200, 200, 200, 255])
+                .with_border(0.0);
+            gui.create_widget()
+                .with_anchors([0.0, 0.5, 0.0, 0.5])
+                .with_margins([5.0, -10.0, 25.0, 10.0])
+                .with_graphic(graphic)
+                .with_parent(toggle)
+                .build()
         };
-        let marker = {
-            let graphic = Some(
-                gui.render()
-                    .add_painel(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0)),
-            );
-            gui.add_widget(
-                Widget::new(
-                    Rect::new([0.5, 0.5, 0.5, 0.5], [-6.0, -6.0, 6.0, 6.0]),
-                    graphic,
-                ),
-                Some(background),
-            )
-        };
+        let marker = gui
+            .create_widget()
+            .with_anchors([0.5, 0.5, 0.5, 0.5])
+            .with_margins([-6.0, -6.0, 6.0, 6.0])
+            .with_graphic(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0))
+            .with_parent(background)
+            .build();
         gui.add_behaviour(toggle, Box::new(Toggle::new(background, marker)));
         let page_2 = {
-            let graphic = gui.render().add_painel(painel.clone());
             let page_2 = gui
                 .create_widget()
                 .with_margins([10.0, 0.0, -10.0, -10.0])
-                .with_graphic(Some(graphic))
-                .with_parent(Some(page_area))
-                .with_layout(Box::new(GridLayout::new([10.0, 15.0], [10.0, 10.0, 10.0, 10.0], 3)))
+                .with_graphic(painel.clone())
+                .with_parent(page_area)
+                .with_layout(Box::new(GridLayout::new(
+                    [10.0, 15.0],
+                    [10.0, 10.0, 10.0, 10.0],
+                    3,
+                )))
                 .build();
 
-            let create_vbox = |gui: &mut GUI<GUISpriteRender>, expand: [bool; 2], aling: i8| {
-                let graphic = gui
-                    .render()
-                    .add_painel(painel.clone().with_color([100, 100, 100, 255]));
-                gui
-                    .create_widget()
-                    .with_parent(Some(page_2))
+            let create_vbox = |gui: &mut GUI<GUISpriteRender>, expand: [bool; 2], align: i8| {
+                gui.create_widget()
+                    .with_parent(page_2)
                     .with_expand_x(expand[0])
                     .with_expand_y(expand[1])
-                    .with_graphic(Some(graphic))
-                    .with_layout(Box::new(VBoxLayout::new(5.0, [0.0, 0.0, 0.0, 0.0], aling)))
+                    .with_graphic(painel.clone().with_color([100, 100, 100, 255]))
+                    .with_layout(Box::new(VBoxLayout::new(5.0, [0.0, 0.0, 0.0, 0.0], align)))
                     .build()
             };
 
-            let create_rect = |gui: &mut GUI<GUISpriteRender>, min_size: [f32; 2], expand: [bool; 2], fill: [RectFill; 2], parent: Id| {
-                let graphic = gui
-                    .render()
-                    .add_painel(painel.clone().with_color([200, 200, 200, 255]));
-
-                let rect = gui.create_widget()
+            let create_rect = |gui: &mut GUI<GUISpriteRender>,
+                               min_size: [f32; 2],
+                               expand: [bool; 2],
+                               fill: [RectFill; 2],
+                               parent: Id| {
+                let rect = gui
+                    .create_widget()
                     .with_min_size(min_size)
                     .with_fill_x(fill[0])
                     .with_fill_y(fill[1])
                     .with_expand_x(expand[0])
                     .with_expand_y(expand[1])
-                    .with_graphic(Some(graphic))
+                    .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
                     .with_behaviour(Box::new(Hoverable::new(
                         hover,
                         hover_label,
-                        "1: 30x30".to_owned(),
+                        format!(
+                            "X: {:?}\nY: {:?}{}{}{}",
+                            fill[0],
+                            fill[1],
+                            if expand[0] || expand[1] {
+                                "\nExpand"
+                            } else {
+                                ""
+                            },
+                            if expand[0] { "X" } else { "" },
+                            if expand[1] { "Y" } else { "" },
+                        ),
                     )))
-                    .with_parent(Some(parent))
+                    .with_parent(parent)
                     .build();
-                let graphic = Some(
-                    gui.render().add_text(
-                        Text::new(format!("{}x{}", min_size[0], min_size[1]), 12.0, (0, 0))
-                            .with_color([40, 40, 100, 255]),
-                    ),
-                );
-                gui.add_widget(
-                    Widget::new(
-                        Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]),
-                        graphic,
-                    ),
-                    Some(rect),
-                );
+                let graphic = Graphic::Text {
+                    text: format!("{}x{}", min_size[0], min_size[1]),
+                    font_size: 12.0,
+                    align: (0, 0),
+                    color: [40, 40, 100, 255],
+                };
+                gui.create_widget()
+                    .with_graphic(graphic)
+                    .with_parent(rect)
+                    .build();
                 rect
             };
 
             {
                 let vbox = create_vbox(&mut gui, [true, true], -1);
-                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
-                create_rect(&mut gui, [75.0, 50.0], [true, true], [RectFill::Fill, RectFill::Fill], vbox);
-                create_rect(&mut gui, [50.0, 75.0], [true, true], [RectFill::Fill, RectFill::Fill], vbox);
+                create_rect(
+                    &mut gui,
+                    [50.0, 50.0],
+                    [false, false],
+                    [RectFill::ShrinkStart, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [75.0, 50.0],
+                    [true, true],
+                    [RectFill::Fill, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [50.0, 75.0],
+                    [true, true],
+                    [RectFill::Fill, RectFill::Fill],
+                    vbox,
+                );
             }
             {
                 let vbox = create_vbox(&mut gui, [false, true], 0);
-                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
-                create_rect(&mut gui, [75.0, 50.0], [false, false], [RectFill::ShrinkCenter, RectFill::Fill], vbox);
-                create_rect(&mut gui, [50.0, 75.0], [false, false], [RectFill::ShrinkEnd, RectFill::Fill], vbox);
+                create_rect(
+                    &mut gui,
+                    [50.0, 50.0],
+                    [false, false],
+                    [RectFill::ShrinkStart, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [75.0, 50.0],
+                    [false, false],
+                    [RectFill::ShrinkCenter, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [50.0, 75.0],
+                    [false, false],
+                    [RectFill::ShrinkEnd, RectFill::Fill],
+                    vbox,
+                );
             }
             {
                 let vbox = create_vbox(&mut gui, [false, false], 1);
-                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
-                create_rect(&mut gui, [75.0, 50.0], [false, false], [RectFill::ShrinkCenter, RectFill::Fill], vbox);
-                create_rect(&mut gui, [50.0, 75.0], [false, false], [RectFill::ShrinkEnd, RectFill::Fill], vbox);
+                create_rect(
+                    &mut gui,
+                    [50.0, 50.0],
+                    [false, false],
+                    [RectFill::ShrinkStart, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [75.0, 50.0],
+                    [false, false],
+                    [RectFill::ShrinkCenter, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [50.0, 75.0],
+                    [false, false],
+                    [RectFill::ShrinkEnd, RectFill::Fill],
+                    vbox,
+                );
             }
-            
+
             {
                 let vbox = create_vbox(&mut gui, [true, false], -1);
-                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
-                create_rect(&mut gui, [75.0, 50.0], [false, false], [RectFill::ShrinkCenter, RectFill::Fill], vbox);
-                create_rect(&mut gui, [50.0, 75.0], [false, false], [RectFill::ShrinkEnd, RectFill::Fill], vbox);
+                create_rect(
+                    &mut gui,
+                    [50.0, 50.0],
+                    [false, false],
+                    [RectFill::ShrinkStart, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [75.0, 50.0],
+                    [false, false],
+                    [RectFill::ShrinkCenter, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [50.0, 75.0],
+                    [false, false],
+                    [RectFill::ShrinkEnd, RectFill::Fill],
+                    vbox,
+                );
             }
             {
                 let vbox = create_vbox(&mut gui, [false, false], 0);
-                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
-                create_rect(&mut gui, [75.0, 50.0], [false, false], [RectFill::ShrinkCenter, RectFill::Fill], vbox);
-                create_rect(&mut gui, [50.0, 75.0], [false, false], [RectFill::ShrinkEnd, RectFill::Fill], vbox);
+                create_rect(
+                    &mut gui,
+                    [50.0, 50.0],
+                    [false, false],
+                    [RectFill::ShrinkStart, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [75.0, 50.0],
+                    [false, false],
+                    [RectFill::ShrinkCenter, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [50.0, 75.0],
+                    [false, false],
+                    [RectFill::ShrinkEnd, RectFill::Fill],
+                    vbox,
+                );
             }
             {
                 let vbox = create_vbox(&mut gui, [false, false], 1);
-                create_rect(&mut gui, [50.0, 50.0], [false, false], [RectFill::ShrinkStart, RectFill::Fill], vbox);
-                create_rect(&mut gui, [75.0, 50.0], [false, false], [RectFill::ShrinkCenter, RectFill::Fill], vbox);
-                create_rect(&mut gui, [50.0, 75.0], [false, false], [RectFill::ShrinkEnd, RectFill::Fill], vbox);
+                create_rect(
+                    &mut gui,
+                    [50.0, 50.0],
+                    [false, false],
+                    [RectFill::ShrinkStart, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [75.0, 50.0],
+                    [false, false],
+                    [RectFill::ShrinkCenter, RectFill::Fill],
+                    vbox,
+                );
+                create_rect(
+                    &mut gui,
+                    [50.0, 75.0],
+                    [false, false],
+                    [RectFill::ShrinkEnd, RectFill::Fill],
+                    vbox,
+                );
             }
 
             page_2
         };
         let page_na = {
-            let rect = Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]);
-            let page_2 = gui.add_widget(Widget::new(rect, None), Some(page_area));
-            let graphic = gui.render().add_text(Text::new(
-                "This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(),
-                20.0,
-                (0, -1),
-            ).with_color([255, 255, 255, 255]));
-            gui.add_widget(
-                Widget::new(
-                    Rect::new([0.0, 0.0, 1.0, 1.0], [15.0, 15.0, -15.0, -15.0]),
-                    Some(graphic),
-                ),
-                Some(page_2),
-            );
-            page_2
+            let page_na = gui.create_widget().with_parent(page_area).build();
+            let graphic = Graphic::Text {
+                color: [255, 255, 255, 255],
+                text: "This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(),
+                font_size: 20.0,
+                align: (0, -1),
+            };
+            gui.create_widget()
+                .with_margins([15.0, 15.0, -15.0, -15.0])
+                .with_graphic(graphic)
+                .with_parent(page_na)
+                .build();
+            page_na
         };
         {
-            let rect = Rect::new([0.0, 0.0, 1.0, 0.0], [5.0, 10.0, -10.0, 40.0]);
-            let header = gui.add_widget(Widget::new(rect, None), None);
+            let header = gui
+                .create_widget()
+                .with_anchors([0.0, 0.0, 1.0, 0.0])
+                .with_margins([5.0, 10.0, -10.0, 40.0])
+                .build();
             let create_button = |gui: &mut GUI<GUISpriteRender>, i: usize, total: usize| {
-                let graphic = Some(
-                    gui.render()
-                        .add_painel(painel.clone().with_color([200, 200, 200, 255])),
-                );
                 let x = i as f32 / total as f32;
-                let button = gui.add_widget(
-                    Widget::new(
-                        Rect::new([x, 0.0, x + 1.0 / total as f32, 1.0], [5.0, 0.0, 0.0, 0.0]),
-                        graphic,
-                    )
-                    .with_behaviour(Box::new(TabButton::new(header))),
-                    Some(header),
-                );
-                let graphic = Some(
-                    gui.render().add_text(
-                        Text::new(format!("Tab {}", i + 1), 16.0, (0, 0))
-                            .with_color([40, 40, 100, 255]),
-                    ),
-                );
-                gui.add_widget(
-                    Widget::new(
-                        Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]),
-                        graphic,
-                    ),
-                    Some(button),
-                );
+                let button = gui
+                    .create_widget()
+                    .with_anchors([x, 0.0, x + 1.0 / total as f32, 1.0])
+                    .with_margins([5.0, 0.0, 0.0, 0.0])
+                    .with_graphic(painel.clone())
+                    .with_parent(header)
+                    .with_behaviour(Box::new(TabButton::new(header)))
+                    .build();
+                let graphic = Graphic::Text {
+                    text: format!("Tab {}", i + 1),
+                    font_size: 16.0,
+                    align: (0, 0),
+                    color: [40, 40, 100, 255],
+                };
+                gui.create_widget()
+                    .with_anchors([0.0, 0.0, 1.0, 1.0])
+                    .with_margins([0.0, 0.0, 0.0, 0.0])
+                    .with_graphic(graphic)
+                    .with_parent(button)
+                    .build();
                 button
             };
             let buttons = vec![
@@ -411,16 +495,18 @@ fn main() {
         }
 
         {
-            let graphic = Some(gui.render().add_text(
-                Text::new("Bottom Text".to_owned(), 16.0, (-1, 0)).with_color([40, 40, 100, 255]),
-            ));
-            gui.add_widget(
-                Widget::new(
-                    Rect::new([0.0, 0.0, 1.0, 1.0], [30.0, 0.0, 0.0, 0.0]),
-                    graphic,
-                ),
-                Some(toggle),
-            );
+            let graphic = Graphic::Text {
+                text: "Bottom Text".to_owned(),
+                color: [40, 40, 100, 255],
+                font_size: 16.0,
+                align: (-1, 0),
+            };
+            gui.create_widget()
+                .with_anchors([0.0, 0.0, 1.0, 1.0])
+                .with_margins([30.0, 0.0, 0.0, 0.0])
+                .with_graphic(graphic)
+                .with_parent(toggle)
+                .build();
         }
 
         toggle
@@ -459,14 +545,14 @@ fn main() {
                 }
             } else if let Some(ui_event::ValueChanged { id, value }) = event.downcast_ref() {
                 if *id == my_slider {
-                    if let GraphicId::Text { index, .. } = top_text {
-                        gui.render().get_text(index).set_scale(*value);
+                    if let Some(Graphic::Text { font_size, .. }) = gui.get_graphic(top_text) {
+                        *font_size = *value;
                     }
                 }
             } else if let Some(ui_event::ValueSet { id, value }) = event.downcast_ref() {
                 if *id == my_slider {
-                    if let GraphicId::Text { index, .. } = top_text {
-                        gui.render().get_text(index).set_scale(*value);
+                    if let Some(Graphic::Text { font_size, .. }) = gui.get_graphic(top_text) {
+                        *font_size = *value;
                     }
                     println!("Slide value set!! {}", value);
                 }

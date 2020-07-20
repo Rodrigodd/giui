@@ -1,16 +1,66 @@
-use crate::{Id, Layout, Rect, Widgets};
+use crate::{Id, Layout, Widgets};
+
+pub struct FitText;
+impl Layout for FitText {
+    fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets) {
+        let fonts = widgets.get_fonts();
+        let min_size = if let Some(graphic) = widgets.get_graphic(this) {
+            graphic.compute_min_size(fonts).unwrap_or([0.0, 0.0])
+        } else {
+            [0.0, 0.0]
+        };
+        widgets.get_rect(this).min_size = min_size;
+    }
+    fn update_layouts(&mut self, _: Id, _: &mut Widgets) {}
+}
+
+pub struct MarginLayout {
+    margins: [f32; 4],
+}
+impl MarginLayout {
+    pub fn new(margins: [f32; 4]) -> Self {
+        Self { margins }
+    }
+}
+impl Layout for MarginLayout {
+    fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets) {
+        let mut min_size = [0.0f32, 0.0];
+        for child in widgets.get_children(this) {
+            let c_min_size = widgets.get_rect(child).min_size;
+            min_size[0] = min_size[0].max(c_min_size[0]);
+            min_size[1] = min_size[1].max(c_min_size[1]);
+        }
+        widgets.get_rect(this).min_size = [
+            self.margins[0] + self.margins[2] + min_size[0],
+            self.margins[1] + self.margins[3] + min_size[1],
+        ];
+    }
+    fn update_layouts(&mut self, this: Id, widgets: &mut Widgets) {
+        let rect = widgets.get_rect(this).rect;
+        let des_rect = [
+            rect[0] + self.margins[0],
+            rect[1] + self.margins[1],
+            rect[2] - self.margins[2],
+            rect[3] - self.margins[3],
+        ];
+        for child in widgets.get_children(this) {
+            let rect = widgets.get_rect(child);
+            rect.set_designed_rect(des_rect);
+        }
+    }
+}
 
 pub struct VBoxLayout {
     spacing: f32,
     margins: [f32; 4],
-    aling: i8,
+    align: i8,
 }
 impl VBoxLayout {
-    pub fn new(spacing: f32, margins: [f32; 4], aling: i8) -> Self {
+    pub fn new(spacing: f32, margins: [f32; 4], align: i8) -> Self {
         Self {
             spacing,
             margins,
-            aling,
+            align,
         }
     }
 }
@@ -34,7 +84,6 @@ impl Layout for VBoxLayout {
             widgets
                 .get_rect(this)
                 .set_min_size([min_width + self.margins[0] + self.margins[2], min_height]);
-            println!("min_size: {:?}", widgets.get_rect(this).min_size);
         }
     }
 
@@ -59,7 +108,7 @@ impl Layout for VBoxLayout {
         let height = rect.get_height() - self.margins[1] - self.margins[3];
         let free_height = height - reserved_height;
         if free_height <= 0.0 || max_weight == 0.0 {
-            match self.aling {
+            match self.align {
                 0 => y += free_height / 2.0,
                 1 => y += free_height,
                 _ => {}
@@ -178,8 +227,6 @@ impl Layout for GridLayout {
         let free_width = width - reserved_width;
         let free_height = height - reserved_height;
         let mut positions = vec![[0.0; 2]; self.columns as usize + self.rows as usize];
-        println!("free_width: {} - {} = {}", width, reserved_width, free_width);
-        println!("free_height: {} - {} = {}", height , reserved_height, free_height);
         let mut x = rect.rect[0] + self.margins[0];
         if free_width <= 0.0 || width_weight == 0.0 {
             for i in collumn_range {
@@ -188,7 +235,6 @@ impl Layout for GridLayout {
                 x += self.spacing[0] + self.min_sizes[i];
             }
         } else {
-            println!("Expand X!");
             for i in collumn_range {
                 if self.expand[i] {
                     // FIXME: this implementation imply that rects with the same ratio
@@ -228,7 +274,6 @@ impl Layout for GridLayout {
                 }
             }
         }
-        println!("positions: {:?}", positions);
         for (i, child) in children.into_iter().enumerate() {
             let col = i % self.columns as usize;
             let row = self.columns as usize + i / self.columns as usize;
@@ -238,7 +283,6 @@ impl Layout for GridLayout {
                 positions[col][1],
                 positions[row][1],
             ];
-            println!("designed_rect: {:?}", rect);
             widgets.get_rect(child).set_designed_rect(rect);
         }
     }

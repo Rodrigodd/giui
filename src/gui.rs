@@ -1,7 +1,8 @@
-use crate::{render::GraphicId, GUIRender};
+use crate::{render::Graphic, GUIRender};
 use std::any::Any;
 use std::collections::VecDeque;
 use winit::event::{ElementState, Event, WindowEvent};
+use glyph_brush_layout::{ab_glyph::FontArc};
 
 pub mod event {
     use super::Id;
@@ -103,7 +104,7 @@ pub struct WidgetBuilder<'a, R: GUIRender> {
     gui: &'a mut GUI<R>,
     listen_mouse: bool,
     rect: Rect,
-    graphic: Option<GraphicId>,
+    graphic: Option<Graphic>,
     behaviours: Vec<Box<dyn Behaviour>>,
     layout: Option<Box<dyn Layout>>,
     parent: Option<Id>,
@@ -157,12 +158,12 @@ impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
         self.layout = Some(layout);
         self
     }
-    pub fn with_graphic(mut self, graphic: Option<GraphicId>) -> Self {
-        self.graphic = graphic;
+    pub fn with_graphic(mut self, graphic: Graphic) -> Self {
+        self.graphic = Some(graphic);
         self
     }
-    pub fn with_parent(mut self, parent: Option<Id>) -> Self {
-        self.parent = parent;
+    pub fn with_parent(mut self, parent: Id) -> Self {
+        self.parent = Some(parent);
         self
     }
     pub fn build(self) -> Id {
@@ -191,13 +192,13 @@ impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
 pub struct Widget {
     listen_mouse: bool,
     rect: Rect,
-    graphic: Option<GraphicId>,
+    graphic: Option<Graphic>,
     layout: Option<Box<dyn Layout>>,
     behaviours: Vec<Box<dyn Behaviour>>,
 }
 impl Widget {
     /// create a widget with no behaviour
-    pub fn new(rect: Rect, graphic: Option<GraphicId>) -> Self {
+    pub fn new(rect: Rect, graphic: Option<Graphic>) -> Self {
         Self {
             listen_mouse: false,
             rect,
@@ -230,6 +231,7 @@ impl Widget {
 pub struct Widgets<'a> {
     widgets: &'a mut [Widget],
     hierarchy: &'a mut Hierarchy,
+    fonts: &'a [FontArc],
     events: Vec<Box<dyn Any>>,
 }
 impl<'a> Widgets<'a> {
@@ -237,6 +239,7 @@ impl<'a> Widgets<'a> {
         this: Id,
         widgets: &'a mut [Widget],
         hierarchy: &'a mut Hierarchy,
+        fonts: &'a [FontArc],
     ) -> Option<(&'a mut dyn Layout, Self)> {
         let this_one =
             unsafe { &mut *(widgets[this.index].layout.as_mut()?.as_mut() as *mut dyn Layout) };
@@ -246,6 +249,7 @@ impl<'a> Widgets<'a> {
                 widgets,
                 hierarchy,
                 events: Vec::new(),
+                fonts,
             },
         ))
     }
@@ -255,6 +259,7 @@ impl<'a> Widgets<'a> {
         index: usize,
         widgets: &'a mut [Widget],
         hierarchy: &'a mut Hierarchy,
+        fonts: &'a [FontArc],
     ) -> Option<(&'a mut dyn Behaviour, Self)> {
         let this_one = unsafe {
             &mut *(widgets[this.index].behaviours.get_mut(index)?.as_mut() as *mut dyn Behaviour)
@@ -265,11 +270,16 @@ impl<'a> Widgets<'a> {
                 widgets,
                 hierarchy,
                 events: Vec::new(),
+                fonts,
             },
         ))
     }
 
-    pub fn get_graphic(&mut self, id: Id) -> Option<&mut GraphicId> {
+    pub fn get_fonts(&mut self) -> &'a [FontArc] {
+        self.fonts
+    }
+
+    pub fn get_graphic(&mut self, id: Id) -> Option<&mut Graphic> {
         self.widgets[id.index].graphic.as_mut()
     }
 
@@ -326,10 +336,11 @@ pub struct GUI<R: GUIRender> {
     current_over: Option<Id>,
     over_is_locked: bool,
     events: Vec<Box<dyn Any>>,
+    fonts: Vec<FontArc>,
     render: R,
 }
 impl<R: GUIRender> GUI<R> {
-    pub fn new(width: f32, height: f32, render: R) -> Self {
+    pub fn new(width: f32, height: f32, fonts: Vec<FontArc>, render: R) -> Self {
         Self {
             widgets: vec![Widget {
                 listen_mouse: false,
@@ -353,6 +364,7 @@ impl<R: GUIRender> GUI<R> {
             current_over: None,
             over_is_locked: false,
             events: Vec::new(),
+            fonts,
             render,
         }
     }
@@ -382,6 +394,10 @@ impl<R: GUIRender> GUI<R> {
         self.send_event(Box::new(event::InvalidadeLayout));
     }
 
+    pub fn get_fonts(&mut self) -> Vec<FontArc> {
+        self.fonts.clone()
+    }
+
     #[inline]
     pub fn get_childs(&mut self, id: Id) -> Vec<Id> {
         self.hierarchy.get_childs(id)
@@ -395,7 +411,7 @@ impl<R: GUIRender> GUI<R> {
     pub fn add_behaviour(&mut self, id: Id, behaviour: Box<dyn Behaviour>) {
         self.widgets[id.index].add_behaviour(behaviour);
     }
-    pub fn get_graphic(&mut self, id: Id) -> Option<&mut GraphicId> {
+    pub fn get_graphic(&mut self, id: Id) -> Option<&mut Graphic> {
         self.widgets[id.index].graphic.as_mut()
     }
     pub fn get_rect(&self, id: Id) -> &Rect {
@@ -430,7 +446,7 @@ impl<R: GUIRender> GUI<R> {
     ) {
         for index in 0..self.widgets[id.index].behaviours.len() {
             if let Some((this, mut widgets)) =
-                Widgets::new_with_mut_behaviour(id, index, &mut self.widgets, &mut self.hierarchy)
+                Widgets::new_with_mut_behaviour(id, index, &mut self.widgets, &mut self.hierarchy, &self.fonts)
             {
                 let mut event_handler = EventHandler::new();
                 event(this, id, &mut widgets, &mut event_handler);
@@ -446,6 +462,7 @@ impl<R: GUIRender> GUI<R> {
                             index,
                             &mut self.widgets,
                             &mut self.hierarchy,
+                            &self.fonts,
                         ) {
                             let mut event_handler = EventHandler::new();
                             this.on_event(event.as_ref(), id, &mut widgets, &mut event_handler);
@@ -579,7 +596,7 @@ impl<R: GUIRender> GUI<R> {
         }
         while let Some(parent) = parents.pop() {
             if let Some((layout, mut widgets)) =
-                Widgets::new_with_mut_layout(parent, &mut self.widgets, &mut self.hierarchy)
+                Widgets::new_with_mut_layout(parent, &mut self.widgets, &mut self.hierarchy, &self.fonts)
             {
                 layout.compute_min_size(parent, &mut widgets);
             }
@@ -589,7 +606,7 @@ impl<R: GUIRender> GUI<R> {
         parents.push(id);
         while let Some(parent) = parents.pop() {
             if let Some((layout, mut widgets)) =
-                Widgets::new_with_mut_layout(parent, &mut self.widgets, &mut self.hierarchy)
+                Widgets::new_with_mut_layout(parent, &mut self.widgets, &mut self.hierarchy, &self.fonts)
             {
                 layout.update_layouts(parent, &mut widgets);
             } else {
@@ -600,11 +617,19 @@ impl<R: GUIRender> GUI<R> {
                         self.widgets[parent.index].rect.rect[0],
                         self.widgets[parent.index].rect.rect[1],
                     ];
+                    let rect = &mut self.widgets[child.index].rect;
                     for i in 0..4 {
-                        self.widgets[child.index].rect.rect[i] = pos[i % 2]
-                            + size[i % 2] * self.widgets[child.index].rect.anchors[i]
-                            + self.widgets[child.index].rect.margins[i];
+                        rect.rect[i] = pos[i % 2]
+                            + size[i % 2] * rect.anchors[i]
+                            + rect.margins[i];
                     }
+                    if rect.get_width() < rect.min_size[0] {
+                        rect.set_width(rect.min_size[0]);
+                    }
+                    if rect.get_height() < rect.min_size[1] {
+                        rect.set_height(rect.min_size[1]);
+                    }
+                    
                 }
             }
             parents.extend(self.hierarchy.get_childs(parent).iter().rev());
@@ -612,7 +637,7 @@ impl<R: GUIRender> GUI<R> {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum RectFill {
     Fill,
     ShrinkStart,
@@ -759,8 +784,18 @@ impl Rect {
     }
 
     #[inline]
+    pub fn set_width(&mut self, width: f32) {
+        self.rect[2] = self.rect[0] + width;
+    }
+
+    #[inline]
     pub fn get_height(&self) -> f32 {
         self.rect[3] - self.rect[1]
+    }
+
+    #[inline]
+    pub fn set_height(&mut self, height: f32) {
+        self.rect[3] = self.rect[1] + height;
     }
 
     #[inline]
