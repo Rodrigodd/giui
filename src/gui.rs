@@ -1,8 +1,8 @@
 use crate::{render::Graphic, GUIRender};
-use std::any::Any;
+use glyph_brush_layout::ab_glyph::FontArc;
+use std::any::{Any, TypeId};
 use std::collections::VecDeque;
 use winit::event::{ElementState, Event, WindowEvent};
-use glyph_brush_layout::{ab_glyph::FontArc};
 
 pub mod event {
     use super::Id;
@@ -10,6 +10,12 @@ pub mod event {
     pub struct InvalidadeLayout;
     pub struct LockOver;
     pub struct UnlockOver;
+    pub struct ActiveWidget {
+        pub id: Id,
+    }
+    pub struct DeactiveWidget {
+        pub id: Id,
+    }
     pub struct ButtonClicked {
         pub id: Id,
     }
@@ -60,12 +66,22 @@ impl Hierarchy {
     }
 
     #[inline]
+    fn get_parent(&self, id: Id) -> Option<Id> {
+        self.parents[id.index]
+    }
+
+    #[inline]
     fn get_childs(&self, id: Id) -> Vec<Id> {
         self.childs[id.index]
             .iter()
             .filter(|x| self.active[x.index])
             .cloned()
             .collect::<Vec<Id>>()
+    }
+
+    #[inline]
+    fn is_active(&mut self, id: Id) -> bool {
+        self.active[id.index]
     }
 
     #[inline]
@@ -102,7 +118,7 @@ impl Hierarchy {
 
 pub struct WidgetBuilder<'a, R: GUIRender> {
     gui: &'a mut GUI<R>,
-    listen_mouse: bool,
+    input_flags: InputFlags,
     rect: Rect,
     graphic: Option<Graphic>,
     behaviours: Vec<Box<dyn Behaviour>>,
@@ -113,7 +129,7 @@ impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
     fn new(gui: &'a mut GUI<R>) -> Self {
         Self {
             gui,
-            listen_mouse: false,
+            input_flags: InputFlags::empty(),
             rect: Rect::new([0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]),
             graphic: None,
             behaviours: Vec::new(),
@@ -150,7 +166,7 @@ impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
         self
     }
     pub fn with_behaviour(mut self, behaviour: Box<dyn Behaviour>) -> Self {
-        self.listen_mouse = self.listen_mouse || behaviour.listen_mouse();
+        self.input_flags |= behaviour.input_flags();
         self.behaviours.push(behaviour);
         self
     }
@@ -169,7 +185,7 @@ impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
     pub fn build(self) -> Id {
         let Self {
             gui,
-            listen_mouse,
+            input_flags,
             rect,
             graphic,
             behaviours,
@@ -178,7 +194,7 @@ impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
         } = self;
         gui.add_widget(
             Widget {
-                listen_mouse,
+                input_flags,
                 rect,
                 graphic,
                 layout,
@@ -190,7 +206,7 @@ impl<'a, R: GUIRender> WidgetBuilder<'a, R> {
 }
 
 pub struct Widget {
-    listen_mouse: bool,
+    input_flags: InputFlags,
     rect: Rect,
     graphic: Option<Graphic>,
     layout: Option<Box<dyn Layout>>,
@@ -200,7 +216,7 @@ impl Widget {
     /// create a widget with no behaviour
     pub fn new(rect: Rect, graphic: Option<Graphic>) -> Self {
         Self {
-            listen_mouse: false,
+            input_flags: InputFlags::empty(),
             rect,
             graphic,
             layout: None,
@@ -209,21 +225,26 @@ impl Widget {
     }
     /// add one more behaviour to the widget
     pub fn with_behaviour(mut self, behaviour: Box<dyn Behaviour>) -> Self {
-        self.listen_mouse = self.listen_mouse || behaviour.listen_mouse();
+        self.input_flags |= behaviour.input_flags();
         self.behaviours.push(behaviour);
         self
     }
 
     /// add one more behaviour to the widget
     pub fn add_behaviour(&mut self, behaviour: Box<dyn Behaviour>) {
-        self.listen_mouse = self.listen_mouse || behaviour.listen_mouse();
+        self.input_flags |= behaviour.input_flags();
         self.behaviours.push(behaviour);
     }
 
-    /// add one more behaviour to the widget
+    /// set the layout of the widget
     pub fn with_layout(mut self, layout: Box<dyn Layout>) -> Self {
         self.layout = Some(layout);
         self
+    }
+
+    /// set the layout of the widget
+    pub fn set_layout(&mut self, layout: Box<dyn Layout>) {
+        self.layout = Some(layout);
     }
 }
 
@@ -287,22 +308,38 @@ impl<'a> Widgets<'a> {
         &mut self.widgets[id.index].rect
     }
 
-    pub fn active(&mut self, id: Id) {
-        self.hierarchy.active(id);
-        self.events.push(Box::new(event::InvalidadeLayout));
-        self.events.push(Box::new(event::Redraw));
+    pub fn get_layout(&mut self, id: Id) -> Option<&mut dyn Layout> {
+        //TODO: this is unsafe, when this is called from inside a Layout with the id 'this'
+        Some(self.widgets[id.index].layout.as_mut()?.as_mut())
     }
 
+    pub fn set_layout(&mut self, id: Id, layout: Box<dyn Layout>) {
+        //TODO: this is unsafe, when this is called from inside a Layout with the id 'this'
+        self.widgets[id.index].layout = Some(layout);
+    }
+
+    pub fn is_active(&mut self, id: Id) -> bool {
+        self.hierarchy.is_active(id)
+    }
+
+    /// This only took effect when Widgets is dropped
+    pub fn active(&mut self, id: Id) {
+        self.events.push(Box::new(event::ActiveWidget { id }));
+    }
+
+    /// This only took effect when Widgets is dropped
     pub fn deactive(&mut self, id: Id) {
-        self.hierarchy.deactive(id);
-        self.events.push(Box::new(event::InvalidadeLayout));
-        self.events.push(Box::new(event::Redraw));
+        self.events.push(Box::new(event::DeactiveWidget { id }));
     }
 
     pub fn move_to_front(&mut self, id: Id) {
         self.hierarchy.move_to_front(id);
         self.events.push(Box::new(event::InvalidadeLayout));
         self.events.push(Box::new(event::Redraw));
+    }
+
+    pub fn get_parent(&mut self, id: Id) -> Option<Id> {
+        self.hierarchy.get_parent(id)
     }
 
     pub fn get_children(&mut self, id: Id) -> Vec<Id> {
@@ -334,6 +371,7 @@ pub struct GUI<R: GUIRender> {
     widgets: Vec<Widget>,
     hierarchy: Hierarchy,
     current_over: Option<Id>,
+    current_scroll: Option<Id>,
     over_is_locked: bool,
     events: Vec<Box<dyn Any>>,
     fonts: Vec<FontArc>,
@@ -343,7 +381,7 @@ impl<R: GUIRender> GUI<R> {
     pub fn new(width: f32, height: f32, fonts: Vec<FontArc>, render: R) -> Self {
         Self {
             widgets: vec![Widget {
-                listen_mouse: false,
+                input_flags: InputFlags::empty(),
                 rect: Rect {
                     anchors: [0.0; 4],
                     margins: [0.0; 4],
@@ -362,6 +400,7 @@ impl<R: GUIRender> GUI<R> {
             }],
             hierarchy: Hierarchy::default(),
             current_over: None,
+            current_scroll: None,
             over_is_locked: false,
             events: Vec::new(),
             fonts,
@@ -387,6 +426,13 @@ impl<R: GUIRender> GUI<R> {
     pub fn active_widget(&mut self, id: Id) {
         self.hierarchy.active(id);
         self.send_event(Box::new(event::InvalidadeLayout));
+        let mut parents = vec![id];
+        while let Some(id) = parents.pop() {
+            self.call_event(id, |this, id, widgets, event_handler| {
+                this.on_active(id, widgets, event_handler)
+            });
+            parents.extend(self.hierarchy.get_childs(id).iter().rev());
+        }
     }
 
     pub fn deactive_widget(&mut self, id: Id) {
@@ -411,6 +457,11 @@ impl<R: GUIRender> GUI<R> {
     pub fn add_behaviour(&mut self, id: Id, behaviour: Box<dyn Behaviour>) {
         self.widgets[id.index].add_behaviour(behaviour);
     }
+
+    pub fn add_layout(&mut self, id: Id, layout: Box<dyn Layout>) {
+        self.widgets[id.index].set_layout(layout);
+    }
+
     pub fn get_graphic(&mut self, id: Id) -> Option<&mut Graphic> {
         self.widgets[id.index].graphic.as_mut()
     }
@@ -430,6 +481,10 @@ impl<R: GUIRender> GUI<R> {
     pub fn send_event(&mut self, event: Box<dyn Any>) {
         if event.is::<event::InvalidadeLayout>() {
             self.update_layouts(ROOT_ID);
+        } else if let Some(event::ActiveWidget { id }) = event.downcast_ref() {
+            self.active_widget(*id);
+        } else if let Some(event::DeactiveWidget { id }) = event.downcast_ref() {
+            self.deactive_widget(*id);
         } else if event.is::<event::LockOver>() {
             self.over_is_locked = true;
         } else if event.is::<event::UnlockOver>() {
@@ -445,9 +500,13 @@ impl<R: GUIRender> GUI<R> {
         event: F,
     ) {
         for index in 0..self.widgets[id.index].behaviours.len() {
-            if let Some((this, mut widgets)) =
-                Widgets::new_with_mut_behaviour(id, index, &mut self.widgets, &mut self.hierarchy, &self.fonts)
-            {
+            if let Some((this, mut widgets)) = Widgets::new_with_mut_behaviour(
+                id,
+                index,
+                &mut self.widgets,
+                &mut self.hierarchy,
+                &self.fonts,
+            ) {
                 let mut event_handler = EventHandler::new();
                 event(this, id, &mut widgets, &mut event_handler);
                 let EventHandler { events, events_to } = event_handler;
@@ -479,12 +538,22 @@ impl<R: GUIRender> GUI<R> {
     }
 
     pub fn start(&mut self) {
+        self.update_layouts(ROOT_ID);
         let mut parents = vec![ROOT_ID];
         while let Some(id) = parents.pop() {
             self.call_event(id, |this, id, widgets, event_handler| {
                 this.on_start(id, widgets, event_handler)
             });
+            // when acessing childs directly, the inactive widgets is also picked.
             parents.extend(self.hierarchy.childs[id.index].iter().rev());
+        }
+        parents.clear();
+        parents.push(ROOT_ID);
+        while let Some(id) = parents.pop() {
+            self.call_event(id, |this, id, widgets, event_handler| {
+                this.on_active(id, widgets, event_handler)
+            });
+            parents.extend(self.hierarchy.get_childs(id));
         }
         fn print_tree(deep: usize, id: Id, hierarchy: &Hierarchy) {
             let childs = hierarchy.childs[id.index].clone();
@@ -512,14 +581,28 @@ impl<R: GUIRender> GUI<R> {
                 }
                 WindowEvent::MouseInput { state, .. } => {
                     if let Some(curr) = self.current_over {
-                        if self.listen_mouse(curr) {
-                            let event = match state {
-                                ElementState::Pressed => MouseEvent::Down,
-                                ElementState::Released => MouseEvent::Up,
-                            };
-                            self.send_mouse_event_to(curr, event);
-                            return true;
-                        }
+                        let event = match state {
+                            ElementState::Pressed => MouseEvent::Down,
+                            ElementState::Released => MouseEvent::Up,
+                        };
+                        self.send_mouse_event_to(curr, event);
+                        return true;
+                    }
+                }
+                WindowEvent::MouseWheel { delta, .. } => {
+                    if let Some(curr) = self.current_scroll {
+                        //TODO: I should handle Line and Pixel Delta differences more wisely?
+                        let delta = match delta {
+                            winit::event::MouseScrollDelta::LineDelta(x, y) => {
+                                [*x * 100.0, *y * 100.0]
+                            }
+                            winit::event::MouseScrollDelta::PixelDelta(p) => {
+                                [p.x as f32, p.y as f32]
+                            }
+                        };
+                        self.call_event(curr, |this, id, widgets, event_handler| {
+                            this.on_scroll_event(delta, id, widgets, event_handler)
+                        });
                     }
                 }
                 WindowEvent::CursorLeft { .. } => {
@@ -555,15 +638,10 @@ impl<R: GUIRender> GUI<R> {
         let mut curr = ROOT_ID;
         'l: loop {
             if self.listen_mouse(curr) {
-                self.send_mouse_event_to(curr, MouseEvent::Enter);
-                self.send_mouse_event_to(
-                    curr,
-                    MouseEvent::Moved {
-                        x: mouse_x,
-                        y: mouse_y,
-                    },
-                );
                 self.current_over = Some(curr);
+            }
+            if self.listen_scroll(curr) {
+                self.current_scroll = Some(curr);
             }
             // the interator is reversed because the last childs block the previous ones
             for child in self.hierarchy.get_childs(curr).iter().rev() {
@@ -574,10 +652,28 @@ impl<R: GUIRender> GUI<R> {
             }
             break;
         }
+
+        if let Some(curr) = self.current_over {
+            self.send_mouse_event_to(curr, MouseEvent::Enter);
+            self.send_mouse_event_to(
+                curr,
+                MouseEvent::Moved {
+                    x: mouse_x,
+                    y: mouse_y,
+                },
+            );
+        }
     }
 
     pub fn listen_mouse(&self, id: Id) -> bool {
-        self.widgets[id.index].listen_mouse
+        self.widgets[id.index]
+            .input_flags
+            .contains(InputFlags::POINTER)
+    }
+    pub fn listen_scroll(&self, id: Id) -> bool {
+        self.widgets[id.index]
+            .input_flags
+            .contains(InputFlags::SCROLL)
     }
 
     pub fn send_mouse_event_to(&mut self, id: Id, event: MouseEvent) {
@@ -595,9 +691,12 @@ impl<R: GUIRender> GUI<R> {
             i += 1;
         }
         while let Some(parent) = parents.pop() {
-            if let Some((layout, mut widgets)) =
-                Widgets::new_with_mut_layout(parent, &mut self.widgets, &mut self.hierarchy, &self.fonts)
-            {
+            if let Some((layout, mut widgets)) = Widgets::new_with_mut_layout(
+                parent,
+                &mut self.widgets,
+                &mut self.hierarchy,
+                &self.fonts,
+            ) {
                 layout.compute_min_size(parent, &mut widgets);
             }
         }
@@ -605,10 +704,20 @@ impl<R: GUIRender> GUI<R> {
         // inorder traversal
         parents.push(id);
         while let Some(parent) = parents.pop() {
-            if let Some((layout, mut widgets)) =
-                Widgets::new_with_mut_layout(parent, &mut self.widgets, &mut self.hierarchy, &self.fonts)
-            {
+            if let Some((layout, mut widgets)) = Widgets::new_with_mut_layout(
+                parent,
+                &mut self.widgets,
+                &mut self.hierarchy,
+                &self.fonts,
+            ) {
                 layout.update_layouts(parent, &mut widgets);
+                for event in widgets.events {
+                    if let Some(event::DeactiveWidget { id }) = event.downcast_ref() {
+                        self.hierarchy.deactive(*id);
+                    } else if let Some(event::ActiveWidget { id }) = event.downcast_ref() {
+                        self.hierarchy.active(*id);
+                    }
+                }
             } else {
                 for child in &self.hierarchy.get_childs(parent) {
                     let size = self.widgets[parent.index].rect.get_size();
@@ -619,9 +728,7 @@ impl<R: GUIRender> GUI<R> {
                     ];
                     let rect = &mut self.widgets[child.index].rect;
                     for i in 0..4 {
-                        rect.rect[i] = pos[i % 2]
-                            + size[i % 2] * rect.anchors[i]
-                            + rect.margins[i];
+                        rect.rect[i] = pos[i % 2] + size[i % 2] * rect.anchors[i] + rect.margins[i];
                     }
                     if rect.get_width() < rect.min_size[0] {
                         rect.set_width(rect.min_size[0]);
@@ -629,7 +736,6 @@ impl<R: GUIRender> GUI<R> {
                     if rect.get_height() < rect.min_size[1] {
                         rect.set_height(rect.min_size[1]);
                     }
-                    
                 }
             }
             parents.extend(self.hierarchy.get_childs(parent).iter().rev());
@@ -814,15 +920,32 @@ impl Rect {
     }
 }
 
+bitflags! {
+    pub struct InputFlags: u32 {
+        const POINTER = 0x01;
+        const SCROLL = 0x02;
+    }
+}
+
 #[allow(unused_variables)]
 pub trait Behaviour {
-    fn listen_mouse(&self) -> bool;
+    fn input_flags(&self) -> InputFlags;
 
     fn on_start(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {}
+    fn on_active(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {}
 
     fn on_event(
         &mut self,
         event: &dyn Any,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+    }
+
+    fn on_scroll_event(
+        &mut self,
+        delta: [f32; 2],
         this: Id,
         widgets: &mut Widgets,
         event_handler: &mut EventHandler,
@@ -840,10 +963,45 @@ pub trait Behaviour {
 }
 
 #[allow(unused_variables)]
-pub trait Layout {
+pub trait Layout: 'static {
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
     /// Cmpute its own min size, based on the min size of its children.
     fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets);
 
     /// Update the position and size of its children.
     fn update_layouts(&mut self, this: Id, widgets: &mut Widgets);
+}
+impl dyn Layout {
+    #[inline]
+    pub fn is<T: Any>(&self) -> bool {
+        let t = TypeId::of::<T>();
+        let concrete = self.type_id();
+        t == concrete
+    }
+
+    #[inline]
+    pub fn downcast_ref<T: Layout>(&self) -> Option<&T> {
+        if self.is::<T>() {
+            // SAFETY: just checked whether we are pointing to the correct type, and we can rely on
+            // that check for memory safety because we have implemented Any for all types; no other
+            // impls can exist as they would conflict with our impl.
+            unsafe { Some(&*(self as *const dyn Layout as *const T)) }
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
+        if self.is::<T>() {
+            // SAFETY: just checked whether we are pointing to the correct type, and we can rely on
+            // that check for memory safety because we have implemented Any for all types; no other
+            // impls can exist as they would conflict with our impl.
+            unsafe { Some(&mut *(self as *mut dyn Layout as *mut T)) }
+        } else {
+            None
+        }
+    }
 }

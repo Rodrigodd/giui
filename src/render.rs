@@ -1,7 +1,7 @@
 use super::GUI;
 use glyph_brush_draw_cache::{
+    ab_glyph::{Font, FontArc, PxScale},
     DrawCache, DrawCacheBuilder,
-    ab_glyph::{FontArc, Font, PxScale},
 };
 use glyph_brush_layout::{ab_glyph::*, *};
 use sprite_render::{Camera, Renderer, SpriteInstance, SpriteRender};
@@ -30,20 +30,46 @@ impl<'a> GUISpriteRender {
         use crate::ROOT_ID;
         let mut parents = vec![ROOT_ID];
         gui.render().sprites.clear();
+        let mut masks: Vec<(usize, [f32; 4])> = Vec::new();
+
+        fn intersection(a: &[f32; 4], b: &[f32; 4]) -> Option<[f32; 4]> {
+            if a[0] > b[2] || a[2] < b[0] || a[1] > b[3] || a[3] < b[1] {
+                return None;
+            }
+            Some([
+                a[0].max(b[0]),
+                a[1].max(b[1]),
+                a[2].min(b[2]),
+                a[3].min(b[3]),
+            ])
+        }
+
         while let Some(parent) = parents.pop() {
+            // println!("{}: {:?}", parents.len(), parent);
+            let mut mask = None;
+            if let Some((i, m)) = masks.last() {
+                if parents.len() < *i {
+                    masks.pop();
+                    mask = masks.last().map(|x| &x.1);
+                } else {
+                    mask = Some(m);
+                }
+            }
             if let Some(graphic) = gui.get_graphic(parent) {
                 let graphic = graphic.clone();
                 let rect = &gui.get_rect(parent);
                 let pos = rect.get_top_left();
                 let center = rect.get_center();
                 let mut size = rect.get_size();
-                let rect = *rect.get_rect();
-                let bounds = Rect {
-                    min: Point { x: rect[0], y: rect[1] },
-                    max: Point { x: rect[2], y: rect[3] },
-                };
+                let mut rect = *rect.get_rect();
                 size.0 = size.0.max(0.0);
                 size.1 = size.1.max(0.0);
+                if let Some(mask) = mask {
+                    if intersection(&rect, &mask).is_none() {
+                        // skip all its children
+                        continue;
+                    }
+                }
                 match graphic {
                     Graphic::Panel {
                         texture,
@@ -55,15 +81,21 @@ impl<'a> GUISpriteRender {
                         let mut painel = Painel::new(texture, uv_rect, border);
                         painel.set_rect(&rect);
                         painel.set_color(color);
-                        render
-                            .sprites
-                            .extend(painel.get_sprites().iter().cloned());
+                        if let Some(mask) = mask {
+                            for mut sprite in painel.get_sprites().iter().cloned() {
+                                if cut_sprite(&mut sprite, mask) {
+                                    render.sprites.push(sprite);
+                                }
+                            }
+                        } else {
+                            render.sprites.extend(painel.get_sprites().iter().cloned());
+                        }
                     }
                     Graphic::Text {
                         color,
                         text,
                         font_size,
-                        align
+                        align,
                     } => {
                         let fonts = gui.get_fonts();
                         let render: &mut GUISpriteRender = gui.render();
@@ -100,53 +132,70 @@ impl<'a> GUISpriteRender {
                                 screen_position,
                                 bounds: size,
                             },
-                            &[
-                                SectionText {
-                                    text: &text,
-                                    scale: PxScale::from(font_size),
-                                    font_id: FontId(0),
-                                },
-                            ],
+                            &[SectionText {
+                                text: &text,
+                                scale: PxScale::from(font_size),
+                                font_id: FontId(0),
+                            }],
                         );
 
                         for glyph in &glyphs {
-                            render.draw_cache.queue_glyph(glyph.font_id.0, glyph.glyph.clone());
+                            render
+                                .draw_cache
+                                .queue_glyph(glyph.font_id.0, glyph.glyph.clone());
                         }
                         let texture = render.font_texture;
                         //TODO: I should queue all the glyphs, before calling cache_queued
-                        render.draw_cache.cache_queued(&fonts, |rect, tex_data| {
-                            let mut data = Vec::with_capacity(tex_data.len() * 4);
-                            for byte in tex_data.iter() {
-                                data.push(255);
-                                data.push(255);
-                                data.push(255);
-                                data.push(*byte);
-                            }
-                            renderer.update_texture(
-                                texture,
-                                &data,
-                                Some([rect.min[0], rect.min[1], rect.width(), rect.height()]),
-                            );
-                        }).unwrap();
+                        render
+                            .draw_cache
+                            .cache_queued(&fonts, |rect, tex_data| {
+                                let mut data = Vec::with_capacity(tex_data.len() * 4);
+                                for byte in tex_data.iter() {
+                                    data.push(255);
+                                    data.push(255);
+                                    data.push(255);
+                                    data.push(*byte);
+                                }
+                                renderer.update_texture(
+                                    texture,
+                                    &data,
+                                    Some([rect.min[0], rect.min[1], rect.width(), rect.height()]),
+                                );
+                            })
+                            .unwrap();
+                        if let Some(mask) = mask {
+                            rect = intersection(&rect, mask).unwrap_or_default();
+                        }
                         for glyph in &glyphs {
-                            if let Some((tex_coords, pixel_coords)) = render.draw_cache.rect_for(glyph.font_id.0, &glyph.glyph) {
-                                if pixel_coords.min.x as f32 > bounds.max.x
-                                    || pixel_coords.min.y as f32 > bounds.max.y
-                                    || bounds.min.x > pixel_coords.max.x as f32
-                                    || bounds.min.y > pixel_coords.max.y as f32
+                            if let Some((tex_coords, pixel_coords)) =
+                                render.draw_cache.rect_for(glyph.font_id.0, &glyph.glyph)
+                            {
+                                if pixel_coords.min.x as f32 > rect[2]
+                                    || pixel_coords.min.y as f32 > rect[3]
+                                    || rect[0] > pixel_coords.max.x as f32
+                                    || rect[1] > pixel_coords.max.y as f32
                                 {
                                     // glyph is totally outside the bounds
                                 } else {
                                     render.sprites.push(to_vertex(
                                         tex_coords,
                                         pixel_coords,
-                                        bounds,
+                                        rect,
                                         color,
                                     ));
                                 }
                             }
                         }
-                        
+                    }
+                    Graphic::Mask => {
+                        if let Some(mask) = mask {
+                            match intersection(&rect, mask) {
+                                Some(rect) => masks.push((parents.len(), rect)),
+                                None => continue, // skip all its children
+                            }
+                        } else {
+                            masks.push((parents.len(), rect));
+                        }
                     }
                 }
             }
@@ -173,6 +222,7 @@ pub enum Graphic {
         font_size: f32,
         align: (i8, i8),
     },
+    Mask,
 }
 impl Graphic {
     pub fn with_color(mut self, new_color: [u8; 4]) -> Self {
@@ -183,6 +233,7 @@ impl Graphic {
             Graphic::Text { ref mut color, .. } => {
                 *color = new_color;
             }
+            Graphic::Mask => {}
         }
         self
     }
@@ -195,6 +246,7 @@ impl Graphic {
             Graphic::Text { ref mut color, .. } => {
                 *color = new_color;
             }
+            Graphic::Mask => {}
         }
     }
     pub fn set_alpha(&mut self, new_alpha: u8) {
@@ -205,6 +257,7 @@ impl Graphic {
             Graphic::Text { ref mut color, .. } => {
                 color[3] = new_alpha;
             }
+            Graphic::Mask => {}
         }
     }
 
@@ -213,9 +266,7 @@ impl Graphic {
             Graphic::Panel { ref mut border, .. } => {
                 *border = new_border;
             }
-            _ => {
-                panic!("call 'with_boder' in a non Graphic::Panel variant")
-            }
+            _ => panic!("call 'with_boder' in a non Graphic::Panel variant"),
         }
         self
     }
@@ -232,7 +283,8 @@ impl Graphic {
             font_size,
             align,
             ..
-        } = self {
+        } = self
+        {
             let layout = {
                 let hor = match align.0.cmp(&0) {
                     Ordering::Less => HorizontalAlign::Left,
@@ -252,16 +304,15 @@ impl Graphic {
             let glyphs = layout.calculate_glyphs(
                 &fonts,
                 &geometry,
-                &[
-                    SectionText {
-                        text: &text,
-                        scale: PxScale::from(*font_size),
-                        font_id: FontId(0),
-                    },
-                ],
+                &[SectionText {
+                    text: &text,
+                    scale: PxScale::from(*font_size),
+                    font_id: FontId(0),
+                }],
             );
 
-            glyphs.iter()
+            glyphs
+                .iter()
                 .fold(None, |b: Option<Rect>, sg| {
                     let sfont = fonts[sg.font_id.0].as_scaled(sg.glyph.scale);
                     let pos = sg.glyph.position;
@@ -287,9 +338,7 @@ impl Graphic {
                     })
                     .or_else(|| Some(lbound))
                 })
-                .map(|b| {
-                    [b.width(), b.height()]
-                })
+                .map(|b| [b.width(), b.height()])
         } else {
             None
         }
@@ -406,45 +455,55 @@ impl Painel {
 // }
 
 #[inline]
+pub fn cut_sprite(sprite: &mut SpriteInstance, bounds: &[f32; 4]) -> bool {
+    let mut rect = [
+        sprite.pos[0] - sprite.get_width() / 2.0,
+        sprite.pos[1] - sprite.get_height() / 2.0,
+        sprite.pos[0] + sprite.get_width() / 2.0,
+        sprite.pos[1] + sprite.get_height() / 2.0,
+    ];
+    if rect[0] < bounds[0] {
+        let d = (bounds[0] - rect[0]) / (rect[2] - rect[0]);
+        rect[0] = bounds[0];
+        sprite.uv_rect[0] += sprite.uv_rect[2] * d;
+        sprite.uv_rect[2] *= 1.0 - d;
+    }
+    if rect[2] > bounds[2] {
+        let d = (rect[2] - bounds[2]) / (rect[2] - rect[0]);
+        rect[2] = bounds[2];
+        sprite.uv_rect[2] *= 1.0 - d;
+    }
+
+    if rect[1] < bounds[1] {
+        let d = (bounds[1] - rect[1]) / (rect[3] - rect[1]);
+        rect[1] = bounds[1];
+        sprite.uv_rect[1] += sprite.uv_rect[3] * d;
+        sprite.uv_rect[3] *= 1.0 - d;
+    }
+    if rect[3] > bounds[3] {
+        let d = (rect[3] - bounds[3]) / (rect[3] - rect[1]);
+        rect[3] = bounds[3];
+        sprite.uv_rect[3] *= 1.0 - d;
+    }
+    sprite.pos = [(rect[0] + rect[2]) / 2.0, (rect[1] + rect[3]) / 2.0];
+    sprite.scale = [(rect[2] - rect[0]), (rect[3] - rect[1])];
+
+    !(sprite.scale[0] < 0.0 || sprite.scale[1] < 0.0)
+}
+
+#[inline]
 pub fn to_vertex(
-    mut tex_coords: Rect,
+    tex_coords: Rect,
     pixel_coords: Rect,
-    bounds: Rect,
+    bounds: [f32; 4],
     color: [u8; 4],
 ) -> SpriteInstance {
-    let mut gl_rect = Rect {
-        min: point(pixel_coords.min.x as f32, pixel_coords.min.y as f32),
-        max: point(pixel_coords.max.x as f32, pixel_coords.max.y as f32),
-    };
-
-    // handle overlapping bounds, modify uv_rect to preserve texture aspect
-    if gl_rect.max.x > bounds.max.x {
-        let old_width = gl_rect.width();
-        gl_rect.max.x = bounds.max.x;
-        tex_coords.max.x = tex_coords.min.x + tex_coords.width() * gl_rect.width() / old_width;
-    }
-    if gl_rect.min.x < bounds.min.x {
-        let old_width = gl_rect.width();
-        gl_rect.min.x = bounds.min.x;
-        tex_coords.min.x = tex_coords.max.x - tex_coords.width() * gl_rect.width() / old_width;
-    }
-    if gl_rect.max.y > bounds.max.y {
-        let old_height = gl_rect.height();
-        gl_rect.max.y = bounds.max.y;
-        tex_coords.max.y = tex_coords.min.y + tex_coords.height() * gl_rect.height() / old_height;
-    }
-    if gl_rect.min.y < bounds.min.y {
-        let old_height = gl_rect.height();
-        gl_rect.min.y = bounds.min.y;
-        tex_coords.min.y = tex_coords.max.y - tex_coords.height() * gl_rect.height() / old_height;
-    }
-
-    SpriteInstance {
+    let mut sprite = SpriteInstance {
         pos: [
-            (gl_rect.min.x + gl_rect.max.x) / 2.0,
-            (gl_rect.min.y + gl_rect.max.y) / 2.0,
+            (pixel_coords.min.x + pixel_coords.max.x) / 2.0,
+            (pixel_coords.min.y + pixel_coords.max.y) / 2.0,
         ],
-        scale: [gl_rect.width(), gl_rect.height()],
+        scale: [pixel_coords.width(), pixel_coords.height()],
         color,
         angle: 0.0,
         texture: 1,
@@ -454,5 +513,8 @@ pub fn to_vertex(
             tex_coords.width(),
             tex_coords.height(),
         ],
-    }
+    };
+
+    cut_sprite(&mut sprite, &bounds);
+    sprite
 }

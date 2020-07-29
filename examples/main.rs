@@ -1,11 +1,12 @@
 #![allow(clippy::useless_vec)]
 use glyph_brush_layout::ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteRender};
+use std::time::Instant;
 use ui_engine::render::{GUISpriteRender, Graphic};
 use ui_engine::{
     event as ui_event,
     layouts::{FitText, GridLayout, MarginLayout, VBoxLayout},
-    widgets::{Button, Hoverable, Slider, TabButton, TabGroup, Toggle},
+    widgets::{Button, Hoverable, ScrollBar, ScrollView, Slider, TabButton, TabGroup, Toggle},
     GUIRender, Id, RectFill, GUI,
 };
 use winit::{
@@ -439,6 +440,131 @@ fn main() {
 
             page_2
         };
+        let page_3 = {
+            let page_3 = gui
+                .create_widget()
+                .with_graphic(painel.clone())
+                .with_parent(page_area)
+                .build();
+            let scroll_view = gui
+                .create_widget()
+                .with_margins([10.0, 10.0, -20.0, -10.0])
+                .with_graphic(
+                    painel
+                        .clone()
+                        .with_color([100, 100, 100, 255])
+                        .with_border(0.0),
+                )
+                .with_parent(page_3)
+                .build();
+            let view = gui
+                .create_widget()
+                .with_graphic(Graphic::Mask)
+                .with_parent(scroll_view)
+                .build();
+            let h_scroll_bar = gui
+                .create_widget()
+                .with_min_size([20.0, 20.0])
+                .with_graphic(
+                    painel
+                        .clone()
+                        .with_color([150, 150, 150, 255])
+                        .with_border(0.0),
+                )
+                .with_parent(scroll_view)
+                .build();
+            let h_scroll_bar_handle = gui
+                .create_widget()
+                .with_graphic(
+                    painel
+                        .clone()
+                        .with_color([220, 220, 220, 255])
+                        .with_border(0.0),
+                )
+                .with_parent(h_scroll_bar)
+                .build();
+            gui.add_behaviour(
+                h_scroll_bar,
+                Box::new(ScrollBar::new(h_scroll_bar_handle, scroll_view, false)),
+            );
+            let v_scroll_bar = gui
+                .create_widget()
+                .with_min_size([20.0, 20.0])
+                .with_graphic(
+                    painel
+                        .clone()
+                        .with_color([150, 150, 150, 255])
+                        .with_border(0.0),
+                )
+                .with_parent(scroll_view)
+                .build();
+            let v_scroll_bar_handle = gui
+                .create_widget()
+                .with_graphic(
+                    painel
+                        .clone()
+                        .with_color([220, 220, 220, 255])
+                        .with_border(0.0),
+                )
+                .with_parent(v_scroll_bar)
+                .build();
+            gui.add_behaviour(
+                v_scroll_bar,
+                Box::new(ScrollBar::new(v_scroll_bar_handle, scroll_view, true)),
+            );
+            let list = gui
+                .create_widget()
+                .with_layout(Box::new(VBoxLayout::new(3.0, [5.0, 5.0, 5.0, 5.0], -1)))
+                .with_parent(view)
+                .build();
+            gui.add_behaviour(
+                scroll_view,
+                Box::new(ScrollView::new(
+                    view,
+                    list,
+                    h_scroll_bar,
+                    h_scroll_bar_handle,
+                    v_scroll_bar,
+                    v_scroll_bar_handle,
+                )),
+            );
+            let create_item =
+                |gui: &mut GUI<GUISpriteRender>, text: String, color: [u8; 4]| -> Id {
+                    let item = gui
+                        .create_widget()
+                        .with_min_size([100.0, 35.0])
+                        .with_graphic(painel.clone().with_border(0.0).with_color(color))
+                        .with_parent(list)
+                        .with_layout(Box::new(MarginLayout::new([5.0, 0.0, 5.0, 0.0])))
+                        .build();
+                    //TODO: there must be a better way to increase the min_size height
+                    gui.create_widget()
+                        .with_min_size([0.0, 35.0])
+                        .with_parent(item)
+                        .build();
+                    gui.create_widget()
+                        .with_parent(item)
+                        .with_graphic(Graphic::Text {
+                            color: [0, 0, 0, 255],
+                            text,
+                            font_size: 16.0,
+                            align: (-1, 0),
+                        })
+                        .with_layout(Box::new(FitText))
+                        .build();
+                    item
+                };
+            let mut seed = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            seed = seed ^ (seed << 64);
+            for i in 0..15 {
+                let color = (seed.rotate_left(i * 3)) as u32 | 0xff;
+                create_item(&mut gui, format!("This is the item number {} with the color which hexadecimal representation is #{:0x}", i + 1, color), color.to_be_bytes());
+            }
+            page_3
+        };
         let page_na = {
             let page_na = gui.create_widget().with_parent(page_area).build();
             let graphic = Graphic::Text {
@@ -490,7 +616,7 @@ fn main() {
                 create_button(&mut gui, 2, 4),
                 create_button(&mut gui, 3, 4),
             ];
-            let pages = vec![page_1, page_2, page_na, page_na];
+            let pages = vec![page_1, page_2, page_3, page_na];
             gui.add_behaviour(header, Box::new(TabGroup::new(buttons, pages)));
         }
 
