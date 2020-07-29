@@ -91,6 +91,28 @@ impl<'a> GUISpriteRender {
                             render.sprites.extend(painel.get_sprites().iter().cloned());
                         }
                     }
+                    Graphic::Texture {
+                        texture,
+                        uv_rect,
+                        color,
+                    } => {
+                        let render = gui.render();
+                        let mut sprite = SpriteInstance {
+                            scale: [size.0, size.1],
+                            angle: 0.0,
+                            uv_rect,
+                            color,
+                            pos: [center.0, center.1],
+                            texture,
+                        };
+                        if let Some(mask) = mask {
+                            if cut_sprite(&mut sprite, mask) {
+                                render.sprites.push(sprite);
+                            }
+                        } else {
+                            render.sprites.push(sprite);
+                        }
+                    }
                     Graphic::Text {
                         color,
                         text,
@@ -216,6 +238,11 @@ pub enum Graphic {
         color: [u8; 4],
         border: f32,
     },
+    Texture {
+        texture: u32,
+        uv_rect: [f32; 4],
+        color: [u8; 4],
+    },
     Text {
         color: [u8; 4],
         text: String,
@@ -227,10 +254,9 @@ pub enum Graphic {
 impl Graphic {
     pub fn with_color(mut self, new_color: [u8; 4]) -> Self {
         match self {
-            Graphic::Panel { ref mut color, .. } => {
-                *color = new_color;
-            }
-            Graphic::Text { ref mut color, .. } => {
+            Graphic::Panel { ref mut color, .. }
+            | Graphic::Texture { ref mut color, .. }
+            | Graphic::Text { ref mut color, .. } => {
                 *color = new_color;
             }
             Graphic::Mask => {}
@@ -240,10 +266,9 @@ impl Graphic {
 
     pub fn set_color(&mut self, new_color: [u8; 4]) {
         match self {
-            Graphic::Panel { ref mut color, .. } => {
-                *color = new_color;
-            }
-            Graphic::Text { ref mut color, .. } => {
+            Graphic::Panel { ref mut color, .. }
+            | Graphic::Texture { ref mut color, .. }
+            | Graphic::Text { ref mut color, .. } => {
                 *color = new_color;
             }
             Graphic::Mask => {}
@@ -251,10 +276,9 @@ impl Graphic {
     }
     pub fn set_alpha(&mut self, new_alpha: u8) {
         match self {
-            Graphic::Panel { ref mut color, .. } => {
-                color[3] = new_alpha;
-            }
-            Graphic::Text { ref mut color, .. } => {
+            Graphic::Panel { ref mut color, .. }
+            | Graphic::Texture { ref mut color, .. }
+            | Graphic::Text { ref mut color, .. } => {
                 color[3] = new_alpha;
             }
             Graphic::Mask => {}

@@ -50,6 +50,70 @@ impl Layout for MarginLayout {
     }
 }
 
+pub struct RatioLayout {
+    ratio: f32,
+    align: (i8, i8),
+}
+impl RatioLayout {
+    pub fn new(ratio: f32, align: (i8, i8)) -> Self {
+        Self { ratio, align }
+    }
+}
+impl Layout for RatioLayout {
+    fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets) {
+        let mut min_size = [0.0f32, 0.0];
+        for child in widgets.get_children(this) {
+            let c_min_size = widgets.get_rect(child).min_size;
+            min_size[0] = min_size[0].max(c_min_size[0]);
+            min_size[1] = min_size[1].max(c_min_size[1]);
+        }
+        if min_size[0] > min_size[1] * self.ratio {
+            widgets.get_rect(this).min_size = [min_size[0], min_size[0] / self.ratio];
+        } else {
+            widgets.get_rect(this).min_size = [min_size[1] * self.ratio, min_size[1]];
+        }
+    }
+
+    fn update_layouts(&mut self, this: Id, widgets: &mut Widgets) {
+        let rect = widgets.get_rect(this);
+        let des_rect = if rect.get_width() < rect.get_height() * self.ratio {
+            let x = rect.rect[0];
+            let mut y = rect.rect[1];
+            match self.align.1 {
+                -1 => {}
+                0 => y += (rect.get_height() - rect.get_width() / self.ratio) / 2.0,
+                1 => y += rect.get_height() - rect.get_width() / self.ratio,
+                _ => {}
+            }
+            [
+                x,
+                y,
+                x + rect.get_width(),
+                y + rect.get_width() / self.ratio,
+            ]
+        } else {
+            let mut x = rect.rect[0];
+            let y = rect.rect[1];
+            match self.align.0 {
+                -1 => {}
+                0 => x += (rect.get_width() - rect.get_height() * self.ratio) / 2.0,
+                1 => x += rect.get_width() - rect.get_height() * self.ratio,
+                _ => {}
+            }
+            [
+                x,
+                y,
+                x + rect.get_height() * self.ratio,
+                y + rect.get_height(),
+            ]
+        };
+        for child in widgets.get_children(this) {
+            let rect = widgets.get_rect(child);
+            rect.set_designed_rect(des_rect);
+        }
+    }
+}
+
 pub struct VBoxLayout {
     spacing: f32,
     margins: [f32; 4],

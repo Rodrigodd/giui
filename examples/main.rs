@@ -1,11 +1,10 @@
 #![allow(clippy::useless_vec)]
 use glyph_brush_layout::ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteRender};
-use std::time::Instant;
 use ui_engine::render::{GUISpriteRender, Graphic};
 use ui_engine::{
     event as ui_event,
-    layouts::{FitText, GridLayout, MarginLayout, VBoxLayout},
+    layouts::{FitText, GridLayout, MarginLayout, RatioLayout, VBoxLayout},
     widgets::{Button, Hoverable, ScrollBar, ScrollView, Slider, TabButton, TabGroup, Toggle},
     GUIRender, Id, RectFill, GUI,
 };
@@ -565,6 +564,23 @@ fn main() {
             }
             page_3
         };
+        let page_4 = {
+            let page_4 = gui
+                .create_widget()
+                .with_parent(page_area)
+                .with_layout(Box::new(RatioLayout::new(1.0, (0, 0))))
+                .build();
+            let graphic = Graphic::Texture {
+                texture: font_texture,
+                uv_rect: [0.0, 0.0, 1.0, 1.0],
+                color: [255, 255, 255, 255],
+            };
+            gui.create_widget()
+                .with_graphic(graphic)
+                .with_parent(page_4)
+                .build();
+            page_4
+        };
         let page_na = {
             let page_na = gui.create_widget().with_parent(page_area).build();
             let graphic = Graphic::Text {
@@ -611,12 +627,13 @@ fn main() {
                 button
             };
             let buttons = vec![
-                create_button(&mut gui, 0, 4),
-                create_button(&mut gui, 1, 4),
-                create_button(&mut gui, 2, 4),
-                create_button(&mut gui, 3, 4),
+                create_button(&mut gui, 0, 5),
+                create_button(&mut gui, 1, 5),
+                create_button(&mut gui, 2, 5),
+                create_button(&mut gui, 3, 5),
+                create_button(&mut gui, 4, 5),
             ];
-            let pages = vec![page_1, page_2, page_3, page_na];
+            let pages = vec![page_1, page_2, page_3, page_4, page_na];
             gui.add_behaviour(header, Box::new(TabGroup::new(buttons, pages)));
         }
 

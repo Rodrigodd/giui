@@ -640,7 +640,7 @@ impl Behaviour for ScrollBar {
     fn on_mouse_event(
         &mut self,
         event: MouseEvent,
-        this: Id,
+        _this: Id,
         widgets: &mut Widgets,
         event_handler: &mut EventHandler,
     ) {
