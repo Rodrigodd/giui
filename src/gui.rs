@@ -7,7 +7,9 @@ use winit::event::{ElementState, Event, WindowEvent};
 pub mod event {
     use super::Id;
     pub struct Redraw;
-    pub struct InvalidadeLayout;
+    pub struct InvalidadeLayout {
+        pub id: Id,
+    }
     pub struct LockOver;
     pub struct UnlockOver;
     pub struct ActiveWidget {
@@ -28,7 +30,7 @@ pub mod event {
         pub value: f32,
     }
 
-    pub struct ToogleChanged {
+    pub struct ToggleChanged {
         pub id: Id,
         pub value: bool,
     }
@@ -39,6 +41,12 @@ pub const ROOT_ID: Id = Id { index: 0 };
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Id {
     index: usize,
+}
+impl Id {
+    /// Get the index of the widget in the widgets vector inside GUI<R>
+    pub fn get_index(&self) -> usize {
+        self.index
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -71,7 +79,7 @@ impl Hierarchy {
     }
 
     #[inline]
-    fn get_childs(&self, id: Id) -> Vec<Id> {
+    fn get_children(&self, id: Id) -> Vec<Id> {
         self.childs[id.index]
             .iter()
             .filter(|x| self.active[x.index])
@@ -256,6 +264,19 @@ pub struct Widgets<'a> {
     events: Vec<Box<dyn Any>>,
 }
 impl<'a> Widgets<'a> {
+    pub fn new(
+        widgets: &'a mut [Widget],
+        hierarchy: &'a mut Hierarchy,
+        fonts: &'a [FontArc],
+    ) -> Self {
+        Self {
+            widgets,
+            hierarchy,
+            events: Vec::new(),
+            fonts,
+        }
+    }
+
     pub fn new_with_mut_layout(
         this: Id,
         widgets: &'a mut [Widget],
@@ -300,12 +321,17 @@ impl<'a> Widgets<'a> {
         self.fonts
     }
 
+    pub fn get_rect(&mut self, id: Id) -> &mut Rect {
+        &mut self.widgets[id.index].rect
+    }
+
     pub fn get_graphic(&mut self, id: Id) -> Option<&mut Graphic> {
         self.widgets[id.index].graphic.as_mut()
     }
 
-    pub fn get_rect(&mut self, id: Id) -> &mut Rect {
-        &mut self.widgets[id.index].rect
+    pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
+        let widget = &mut self.widgets[id.index];
+        Some((&mut widget.rect, widget.graphic.as_mut()?))
     }
 
     pub fn get_layout(&mut self, id: Id) -> Option<&mut dyn Layout> {
@@ -334,7 +360,7 @@ impl<'a> Widgets<'a> {
 
     pub fn move_to_front(&mut self, id: Id) {
         self.hierarchy.move_to_front(id);
-        self.events.push(Box::new(event::InvalidadeLayout));
+        self.events.push(Box::new(event::InvalidadeLayout { id }));
         self.events.push(Box::new(event::Redraw));
     }
 
@@ -343,7 +369,7 @@ impl<'a> Widgets<'a> {
     }
 
     pub fn get_children(&mut self, id: Id) -> Vec<Id> {
-        self.hierarchy.get_childs(id)
+        self.hierarchy.get_children(id)
     }
 }
 
@@ -393,6 +419,7 @@ impl<R: GUIRender> GUI<R> {
                     fill_y: RectFill::Fill,
                     ratio_x: 0.0,
                     ratio_y: 0.0,
+                    dirty_flags: DirtyFlags::empty(),
                 },
                 graphic: None,
                 layout: None,
@@ -425,19 +452,20 @@ impl<R: GUIRender> GUI<R> {
 
     pub fn active_widget(&mut self, id: Id) {
         self.hierarchy.active(id);
-        self.send_event(Box::new(event::InvalidadeLayout));
+        self.send_event(Box::new(event::InvalidadeLayout { id }));
+        self.send_event(Box::new(event::Redraw));
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
             self.call_event(id, |this, id, widgets, event_handler| {
                 this.on_active(id, widgets, event_handler)
             });
-            parents.extend(self.hierarchy.get_childs(id).iter().rev());
+            parents.extend(self.hierarchy.get_children(id).iter().rev());
         }
     }
 
     pub fn deactive_widget(&mut self, id: Id) {
         self.hierarchy.deactive(id);
-        self.send_event(Box::new(event::InvalidadeLayout));
+        self.send_event(Box::new(event::InvalidadeLayout { id }));
     }
 
     pub fn get_fonts(&mut self) -> Vec<FontArc> {
@@ -445,13 +473,21 @@ impl<R: GUIRender> GUI<R> {
     }
 
     #[inline]
-    pub fn get_childs(&mut self, id: Id) -> Vec<Id> {
-        self.hierarchy.get_childs(id)
+    pub fn get_children(&mut self, id: Id) -> Vec<Id> {
+        self.hierarchy.get_children(id)
     }
 
     #[inline]
     pub fn render(&mut self) -> &mut R {
         &mut self.render
+    }
+
+    #[inline]
+    pub fn get_render_and_widgets(&mut self) -> (&mut R, Widgets) {
+        (
+            &mut self.render,
+            Widgets::new(&mut self.widgets, &mut self.hierarchy, &self.fonts),
+        )
     }
 
     pub fn add_behaviour(&mut self, id: Id, behaviour: Box<dyn Behaviour>) {
@@ -471,6 +507,7 @@ impl<R: GUIRender> GUI<R> {
 
     pub fn resize(&mut self, width: f32, height: f32) {
         self.widgets[ROOT_ID.index].rect.rect = [0.0, 0.0, width, height];
+        self.widgets[ROOT_ID.index].rect.dirty_flags.insert(DirtyFlags::all());
         self.update_layouts(ROOT_ID);
     }
 
@@ -479,8 +516,8 @@ impl<R: GUIRender> GUI<R> {
     }
 
     pub fn send_event(&mut self, event: Box<dyn Any>) {
-        if event.is::<event::InvalidadeLayout>() {
-            self.update_layouts(ROOT_ID);
+        if let Some(event::InvalidadeLayout { id }) = event.downcast_ref() {
+            self.update_layouts(*id);
         } else if let Some(event::ActiveWidget { id }) = event.downcast_ref() {
             self.active_widget(*id);
         } else if let Some(event::DeactiveWidget { id }) = event.downcast_ref() {
@@ -553,7 +590,7 @@ impl<R: GUIRender> GUI<R> {
             self.call_event(id, |this, id, widgets, event_handler| {
                 this.on_active(id, widgets, event_handler)
             });
-            parents.extend(self.hierarchy.get_childs(id));
+            parents.extend(self.hierarchy.get_children(id));
         }
         fn print_tree(deep: usize, id: Id, hierarchy: &Hierarchy) {
             let childs = hierarchy.childs[id.index].clone();
@@ -644,7 +681,7 @@ impl<R: GUIRender> GUI<R> {
                 self.current_scroll = Some(curr);
             }
             // the interator is reversed because the last childs block the previous ones
-            for child in self.hierarchy.get_childs(curr).iter().rev() {
+            for child in self.hierarchy.get_children(curr).iter().rev() {
                 if self.widgets[child.index].rect.contains(mouse_x, mouse_y) {
                     curr = *child;
                     continue 'l;
@@ -682,12 +719,37 @@ impl<R: GUIRender> GUI<R> {
         });
     }
 
-    pub fn update_layouts(&mut self, id: Id) {
+    pub fn update_layouts(&mut self, mut id: Id) {
+        if let Some(parent) = self.hierarchy.get_parent(id) {
+            if self.widgets[parent.index].layout.is_some() {
+                id = parent;
+            } else {
+                let size = self.widgets[parent.index].rect.get_size();
+                let size = [size.0, size.1];
+                let pos: [f32; 2] = [
+                    self.widgets[parent.index].rect.rect[0],
+                    self.widgets[parent.index].rect.rect[1],
+                ];
+                let rect = &mut self.widgets[id.index].rect;
+                let mut new_rect = [0.0; 4];
+                for i in 0..4 {
+                    new_rect[i] = pos[i % 2] + size[i % 2] * rect.anchors[i] + rect.margins[i];
+                }
+                rect.set_rect(new_rect);
+                if rect.get_width() < rect.min_size[0] {
+                    rect.set_width(rect.min_size[0]);
+                }
+                if rect.get_height() < rect.min_size[1] {
+                    rect.set_height(rect.min_size[1]);
+                }
+            }
+        }
+
         let mut parents = vec![id];
         let mut i = 0;
         // post order traversal
         while i != parents.len() {
-            parents.extend(self.hierarchy.get_childs(parents[i]).iter().rev());
+            parents.extend(self.hierarchy.get_children(parents[i]).iter().rev());
             i += 1;
         }
         while let Some(parent) = parents.pop() {
@@ -719,7 +781,7 @@ impl<R: GUIRender> GUI<R> {
                     }
                 }
             } else {
-                for child in &self.hierarchy.get_childs(parent) {
+                for child in &self.hierarchy.get_children(parent) {
                     let size = self.widgets[parent.index].rect.get_size();
                     let size = [size.0, size.1];
                     let pos: [f32; 2] = [
@@ -727,9 +789,11 @@ impl<R: GUIRender> GUI<R> {
                         self.widgets[parent.index].rect.rect[1],
                     ];
                     let rect = &mut self.widgets[child.index].rect;
+                    let mut new_rect = [0.0; 4];
                     for i in 0..4 {
-                        rect.rect[i] = pos[i % 2] + size[i % 2] * rect.anchors[i] + rect.margins[i];
+                        new_rect[i] = pos[i % 2] + size[i % 2] * rect.anchors[i] + rect.margins[i];
                     }
+                    rect.set_rect(new_rect);
                     if rect.get_width() < rect.min_size[0] {
                         rect.set_width(rect.min_size[0]);
                     }
@@ -738,7 +802,7 @@ impl<R: GUIRender> GUI<R> {
                     }
                 }
             }
-            parents.extend(self.hierarchy.get_childs(parent).iter().rev());
+            parents.extend(self.hierarchy.get_children(parent).iter().rev());
         }
     }
 }
@@ -749,6 +813,17 @@ pub enum RectFill {
     ShrinkStart,
     ShrinkCenter,
     ShrinkEnd,
+}
+
+bitflags! {
+    pub struct DirtyFlags: u32 {
+        /// The width of the rect has changed
+        const WIDTH = 0x01;
+        /// The height of the rect has changed
+        const HEIGHT = 0x02;
+        /// The rect of the rect has changed
+        const RECT = 0x04;
+    }
 }
 
 /// The basic component of a UI element.
@@ -763,13 +838,14 @@ pub struct Rect {
     pub anchors: [f32; 4],
     pub margins: [f32; 4],
     pub min_size: [f32; 2],
-    pub rect: [f32; 4],
+    rect: [f32; 4],
     expand_x: bool,
     expand_y: bool,
     fill_x: RectFill,
     fill_y: RectFill,
     pub ratio_x: f32,
     pub ratio_y: f32,
+    dirty_flags: DirtyFlags,
 }
 impl Rect {
     pub fn new(anchors: [f32; 4], margins: [f32; 4]) -> Self {
@@ -784,61 +860,89 @@ impl Rect {
             fill_y: RectFill::Fill,
             ratio_x: 1.0,
             ratio_y: 1.0,
+            dirty_flags: DirtyFlags::all(),
         }
+    }
+
+    /// Get the dirty flags. The dirty flags keep track if some values have changed
+    /// since last call to clear_dirty_flags.
+    pub fn get_dirty_flags(&mut self) -> DirtyFlags {
+        self.dirty_flags
+    }
+
+    pub fn clear_dirty_flags(&mut self) {
+        self.dirty_flags = DirtyFlags::empty();
+    }
+
+    pub fn set_rect(&mut self, rect: [f32; 4]) {
+        #[allow(clippy::float_cmp)]
+        if rect == self.rect {
+            return;
+        }
+        self.dirty_flags.insert(DirtyFlags::RECT);
+        if (self.get_width() - (rect[2] - rect[0])).abs() > f32::EPSILON {
+            self.dirty_flags.insert(DirtyFlags::WIDTH);
+        }
+        if (self.get_height() - (rect[3] - rect[1])).abs() > f32::EPSILON {
+            self.dirty_flags.insert(DirtyFlags::HEIGHT);
+        }
+        self.rect = rect;
     }
 
     /// Set the designed area for this rect. This rect will decide its own size,
     /// based on its size flags and the designed area.
     pub fn set_designed_rect(&mut self, rect: [f32; 4]) {
+        let mut new_rect = [0.0; 4];
         if rect[2] - rect[0] <= self.min_size[0] {
-            self.rect[0] = rect[0];
-            self.rect[2] = rect[0] + self.min_size[0];
+            new_rect[0] = rect[0];
+            new_rect[2] = rect[0] + self.min_size[0];
         } else {
             match self.fill_x {
                 RectFill::Fill => {
-                    self.rect[0] = rect[0];
-                    self.rect[2] = rect[2];
+                    new_rect[0] = rect[0];
+                    new_rect[2] = rect[2];
                 }
                 RectFill::ShrinkStart => {
-                    self.rect[0] = rect[0];
-                    self.rect[2] = rect[0] + self.min_size[0];
+                    new_rect[0] = rect[0];
+                    new_rect[2] = rect[0] + self.min_size[0];
                 }
                 RectFill::ShrinkCenter => {
                     let x = (rect[2] - rect[0] - self.min_size[0]) / 2.0;
-                    self.rect[0] = rect[0] + x;
-                    self.rect[2] = rect[2] - x;
+                    new_rect[0] = rect[0] + x;
+                    new_rect[2] = rect[2] - x;
                 }
                 RectFill::ShrinkEnd => {
-                    self.rect[0] = rect[2] - self.min_size[0];
-                    self.rect[2] = rect[2];
+                    new_rect[0] = rect[2] - self.min_size[0];
+                    new_rect[2] = rect[2];
                 }
             }
         }
 
         if rect[3] - rect[1] <= self.min_size[1] {
-            self.rect[1] = rect[1];
-            self.rect[3] = rect[1] + self.min_size[1];
+            new_rect[1] = rect[1];
+            new_rect[3] = rect[1] + self.min_size[1];
         } else {
             match self.fill_y {
                 RectFill::Fill => {
-                    self.rect[1] = rect[1];
-                    self.rect[3] = rect[3];
+                    new_rect[1] = rect[1];
+                    new_rect[3] = rect[3];
                 }
                 RectFill::ShrinkStart => {
-                    self.rect[1] = rect[1];
-                    self.rect[3] = rect[1] + self.min_size[1];
+                    new_rect[1] = rect[1];
+                    new_rect[3] = rect[1] + self.min_size[1];
                 }
                 RectFill::ShrinkCenter => {
                     let x = (rect[3] - rect[1] - self.min_size[1]) / 2.0;
-                    self.rect[1] = rect[1] + x;
-                    self.rect[3] = rect[3] - x;
+                    new_rect[1] = rect[1] + x;
+                    new_rect[3] = rect[3] - x;
                 }
                 RectFill::ShrinkEnd => {
-                    self.rect[1] = rect[3] - self.min_size[1];
-                    self.rect[3] = rect[3];
+                    new_rect[1] = rect[3] - self.min_size[1];
+                    new_rect[3] = rect[3];
                 }
             }
         }
+        self.set_rect(new_rect);
     }
 
     pub fn set_fill_x(&mut self, fill: RectFill) {
@@ -891,6 +995,9 @@ impl Rect {
 
     #[inline]
     pub fn set_width(&mut self, width: f32) {
+        if (self.get_width() - width).abs() > f32::EPSILON {
+            self.dirty_flags.insert(DirtyFlags::WIDTH);
+        }
         self.rect[2] = self.rect[0] + width;
     }
 
@@ -901,6 +1008,9 @@ impl Rect {
 
     #[inline]
     pub fn set_height(&mut self, height: f32) {
+        if (self.get_height() - height).abs() > f32::EPSILON {
+            self.dirty_flags.insert(DirtyFlags::HEIGHT);
+        }
         self.rect[3] = self.rect[1] + height;
     }
 

@@ -1,10 +1,10 @@
 #![allow(clippy::useless_vec)]
 use glyph_brush_layout::ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteRender};
-use ui_engine::render::{GUISpriteRender, Graphic};
 use ui_engine::{
     event as ui_event,
     layouts::{FitText, GridLayout, MarginLayout, RatioLayout, VBoxLayout},
+    render::{GUISpriteRender, Graphic, Panel, Text, Texture},
     widgets::{Button, Hoverable, ScrollBar, ScrollView, Slider, TabButton, TabGroup, Toggle},
     GUIRender, Id, RectFill, GUI,
 };
@@ -46,12 +46,7 @@ fn main() {
         window_size.width as f32 / 2.0,
         window_size.height as f32 / 2.0,
     );
-    let painel = Graphic::Panel {
-        texture,
-        uv_rect: [0.0, 0.0, 1.0, 1.0],
-        color: [255, 255, 255, 255],
-        border: 5.0,
-    };
+    let painel: Graphic = Panel::new(texture, [0.0, 0.0, 1.0, 1.0], 5.0).into();
     let page_area = gui
         .create_widget()
         .with_margins([0.0, 45.0, 0.0, 0.0])
@@ -68,12 +63,13 @@ fn main() {
             .with_margins([3.0, 6.0, 6.0, 9.0])
             .with_layout(Box::new(MarginLayout::new([3.0, 3.0, 3.0, 3.0])))
             .build();
-        let graphic = Graphic::Text {
-            color: [255, 255, 255, 255],
-            text: "This is a Hover".to_owned(),
-            font_size: 12.0,
-            align: (-1, 0),
-        };
+        let graphic = Text::new(
+            [255, 255, 255, 255],
+            "This is a Hover".to_owned(),
+            12.0,
+            (-1, 0),
+        )
+        .into();
         let label = gui
             .create_widget()
             .with_graphic(graphic)
@@ -108,12 +104,12 @@ fn main() {
             .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
             .with_parent(right_painel)
             .build();
-        let graphic = Graphic::Text {
-            text: "This is a example text. Please, don't mind me. Continue doing what you need to do. If you cannot ignore this text, I don't mind.".to_owned(),
-            color: [0, 0, 0, 255],
-            font_size: 20.0,
-            align: (0, -1),
-        };
+        let graphic = Text::new(
+            [0, 0, 0, 255],
+            "This is a example text. Please, don't mind me. Continue doing what you need to do. If you cannot ignore this text, I don't mind.".to_owned(),
+            20.0,
+            (0, -1),
+        ).into();
         gui.create_widget()
             .with_anchors([0.0, 0.0, 1.0, 1.0])
             .with_margins([5.0, 5.0, -5.0, -5.0])
@@ -129,12 +125,12 @@ fn main() {
             .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
             .with_parent(right_painel)
             .build();
-        let graphic = Graphic::Text {
-            text: "This is another example text. Please, also don't mind me. Continue doing what you was doing. If you cannot ignore this text, I don't mind either.".to_owned(),
-            font_size: 20.0,
-            align: (-1, 0),
-            color: [0, 0, 0, 255],
-        };
+        let graphic = Text::new(
+            [0, 0, 0, 255],
+            "This is another example text. Please, also don't mind me. Continue doing what you was doing. If you cannot ignore this text, I don't mind either.".to_owned(),
+            20.0,
+            (-1, 0),
+        ).into();
         gui.create_widget()
             .with_anchors([0.0, 0.0, 1.0, 1.0])
             .with_margins([5.0, 5.0, -5.0, -5.0])
@@ -157,12 +153,7 @@ fn main() {
             )))
             .with_parent(menu)
             .build();
-        let graphic = Graphic::Text {
-            text: "My Button".to_owned(),
-            font_size: 16.0,
-            align: (0, 0),
-            color: [40, 40, 100, 255],
-        };
+        let graphic = Text::new([40, 40, 100, 255], "My Button".to_owned(), 16.0, (0, 0)).into();
         gui.create_widget()
             .with_anchors([0.0, 0.0, 1.0, 1.0])
             .with_margins([0.0, 0.0, 0.0, 0.0])
@@ -278,12 +269,13 @@ fn main() {
                     )))
                     .with_parent(parent)
                     .build();
-                let graphic = Graphic::Text {
-                    text: format!("{}x{}", min_size[0], min_size[1]),
-                    font_size: 12.0,
-                    align: (0, 0),
-                    color: [40, 40, 100, 255],
-                };
+                let graphic = Text::new(
+                    [40, 40, 100, 255],
+                    format!("{}x{}", min_size[0], min_size[1]),
+                    12.0,
+                    (0, 0),
+                )
+                .into();
                 gui.create_widget()
                     .with_graphic(graphic)
                     .with_parent(rect)
@@ -543,12 +535,7 @@ fn main() {
                         .build();
                     gui.create_widget()
                         .with_parent(item)
-                        .with_graphic(Graphic::Text {
-                            color: [0, 0, 0, 255],
-                            text,
-                            font_size: 16.0,
-                            align: (-1, 0),
-                        })
+                        .with_graphic(Text::new([0, 0, 0, 255], text, 16.0, (-1, 0)).into())
                         .with_layout(Box::new(FitText))
                         .build();
                     item
@@ -570,11 +557,7 @@ fn main() {
                 .with_parent(page_area)
                 .with_layout(Box::new(RatioLayout::new(1.0, (0, 0))))
                 .build();
-            let graphic = Graphic::Texture {
-                texture: font_texture,
-                uv_rect: [0.0, 0.0, 1.0, 1.0],
-                color: [255, 255, 255, 255],
-            };
+            let graphic = Texture::new(font_texture, [0.0, 0.0, 1.0, 1.0]).into();
             gui.create_widget()
                 .with_graphic(graphic)
                 .with_parent(page_4)
@@ -583,12 +566,12 @@ fn main() {
         };
         let page_na = {
             let page_na = gui.create_widget().with_parent(page_area).build();
-            let graphic = Graphic::Text {
-                color: [255, 255, 255, 255],
-                text: "This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(),
-                font_size: 20.0,
-                align: (0, -1),
-            };
+            let graphic = Text::new(
+                [255, 255, 255, 255],
+                "This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(),
+                20.0,
+                (0, -1),
+            ).into();
             gui.create_widget()
                 .with_margins([15.0, 15.0, -15.0, -15.0])
                 .with_graphic(graphic)
@@ -612,12 +595,8 @@ fn main() {
                     .with_parent(header)
                     .with_behaviour(Box::new(TabButton::new(header)))
                     .build();
-                let graphic = Graphic::Text {
-                    text: format!("Tab {}", i + 1),
-                    font_size: 16.0,
-                    align: (0, 0),
-                    color: [40, 40, 100, 255],
-                };
+                let graphic =
+                    Text::new([40, 40, 100, 255], format!("Tab {}", i + 1), 16.0, (0, 0)).into();
                 gui.create_widget()
                     .with_anchors([0.0, 0.0, 1.0, 1.0])
                     .with_margins([0.0, 0.0, 0.0, 0.0])
@@ -638,12 +617,8 @@ fn main() {
         }
 
         {
-            let graphic = Graphic::Text {
-                text: "Bottom Text".to_owned(),
-                color: [40, 40, 100, 255],
-                font_size: 16.0,
-                align: (-1, 0),
-            };
+            let graphic =
+                Text::new([40, 40, 100, 255], "Bottom Text".to_owned(), 16.0, (-1, 0)).into();
             gui.create_widget()
                 .with_anchors([0.0, 0.0, 1.0, 1.0])
                 .with_margins([30.0, 0.0, 0.0, 0.0])
@@ -688,18 +663,18 @@ fn main() {
                 }
             } else if let Some(ui_event::ValueChanged { id, value }) = event.downcast_ref() {
                 if *id == my_slider {
-                    if let Some(Graphic::Text { font_size, .. }) = gui.get_graphic(top_text) {
-                        *font_size = *value;
+                    if let Some(Graphic::Text(text)) = gui.get_graphic(top_text) {
+                        text.set_font_size(*value);
                     }
                 }
             } else if let Some(ui_event::ValueSet { id, value }) = event.downcast_ref() {
                 if *id == my_slider {
-                    if let Some(Graphic::Text { font_size, .. }) = gui.get_graphic(top_text) {
-                        *font_size = *value;
+                    if let Some(Graphic::Text(text)) = gui.get_graphic(top_text) {
+                        text.set_font_size(*value);
                     }
                     println!("Slide value set!! {}", value);
                 }
-            } else if let Some(ui_event::ToogleChanged { id, value }) = event.downcast_ref() {
+            } else if let Some(ui_event::ToggleChanged { id, value }) = event.downcast_ref() {
                 if *id == my_toggle {
                     println!("Toogle changed to {}!", value);
                     if *value {
@@ -720,7 +695,8 @@ fn main() {
                 _ => {}
             },
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                GUISpriteRender::prepare_render(&mut gui, &mut render);
+                let (gui_render, mut widgets) = gui.get_render_and_widgets();
+                gui_render.prepare_render(&mut widgets, &mut render);
                 let mut renderer = render.render();
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
                 gui.render().render(renderer.as_mut(), &mut screen_camera);

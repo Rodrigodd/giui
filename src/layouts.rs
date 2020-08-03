@@ -36,7 +36,7 @@ impl Layout for MarginLayout {
         ];
     }
     fn update_layouts(&mut self, this: Id, widgets: &mut Widgets) {
-        let rect = widgets.get_rect(this).rect;
+        let rect = widgets.get_rect(this).get_rect();
         let des_rect = [
             rect[0] + self.margins[0],
             rect[1] + self.margins[1],
@@ -76,9 +76,9 @@ impl Layout for RatioLayout {
 
     fn update_layouts(&mut self, this: Id, widgets: &mut Widgets) {
         let rect = widgets.get_rect(this);
+        let mut x = rect.get_rect()[0];
+        let mut y = rect.get_rect()[1];
         let des_rect = if rect.get_width() < rect.get_height() * self.ratio {
-            let x = rect.rect[0];
-            let mut y = rect.rect[1];
             match self.align.1 {
                 -1 => {}
                 0 => y += (rect.get_height() - rect.get_width() / self.ratio) / 2.0,
@@ -92,8 +92,6 @@ impl Layout for RatioLayout {
                 y + rect.get_width() / self.ratio,
             ]
         } else {
-            let mut x = rect.rect[0];
-            let y = rect.rect[1];
             match self.align.0 {
                 -1 => {}
                 0 => x += (rect.get_width() - rect.get_height() * self.ratio) / 2.0,
@@ -166,10 +164,11 @@ impl Layout for VBoxLayout {
             }
         }
         let rect = widgets.get_rect(this);
-        let left = rect.rect[0] + self.margins[0];
-        let right = rect.rect[2] - self.margins[2];
-        let mut y = rect.rect[1] + self.margins[1];
         let height = rect.get_height() - self.margins[1] - self.margins[3];
+        let rect = *rect.get_rect();
+        let left = rect[0] + self.margins[0];
+        let right = rect[2] - self.margins[2];
+        let mut y = rect[1] + self.margins[1];
         let free_height = height - reserved_height;
         if free_height <= 0.0 || max_weight == 0.0 {
             match self.align {
@@ -291,7 +290,7 @@ impl Layout for GridLayout {
         let free_width = width - reserved_width;
         let free_height = height - reserved_height;
         let mut positions = vec![[0.0; 2]; self.columns as usize + self.rows as usize];
-        let mut x = rect.rect[0] + self.margins[0];
+        let mut x = rect.get_rect()[0] + self.margins[0];
         if free_width <= 0.0 || width_weight == 0.0 {
             for i in collumn_range {
                 positions[i][0] = x;
@@ -315,7 +314,7 @@ impl Layout for GridLayout {
             }
         }
 
-        let mut y = rect.rect[1] + self.margins[1];
+        let mut y = rect.get_rect()[1] + self.margins[1];
         if free_height <= 0.0 || height_weight == 0.0 {
             for i in row_range {
                 positions[i][0] = y;

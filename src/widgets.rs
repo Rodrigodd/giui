@@ -94,13 +94,14 @@ impl Slider {
         self.value = value;
     }
 
-    fn set_handle_pos(&mut self, rect: &mut Rect, event_handler: &mut EventHandler) {
+    fn set_handle_pos(&mut self, handle: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+        let rect = widgets.get_rect(handle);
         let mut rel_x = (self.value - self.min_value) / (self.max_value - self.min_value);
         rel_x = rel_x.max(0.0).min(1.0);
         rect.anchors[0] = rel_x;
         rect.anchors[2] = rel_x;
         event_handler.send_event(event::Redraw);
-        event_handler.send_event(event::InvalidadeLayout);
+        event_handler.send_event(event::InvalidadeLayout { id: handle });
     }
 }
 impl Behaviour for Slider {
@@ -109,7 +110,7 @@ impl Behaviour for Slider {
     }
 
     fn on_start(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
-        self.set_handle_pos(widgets.get_rect(self.handle), event_handler);
+        self.set_handle_pos(self.handle, widgets, event_handler);
         let value = self.value;
         event_handler.send_event(event::ValueSet { id: this, value });
     }
@@ -128,13 +129,13 @@ impl Behaviour for Slider {
                 self.dragging = true;
                 event_handler.send_event(event::LockOver);
                 self.compute_value(widgets.get_rect(self.slide_area));
-                self.set_handle_pos(widgets.get_rect(self.handle), event_handler);
+                self.set_handle_pos(self.handle, widgets, event_handler);
                 let value = self.value;
                 event_handler.send_event(event::ValueChanged { id: this, value });
             }
             MouseEvent::Up => {
                 self.dragging = false;
-                self.set_handle_pos(widgets.get_rect(self.handle), event_handler);
+                self.set_handle_pos(self.handle, widgets, event_handler);
                 let value = self.value;
                 event_handler.send_event(event::ValueSet { id: this, value });
                 event_handler.send_event(event::UnlockOver);
@@ -143,7 +144,7 @@ impl Behaviour for Slider {
                 self.mouse_x = x;
                 if self.dragging {
                     self.compute_value(widgets.get_rect(self.slide_area));
-                    self.set_handle_pos(widgets.get_rect(self.handle), event_handler);
+                    self.set_handle_pos(self.handle, widgets, event_handler);
                     let value = self.value;
                     event_handler.send_event(event::ValueChanged { id: this, value });
                 }
@@ -174,7 +175,7 @@ impl Behaviour for Toggle {
     }
 
     fn on_start(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
-        event_handler.send_event(event::ToogleChanged {
+        event_handler.send_event(event::ToggleChanged {
             id: this,
             value: self.enable,
         });
@@ -215,7 +216,7 @@ impl Behaviour for Toggle {
                 event_handler.send_event(event::Redraw);
                 if self.click {
                     self.enable = !self.enable;
-                    event_handler.send_event(event::ToogleChanged {
+                    event_handler.send_event(event::ToggleChanged {
                         id: this,
                         value: self.enable,
                     });
@@ -425,7 +426,7 @@ impl Behaviour for Hoverable {
                     .set_text(&self.text);
                 widgets.move_to_front(self.hover);
                 self.is_over = true;
-                event_handler.send_event(event::InvalidadeLayout);
+                event_handler.send_event(event::InvalidadeLayout { id : self.hover}); 
                 event_handler.send_event(event::Redraw);
             }
             MouseEvent::Exit => {
@@ -443,7 +444,7 @@ impl Behaviour for Hoverable {
                     let x = x / width;
                     let y = y / heigth;
                     rect.anchors = [x, y, x, y];
-                    event_handler.send_event(event::InvalidadeLayout);
+                    event_handler.send_event(event::InvalidadeLayout { id: self.hover });
                     event_handler.send_event(event::Redraw);
                 }
             }
@@ -473,10 +474,10 @@ impl Layout for ScrollViewLayout {
     }
 
     fn update_layouts(&mut self, this: Id, widgets: &mut Widgets) {
-        let this_rect = widgets.get_rect(this).rect;
+        let this_rect = *widgets.get_rect(this).get_rect();
         let content = widgets.get_children(self.view)[0];
         let content_size = widgets.get_rect(content).min_size;
-        let view_rect = widgets.get_rect(this).rect;
+        let view_rect = *widgets.get_rect(this).get_rect();
         let view_width = view_rect[2] - view_rect[0];
         let view_height = view_rect[3] - view_rect[1];
 
@@ -560,7 +561,7 @@ impl Layout for ScrollContentLayout {
 
         let content = widgets.get_children(this)[0];
         let content_size = widgets.get_rect(content).min_size;
-        let view_rect = widgets.get_rect(this).rect;
+        let view_rect = *widgets.get_rect(this).get_rect();
         let view_width = view_rect[2] - view_rect[0];
         let view_height = view_rect[3] - view_rect[1];
 
@@ -601,7 +602,7 @@ impl Layout for ScrollContentLayout {
         v_scroll_bar_handle.anchors[1] = self.delta_y / content_size[1];
         v_scroll_bar_handle.anchors[3] = ((self.delta_y + view_height) / content_size[1]).min(1.0);
 
-        widgets.get_rect(content).rect = content_rect;
+        widgets.get_rect(content).set_rect(content_rect);
     }
 }
 
@@ -659,11 +660,11 @@ impl Behaviour for ScrollBar {
                     event_handler.send_event(event::Redraw);
                 }
                 event_handler.send_event(event::LockOver);
-                let handle_rect = widgets.get_rect(self.handle).rect;
+                let handle_rect = *widgets.get_rect(self.handle).get_rect();
                 let area = widgets
                     .get_parent(self.handle)
                     .expect("the handle of the scrollbar must have a parent");
-                let area_rect = widgets.get_rect(area).rect;
+                let area_rect = *widgets.get_rect(area).get_rect();
                 self.drag_start = self.mouse_pos;
                 if !self.vertical {
                     let handle_size = handle_rect[2] - handle_rect[0];
@@ -712,11 +713,11 @@ impl Behaviour for ScrollBar {
             MouseEvent::Moved { x, y } => {
                 self.mouse_pos = if self.vertical { y } else { x };
                 if self.dragging {
-                    let handle_rect = widgets.get_rect(self.handle).rect;
+                    let handle_rect = *widgets.get_rect(self.handle).get_rect();
                     let area = widgets
                         .get_parent(self.handle)
                         .expect("handle must have a parent");
-                    let area_rect = widgets.get_rect(area).rect;
+                    let area_rect = *widgets.get_rect(area).get_rect();
 
                     let handle_size = if !self.vertical {
                         handle_rect[2] - handle_rect[0]
@@ -743,7 +744,7 @@ impl Behaviour for ScrollBar {
                         },
                     )
                 } else if widgets.get_graphic(self.handle).is_some() {
-                    let handle_rect = widgets.get_rect(self.handle).rect;
+                    let handle_rect = *widgets.get_rect(self.handle).get_rect();
                     let graphic = widgets.get_graphic(self.handle).unwrap();
                     if self.mouse_pos < handle_rect[1] || self.mouse_pos > handle_rect[3] {
                         graphic.set_color([220, 220, 220, 255]);
@@ -817,7 +818,7 @@ impl Behaviour for ScrollView {
         let content_size = widgets.get_rect(self.content).min_size;
 
         let view = widgets.get_rect(self.view);
-        let view_rect = view.rect;
+        let view_rect = view.get_rect();
 
         let width = view_rect[2] - view_rect[0];
         let height = view_rect[3] - view_rect[1];
@@ -829,13 +830,13 @@ impl Behaviour for ScrollView {
         v_scroll_bar_handle.anchors[1] = self.delta_y / view_size[1];
         v_scroll_bar_handle.anchors[3] = (self.delta_y + height) / view_size[1];
 
-        event_handler.send_event(event::InvalidadeLayout);
+        event_handler.send_event(event::InvalidadeLayout { id: self.h_scroll_bar_handle });
     }
 
     fn on_scroll_event(
         &mut self,
         delta: [f32; 2],
-        _this: Id,
+        this: Id,
         widgets: &mut Widgets,
         event_handler: &mut EventHandler,
     ) {
@@ -847,14 +848,14 @@ impl Behaviour for ScrollView {
         scroll_view_layout.delta_x += delta[0];
         scroll_view_layout.delta_y -= delta[1];
 
-        event_handler.send_event(event::InvalidadeLayout);
+        event_handler.send_event(event::InvalidadeLayout { id: this });
         event_handler.send_event(event::Redraw);
     }
 
     fn on_event(
         &mut self,
         event: &dyn Any,
-        _this: Id,
+        this: Id,
         widgets: &mut Widgets,
         event_handler: &mut EventHandler,
     ) {
@@ -879,7 +880,7 @@ impl Behaviour for ScrollView {
                 scroll_view_layout.delta_y = event.value * total_size;
             }
 
-            event_handler.send_event(event::InvalidadeLayout);
+            event_handler.send_event(event::InvalidadeLayout { id: this });
             event_handler.send_event(event::Redraw);
         }
     }
