@@ -59,7 +59,6 @@ impl<'a> GUISpriteRender {
         }
 
         while let Some(parent) = parents.pop() {
-            
             let mut mask = None;
             let mut mask_changed = false;
             if let Some((i, m, changed)) = masks.last() {
@@ -76,7 +75,6 @@ impl<'a> GUISpriteRender {
             }
 
             if let Some((rect, graphic)) = widgets.get_rect_and_graphic(parent) {
-                
                 if let Some(mask) = mask {
                     if intersection(rect.get_rect(), &mask).is_none() {
                         // skip all its children
@@ -293,12 +291,26 @@ impl Text {
         self.dirty();
     }
 
+    pub fn get_align_anchor(&self, rect: [f32; 4]) -> [f32; 2] {
+        let mut anchor = [0.0; 2];
+        match self.align.0 {
+            -1 => anchor[0] = rect[0],
+            0 => anchor[0] = (rect[0] + rect[2]) / 2.0,
+            _ => anchor[0] = rect[2],
+        }
+        match self.align.1 {
+            -1 => anchor[1] = rect[1],
+            0 => anchor[1] = (rect[1] + rect[3]) / 2.0,
+            _ => anchor[1] = rect[3],
+        }
+        anchor
+    }
+
     pub fn get_glyphs<F: Font>(&mut self, rect: &mut Rect, fonts: &[F]) -> &[SectionGlyph] {
         let dirty_flags = rect.get_dirty_flags();
-        if self.text_dirty
-            || (dirty_flags.contains(DirtyFlags::WIDTH)
-                && self.min_size.map_or(true, |x| rect.get_width() < x[0]))
-        {
+        let width_change = dirty_flags.contains(DirtyFlags::WIDTH)
+            && self.min_size.map_or(true, |x| rect.get_width() < x[0]);
+        if self.text_dirty || width_change {
             let layout = {
                 let hor = match self.align.0.cmp(&0) {
                     Ordering::Less => HorizontalAlign::Left,
@@ -326,7 +338,7 @@ impl Text {
                 (x, y)
             };
 
-            self.last_pos = [rect.get_rect()[0], rect.get_rect()[1]];
+            self.last_pos = self.get_align_anchor(*rect.get_rect());
 
             self.glyphs = layout.calculate_glyphs(
                 &fonts,
@@ -340,13 +352,11 @@ impl Text {
                     font_id: FontId(0),
                 }],
             )
-        } else if dirty_flags.contains(DirtyFlags::RECT) && !dirty_flags.contains(DirtyFlags::WIDTH)
-        {
-            let delta = [
-                rect.get_rect()[0] - self.last_pos[0],
-                rect.get_rect()[1] - self.last_pos[1],
-            ];
-            self.last_pos = [rect.get_rect()[0], rect.get_rect()[1]];
+        } else if dirty_flags.contains(DirtyFlags::RECT) && !width_change {
+            let rect = *rect.get_rect();
+            let anchor = self.get_align_anchor(rect);
+            let delta = [anchor[0] - self.last_pos[0], anchor[1] - self.last_pos[1]];
+            self.last_pos = anchor;
 
             for glyph in &mut self.glyphs {
                 glyph.glyph.position.x += delta[0];

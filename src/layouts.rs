@@ -112,6 +112,93 @@ impl Layout for RatioLayout {
     }
 }
 
+pub struct HBoxLayout {
+    spacing: f32,
+    margins: [f32; 4],
+    align: i8,
+}
+impl HBoxLayout {
+    pub fn new(spacing: f32, margins: [f32; 4], align: i8) -> Self {
+        Self {
+            spacing,
+            margins,
+            align,
+        }
+    }
+}
+impl Layout for HBoxLayout {
+    fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets) {
+        let children = widgets.get_children(this);
+        if children.is_empty() {
+            widgets.get_rect(this).set_min_size([
+                self.margins[0] + self.margins[2],
+                self.margins[1] + self.margins[3],
+            ]);
+        } else {
+            let mut min_width: f32 =
+                self.margins[0] + self.margins[2] + (children.len() - 1) as f32 * self.spacing;
+            let mut min_height: f32 = 0.0;
+            for child in children {
+                let [width, height] = widgets.get_rect(child).min_size;
+                min_width += width;
+                min_height = min_height.max(height);
+            }
+            widgets
+                .get_rect(this)
+                .set_min_size([min_width, min_height + self.margins[1] + self.margins[3]]);
+        }
+    }
+
+    fn update_layouts(&mut self, this: Id, widgets: &mut Widgets) {
+        let children = widgets.get_children(this);
+        if children.is_empty() {
+            return;
+        }
+        let mut reserved_width = self.spacing * (children.len() - 1) as f32;
+        let mut max_weight = 0.0;
+        for child in children {
+            let rect = widgets.get_rect(child);
+            reserved_width += rect.min_size[0];
+            if rect.is_expand_x() {
+                max_weight += rect.ratio_x;
+            }
+        }
+        let rect = widgets.get_rect(this);
+        let width = rect.get_width() - self.margins[0] - self.margins[2];
+        let rect = *rect.get_rect();
+        let top = rect[1] + self.margins[1];
+        let bottom = rect[3] - self.margins[3];
+        let mut x = rect[0] + self.margins[0];
+        let free_width = width - reserved_width;
+        if free_width <= 0.0 || max_weight == 0.0 {
+            match self.align {
+                0 => x += free_width / 2.0,
+                1 => x += free_width,
+                _ => {}
+            }
+            for child in widgets.get_children(this) {
+                let rect = widgets.get_rect(child);
+                rect.set_designed_rect([x, top, x + rect.min_size[0], bottom]);
+                x += self.spacing + rect.min_size[0];
+            }
+        } else {
+            for child in widgets.get_children(this) {
+                let rect = widgets.get_rect(child);
+                if rect.is_expand_x() {
+                    // FIXME: this implementation imply that rect with same ratio,
+                    // may not have the same size when expanded
+                    let width = rect.min_size[0] + free_width * rect.ratio_x / max_weight;
+                    rect.set_designed_rect([x, top, x + width, bottom]);
+                    x += self.spacing + width
+                } else {
+                    rect.set_designed_rect([x, top, x + rect.min_size[0], bottom]);
+                    x += self.spacing + rect.min_size[0];
+                }
+            }
+        }
+    }
+}
+
 pub struct VBoxLayout {
     spacing: f32,
     margins: [f32; 4],

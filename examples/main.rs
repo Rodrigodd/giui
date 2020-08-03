@@ -3,7 +3,7 @@ use glyph_brush_layout::ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteRender};
 use ui_engine::{
     event as ui_event,
-    layouts::{FitText, GridLayout, MarginLayout, RatioLayout, VBoxLayout},
+    layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
     render::{GUISpriteRender, Graphic, Panel, Text, Texture},
     widgets::{Button, Hoverable, ScrollBar, ScrollView, Slider, TabButton, TabGroup, Toggle},
     GUIRender, Id, RectFill, GUI,
@@ -583,34 +583,32 @@ fn main() {
             let header = gui
                 .create_widget()
                 .with_anchors([0.0, 0.0, 1.0, 0.0])
-                .with_margins([5.0, 10.0, -10.0, 40.0])
+                .with_margins([10.0, 10.0, -10.0, 40.0])
+                .with_layout(Box::new(HBoxLayout::new(3.0, [0.0, 0.0, 0.0, 0.0], -1)))
                 .build();
-            let create_button = |gui: &mut GUI<GUISpriteRender>, i: usize, total: usize| {
-                let x = i as f32 / total as f32;
+            let create_button = |gui: &mut GUI<GUISpriteRender>, label: String| {
                 let button = gui
                     .create_widget()
-                    .with_anchors([x, 0.0, x + 1.0 / total as f32, 1.0])
-                    .with_margins([5.0, 0.0, 0.0, 0.0])
                     .with_graphic(painel.clone())
                     .with_parent(header)
+                    .with_expand_x(true)
                     .with_behaviour(Box::new(TabButton::new(header)))
+                    .with_layout(Box::new(MarginLayout::new([3.0, 0.0, 3.0, 0.0])))
                     .build();
-                let graphic =
-                    Text::new([40, 40, 100, 255], format!("Tab {}", i + 1), 16.0, (0, 0)).into();
+                let graphic = Text::new([40, 40, 100, 255], label, 16.0, (0, 0)).into();
                 gui.create_widget()
-                    .with_anchors([0.0, 0.0, 1.0, 1.0])
-                    .with_margins([0.0, 0.0, 0.0, 0.0])
                     .with_graphic(graphic)
                     .with_parent(button)
+                    .with_layout(Box::new(FitText))
                     .build();
                 button
             };
             let buttons = vec![
-                create_button(&mut gui, 0, 5),
-                create_button(&mut gui, 1, 5),
-                create_button(&mut gui, 2, 5),
-                create_button(&mut gui, 3, 5),
-                create_button(&mut gui, 4, 5),
+                create_button(&mut gui, "Random Widgets".to_owned()),
+                create_button(&mut gui, "Grid Layout".to_owned()),
+                create_button(&mut gui, "ScrollView".to_owned()),
+                create_button(&mut gui, "Font Texture".to_owned()),
+                create_button(&mut gui, "To be continued...".to_owned()),
             ];
             let pages = vec![page_1, page_2, page_3, page_4, page_na];
             gui.add_behaviour(header, Box::new(TabGroup::new(buttons, pages)));
