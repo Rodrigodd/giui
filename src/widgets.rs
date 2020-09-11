@@ -1,5 +1,10 @@
-use crate::{event, Behaviour, EventHandler, Id, InputFlags, Layout, MouseEvent, Rect, Widgets};
+use crate::{
+    event, render::Graphic, text::TextInfo, Behaviour, EventHandler, Id, InputFlags, KeyboardEvent,
+    Layout, MouseEvent, Rect, Widgets,
+};
+use copypasta::{ClipboardContext, ClipboardProvider};
 use std::any::Any;
+use winit::event::VirtualKeyCode;
 
 #[derive(Default)]
 pub struct Button {
@@ -94,7 +99,12 @@ impl Slider {
         self.value = value;
     }
 
-    fn set_handle_pos(&mut self, handle: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+    fn set_handle_pos(
+        &mut self,
+        handle: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
         let rect = widgets.get_rect(handle);
         let mut rel_x = (self.value - self.min_value) / (self.max_value - self.min_value);
         rel_x = rel_x.max(0.0).min(1.0);
@@ -426,7 +436,7 @@ impl Behaviour for Hoverable {
                     .set_text(&self.text);
                 widgets.move_to_front(self.hover);
                 self.is_over = true;
-                event_handler.send_event(event::InvalidadeLayout { id : self.hover}); 
+                event_handler.send_event(event::InvalidadeLayout { id: self.hover });
                 event_handler.send_event(event::Redraw);
             }
             MouseEvent::Exit => {
@@ -830,7 +840,9 @@ impl Behaviour for ScrollView {
         v_scroll_bar_handle.anchors[1] = self.delta_y / view_size[1];
         v_scroll_bar_handle.anchors[3] = (self.delta_y + height) / view_size[1];
 
-        event_handler.send_event(event::InvalidadeLayout { id: self.h_scroll_bar_handle });
+        event_handler.send_event(event::InvalidadeLayout {
+            id: self.h_scroll_bar_handle,
+        });
     }
 
     fn on_scroll_event(
@@ -882,6 +894,453 @@ impl Behaviour for ScrollView {
 
             event_handler.send_event(event::InvalidadeLayout { id: this });
             event_handler.send_event(event::Redraw);
+        }
+    }
+}
+
+pub struct TextField {
+    caret: Id,
+    label: Id,
+    text: String,
+    caret_index: usize,
+    selection_index: Option<usize>,
+    text_info: TextInfo,
+    text_width: f32,
+    x_scroll: f32,
+    on_focus: bool,
+    mouse_x: f32,
+    mouse_down: bool,
+}
+impl TextField {
+    pub fn new(caret: Id, label: Id) -> Self {
+        Self {
+            caret,
+            label,
+            text: String::new(),
+            caret_index: 0,
+            selection_index: None,
+            text_info: TextInfo::default(),
+            text_width: 0.0,
+            x_scroll: 0.0,
+            on_focus: false,
+            mouse_x: 0.0,
+            mouse_down: false,
+        }
+    }
+}
+impl TextField {
+    fn update_text(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+        let fonts = widgets.get_fonts();
+        if let Some((ref mut rect, Graphic::Text(text))) = widgets.get_rect_and_graphic(self.label)
+        {
+            let display_text = self.text.clone();
+            text.set_text(&display_text);
+            let min_size = text.compute_min_size(fonts).unwrap_or([0.0, 0.0]);
+            self.text_width = min_size[0];
+            rect.set_min_size(min_size);
+            self.text_info = text.get_text_info(fonts, rect).clone();
+            self.update_carret(this, widgets, event_handler, true);
+        }
+    }
+
+    fn update_carret(
+        &mut self,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+        focus_caret: bool,
+    ) {
+        let this_rect = *widgets.get_rect(this).get_rect();
+
+        let mut caret_pos = self.text_info.get_caret_pos(self.caret_index);
+
+        const MARGIN: f32 = 5.0;
+
+        let this_width = this_rect[2] - this_rect[0];
+        if this_width > self.text_width {
+            self.x_scroll = -MARGIN;
+        } else if focus_caret {
+            if caret_pos[0] - self.x_scroll > this_width - MARGIN {
+                self.x_scroll = caret_pos[0] - (this_width - MARGIN);
+            }
+            if caret_pos[0] - self.x_scroll < MARGIN {
+                self.x_scroll = caret_pos[0] - MARGIN;
+            }
+        } else {
+            if self.text_width - self.x_scroll < this_width - MARGIN {
+                self.x_scroll = self.text_width - (this_width - MARGIN);
+            }
+            if self.x_scroll < -MARGIN {
+                self.x_scroll = -MARGIN;
+            }
+        }
+
+        widgets.get_rect(self.label).margins[0] = -self.x_scroll;
+
+        caret_pos[0] -= self.x_scroll;
+
+        if let Some(selection_index) = self.selection_index {
+            widgets
+                .get_graphic(self.caret)
+                .unwrap()
+                .set_color([51, 153, 255, 255]);
+            let mut selection_pos = self.text_info.get_caret_pos(selection_index);
+            selection_pos[0] -= self.x_scroll;
+            let margins = &mut widgets.get_rect(self.caret).margins;
+            *margins = [
+                caret_pos[0],
+                caret_pos[1] - self.text_info.get_line_heigth(),
+                selection_pos[0],
+                caret_pos[1],
+            ];
+            if margins[0] > margins[2] {
+                margins.swap(0, 2);
+            }
+            if margins[1] > margins[3] {
+                margins.swap(1, 3);
+            }
+        } else {
+            widgets
+                .get_graphic(self.caret)
+                .unwrap()
+                .set_color([0, 0, 0, 255]);
+            if self.on_focus {
+                widgets.get_rect(self.caret).margins = [
+                    caret_pos[0],
+                    caret_pos[1] - self.text_info.get_line_heigth(),
+                    caret_pos[0] + 1.0,
+                    caret_pos[1],
+                ];
+            } else {
+                widgets.get_rect(self.caret).margins = [0.0, 0.0, 0.0, 0.0];
+            }
+        }
+        event_handler.send_event(event::Redraw);
+        event_handler.send_event(event::InvalidadeLayout { id: this });
+    }
+
+    fn move_caret(&mut self, caret: usize, widgets: &mut Widgets) {
+        if widgets.modifiers().shift() {
+            if let Some(selection_index) = self.selection_index {
+                if selection_index == caret {
+                    self.selection_index = None;
+                }
+            } else {
+                self.selection_index = Some(self.caret_index);
+            }
+        } else if let Some(selection_index) = self.selection_index {
+            let start = selection_index;
+            let end = self.caret_index;
+            if (caret < self.caret_index) ^ (start > end) {
+                self.caret_index = start;
+            } else {
+                self.caret_index = end;
+            }
+            self.selection_index = None;
+            return;
+        }
+        self.caret_index = caret;
+    }
+
+    fn delete_selection(
+        &mut self,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+        let selection_index = self.selection_index.unwrap();
+        let a = self.text_info.get_indice(self.caret_index);
+        let b = self.text_info.get_indice(selection_index);
+        let range = if a > b { b..a } else { a..b };
+        if self.caret_index > selection_index {
+            self.caret_index = selection_index;
+        }
+        self.selection_index = None;
+        self.text.replace_range(range, "");
+        self.update_text(this, widgets, event_handler);
+    }
+
+    fn insert_char(
+        &mut self,
+        ch: char,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+        self.text
+            .insert(self.text_info.get_indice(self.caret_index), ch);
+        self.caret_index += 1;
+        self.update_text(this, widgets, event_handler);
+    }
+}
+impl Behaviour for TextField {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::KEYBOARD | InputFlags::POINTER | InputFlags::SCROLL
+    }
+
+    fn on_start(&mut self, this: Id, widgets: &mut Widgets, event_handler: &mut EventHandler) {
+        self.update_text(this, widgets, event_handler);
+        widgets.move_to_front(self.label);
+    }
+
+    fn on_event(
+        &mut self,
+        event: &dyn Any,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+        if event.is::<event::ClearText>() {
+            self.text.clear();
+            self.caret_index = 0;
+            self.selection_index = None;
+            self.update_text(this, widgets, event_handler);
+        }
+    }
+
+    fn on_scroll_event(
+        &mut self,
+        delta: [f32; 2],
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+        let delta = if delta[0].abs() > delta[1].abs() {
+            delta[0]
+        } else {
+            delta[1]
+        };
+        self.x_scroll -= delta;
+        self.update_carret(this, widgets, event_handler, false);
+    }
+
+    fn on_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+        match event {
+            MouseEvent::Enter => {}
+            MouseEvent::Exit => {}
+            MouseEvent::Down => {
+                if !self.on_focus {
+                    event_handler.send_event(event::RequestKeyboardFocus { id: this });
+                }
+                let left = widgets.get_rect(this).get_rect()[0] - self.x_scroll;
+                let x = self.mouse_x - left;
+                self.caret_index = self.text_info.get_caret_index_at_pos(0, x);
+                self.mouse_down = true;
+                self.selection_index = None;
+                self.update_carret(this, widgets, event_handler, true);
+                event_handler.send_event(event::LockOver);
+            }
+            MouseEvent::Up => {
+                self.mouse_down = false;
+                event_handler.send_event(event::UnlockOver);
+            }
+            MouseEvent::Moved { x, .. } => {
+                self.mouse_x = x;
+                if self.mouse_down {
+                    let left = widgets.get_rect(this).get_rect()[0] - self.x_scroll;
+                    let x = self.mouse_x - left;
+                    let caret_index = self.text_info.get_caret_index_at_pos(0, x);
+                    if caret_index == self.caret_index {
+                        return;
+                    }
+                    if let Some(selection_index) = self.selection_index {
+                        if caret_index == selection_index {
+                            self.selection_index = None;
+                        }
+                    } else {
+                        self.selection_index = Some(self.caret_index);
+                    }
+                    self.caret_index = caret_index;
+                    self.update_carret(this, widgets, event_handler, true);
+                }
+            }
+        }
+    }
+
+    fn on_keyboard_focus_change(
+        &mut self,
+        focus: bool,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+        self.on_focus = focus;
+        self.update_carret(this, widgets, event_handler, true);
+        event_handler.send_event(event::InvalidadeLayout { id: this });
+        event_handler.send_event(event::Redraw);
+    }
+
+    fn on_keyboard_event(
+        &mut self,
+        event: KeyboardEvent,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+        match event {
+            KeyboardEvent::Char(ch) => {
+                if self.selection_index.is_some() {
+                    self.delete_selection(this, widgets, event_handler);
+                }
+                self.insert_char(ch, this, widgets, event_handler);
+                println!("receive char {:?}", ch);
+            }
+            KeyboardEvent::Pressed(key_code) => match key_code {
+                VirtualKeyCode::C | VirtualKeyCode::X => {
+                    if widgets.modifiers().ctrl() {
+                        if let Some(selection_index) = self.selection_index {
+                            let a = self.text_info.get_indice(selection_index);
+                            let b = self.text_info.get_indice(self.caret_index);
+                            let range = if a < b { a..b } else { b..a };
+                            let mut ctx = ClipboardContext::new().unwrap();
+                            let _ = ctx.set_contents(self.text[range].to_owned());
+                            if key_code == VirtualKeyCode::X {
+                                self.delete_selection(this, widgets, event_handler);
+                            }
+                        }
+                    }
+                }
+                VirtualKeyCode::V => {
+                    if widgets.modifiers().ctrl() {
+                        let mut ctx = ClipboardContext::new().unwrap();
+                        if let Ok(text) = ctx.get_contents() {
+                            let text = text.replace(|x: char| x.is_control(), "");
+                            let indice = self.text_info.get_indice(self.caret_index);
+                            if let Some(selection_index) = self.selection_index {
+                                let a = self.text_info.get_indice(selection_index);
+                                let b = indice;
+                                let range = if a < b { a..b } else { b..a };
+                                self.text.replace_range(range.clone(), &text);
+                                self.selection_index = None;
+                                self.update_text(this, widgets, event_handler); // TODO: is is not working?
+                                self.caret_index =
+                                    self.text_info.get_caret_index(range.start + text.len());
+                            } else {
+                                self.text.insert_str(indice, &text);
+                                self.update_text(this, widgets, event_handler);
+                                self.caret_index =
+                                    self.text_info.get_caret_index(indice + text.len());
+                            }
+                            self.update_carret(this, widgets, event_handler, true);
+                        }
+                    }
+                }
+                VirtualKeyCode::A => {
+                    if widgets.modifiers().ctrl() {
+                        let start = 0;
+                        let end = self
+                            .text_info
+                            .get_line_range(self.caret_index)
+                            .map_or(0, |x| x.end.saturating_sub(1));
+                        self.selection_index = Some(start);
+                        self.caret_index = end;
+                        self.update_carret(this, widgets, event_handler, false);
+                    }
+                }
+                VirtualKeyCode::Return => {
+                    event_handler.send_event(event::SubmitText {
+                        id: this,
+                        text: self.text.clone(),
+                    });
+                }
+                VirtualKeyCode::Back | VirtualKeyCode::Delete if self.selection_index.is_some() => {
+                    self.delete_selection(this, widgets, event_handler);
+                }
+                VirtualKeyCode::Back => {
+                    if self.caret_index == 0 {
+                        return;
+                    }
+                    self.caret_index -= 1;
+                    self.text
+                        .remove(self.text_info.get_indice(self.caret_index));
+                    self.update_text(this, widgets, event_handler);
+                }
+                VirtualKeyCode::Delete => {
+                    if self.caret_index + 1 < self.text_info.len() {
+                        self.text
+                            .remove(self.text_info.get_indice(self.caret_index));
+                        self.update_text(this, widgets, event_handler);
+                    }
+                }
+                VirtualKeyCode::Left => {
+                    if self.caret_index == 0 {
+                        self.move_caret(0, widgets);
+                    } else if widgets.modifiers().ctrl() {
+                        let mut caret = self.caret_index - 1;
+                        let mut s = false;
+                        while caret != 0 {
+                            let whitespace = match self.text[self.text_info.get_indice(caret)..]
+                                .chars()
+                                .next()
+                            {
+                                Some(x) => x.is_whitespace(),
+                                None => false,
+                            };
+                            if !whitespace {
+                                s = true;
+                            } else if s {
+                                caret += 1;
+                                break;
+                            }
+                            caret -= 1;
+                        }
+                        self.move_caret(caret, widgets);
+                    } else {
+                        self.move_caret(self.caret_index - 1, widgets);
+                    }
+                    self.update_carret(this, widgets, event_handler, true);
+                }
+                VirtualKeyCode::Right => {
+                    if self.caret_index + 1 >= self.text_info.len() {
+                        self.move_caret(self.caret_index, widgets);
+                    } else if widgets.modifiers().ctrl() {
+                        let mut caret = self.caret_index;
+                        let mut s = false;
+                        loop {
+                            let whitespace = match self.text[self.text_info.get_indice(caret)..]
+                                .chars()
+                                .next()
+                            {
+                                Some(x) => x.is_whitespace(),
+                                None => {
+                                    caret = self.text_info.len() - 1;
+                                    break;
+                                }
+                            };
+                            if whitespace {
+                                s = true;
+                            } else if s {
+                                break;
+                            }
+                            caret += 1;
+                        }
+                        self.move_caret(caret, widgets);
+                    } else {
+                        self.move_caret(self.caret_index + 1, widgets);
+                    }
+                    self.update_carret(this, widgets, event_handler, true);
+                }
+                VirtualKeyCode::Home => {
+                    self.move_caret(0, widgets);
+                    self.update_carret(this, widgets, event_handler, true);
+                }
+                VirtualKeyCode::End => {
+                    self.move_caret(
+                        self.text_info
+                            .get_line_range(self.caret_index)
+                            .map_or(0, |x| x.end.saturating_sub(1)),
+                        widgets,
+                    );
+                    self.update_carret(this, widgets, event_handler, true);
+                }
+                _ => {}
+            },
         }
     }
 }

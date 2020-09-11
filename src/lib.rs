@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate bitflags;
 
+mod text;
+
 mod gui;
 pub mod layouts;
 pub mod render;

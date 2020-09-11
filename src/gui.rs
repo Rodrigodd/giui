@@ -1,8 +1,10 @@
 use crate::{render::Graphic, GUIRender};
-use glyph_brush_layout::ab_glyph::FontArc;
+use ab_glyph::FontArc;
 use std::any::{Any, TypeId};
 use std::collections::VecDeque;
-use winit::event::{ElementState, Event, WindowEvent};
+use winit::event::{
+    ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent,
+};
 
 pub mod event {
     use super::Id;
@@ -12,6 +14,9 @@ pub mod event {
     }
     pub struct LockOver;
     pub struct UnlockOver;
+    pub struct RequestKeyboardFocus {
+        pub id: Id,
+    }
     pub struct ActiveWidget {
         pub id: Id,
     }
@@ -21,6 +26,11 @@ pub mod event {
     pub struct ButtonClicked {
         pub id: Id,
     }
+    pub struct SubmitText {
+        pub id: Id,
+        pub text: String,
+    }
+    pub struct ClearText;
     pub struct ValueChanged {
         pub id: Id,
         pub value: f32,
@@ -56,6 +66,12 @@ pub enum MouseEvent {
     Down,
     Up,
     Moved { x: f32, y: f32 },
+}
+
+#[derive(Copy, Clone)]
+pub enum KeyboardEvent {
+    Char(char),
+    Pressed(VirtualKeyCode),
 }
 
 #[derive(Default)]
@@ -258,6 +274,7 @@ impl Widget {
 
 // contains a reference to all the widgets, except the behaviour of one widget
 pub struct Widgets<'a> {
+    modifiers: ModifiersState,
     widgets: &'a mut [Widget],
     hierarchy: &'a mut Hierarchy,
     fonts: &'a [FontArc],
@@ -268,8 +285,10 @@ impl<'a> Widgets<'a> {
         widgets: &'a mut [Widget],
         hierarchy: &'a mut Hierarchy,
         fonts: &'a [FontArc],
+        modifiers: ModifiersState,
     ) -> Self {
         Self {
+            modifiers,
             widgets,
             hierarchy,
             events: Vec::new(),
@@ -282,12 +301,14 @@ impl<'a> Widgets<'a> {
         widgets: &'a mut [Widget],
         hierarchy: &'a mut Hierarchy,
         fonts: &'a [FontArc],
+        modifiers: ModifiersState,
     ) -> Option<(&'a mut dyn Layout, Self)> {
         let this_one =
             unsafe { &mut *(widgets[this.index].layout.as_mut()?.as_mut() as *mut dyn Layout) };
         Some((
             this_one,
             Self {
+                modifiers,
                 widgets,
                 hierarchy,
                 events: Vec::new(),
@@ -302,6 +323,7 @@ impl<'a> Widgets<'a> {
         widgets: &'a mut [Widget],
         hierarchy: &'a mut Hierarchy,
         fonts: &'a [FontArc],
+        modifiers: ModifiersState,
     ) -> Option<(&'a mut dyn Behaviour, Self)> {
         let this_one = unsafe {
             &mut *(widgets[this.index].behaviours.get_mut(index)?.as_mut() as *mut dyn Behaviour)
@@ -309,12 +331,17 @@ impl<'a> Widgets<'a> {
         Some((
             this_one,
             Self {
+                modifiers,
                 widgets,
                 hierarchy,
                 events: Vec::new(),
                 fonts,
             },
         ))
+    }
+
+    pub fn modifiers(&self) -> ModifiersState {
+        self.modifiers
     }
 
     pub fn get_fonts(&mut self) -> &'a [FontArc] {
@@ -396,8 +423,10 @@ impl EventHandler {
 pub struct GUI<R: GUIRender> {
     widgets: Vec<Widget>,
     hierarchy: Hierarchy,
+    modifiers: ModifiersState,
     current_over: Option<Id>,
     current_scroll: Option<Id>,
+    current_keyboard: Option<Id>,
     over_is_locked: bool,
     events: Vec<Box<dyn Any>>,
     fonts: Vec<FontArc>,
@@ -406,6 +435,7 @@ pub struct GUI<R: GUIRender> {
 impl<R: GUIRender> GUI<R> {
     pub fn new(width: f32, height: f32, fonts: Vec<FontArc>, render: R) -> Self {
         Self {
+            modifiers: ModifiersState::empty(),
             widgets: vec![Widget {
                 input_flags: InputFlags::empty(),
                 rect: Rect {
@@ -428,6 +458,7 @@ impl<R: GUIRender> GUI<R> {
             hierarchy: Hierarchy::default(),
             current_over: None,
             current_scroll: None,
+            current_keyboard: None,
             over_is_locked: false,
             events: Vec::new(),
             fonts,
@@ -447,6 +478,7 @@ impl<R: GUIRender> GUI<R> {
         };
         self.hierarchy.resize(self.widgets.len());
         self.hierarchy.set_child(parent, new);
+        self.update_layouts(parent);
         new
     }
 
@@ -486,7 +518,12 @@ impl<R: GUIRender> GUI<R> {
     pub fn get_render_and_widgets(&mut self) -> (&mut R, Widgets) {
         (
             &mut self.render,
-            Widgets::new(&mut self.widgets, &mut self.hierarchy, &self.fonts),
+            Widgets::new(
+                &mut self.widgets,
+                &mut self.hierarchy,
+                &self.fonts,
+                self.modifiers,
+            ),
         )
     }
 
@@ -507,7 +544,10 @@ impl<R: GUIRender> GUI<R> {
 
     pub fn resize(&mut self, width: f32, height: f32) {
         self.widgets[ROOT_ID.index].rect.rect = [0.0, 0.0, width, height];
-        self.widgets[ROOT_ID.index].rect.dirty_flags.insert(DirtyFlags::all());
+        self.widgets[ROOT_ID.index]
+            .rect
+            .dirty_flags
+            .insert(DirtyFlags::all());
         self.update_layouts(ROOT_ID);
     }
 
@@ -526,8 +566,33 @@ impl<R: GUIRender> GUI<R> {
             self.over_is_locked = true;
         } else if event.is::<event::UnlockOver>() {
             self.over_is_locked = false;
+        } else if let Some(event::RequestKeyboardFocus { id }) = event.downcast_ref() {
+            self.set_keyboard_focus(Some(*id));
         } else {
             self.events.push(event);
+        }
+    }
+
+    pub fn send_event_to(&mut self, id: Id, event: Box<dyn Any>) {
+        for index in 0..self.widgets[id.index].behaviours.len() {
+            if let Some((this, mut widgets)) = Widgets::new_with_mut_behaviour(
+                id,
+                index,
+                &mut self.widgets,
+                &mut self.hierarchy,
+                &self.fonts,
+                self.modifiers,
+            ) {
+                let mut event_handler = EventHandler::new();
+                this.on_event(event.as_ref(), id, &mut widgets, &mut event_handler);
+                let EventHandler { events, events_to } = event_handler;
+                for event in events.into_iter().chain(widgets.events.into_iter()) {
+                    self.send_event(event);
+                }
+                for (id, event) in events_to {
+                    self.send_event_to(id, event);
+                }
+            }
         }
     }
 
@@ -543,6 +608,7 @@ impl<R: GUIRender> GUI<R> {
                 &mut self.widgets,
                 &mut self.hierarchy,
                 &self.fonts,
+                self.modifiers,
             ) {
                 let mut event_handler = EventHandler::new();
                 event(this, id, &mut widgets, &mut event_handler);
@@ -552,23 +618,7 @@ impl<R: GUIRender> GUI<R> {
                 }
                 let mut event_queue = VecDeque::from(events_to);
                 while let Some((id, event)) = event_queue.pop_back() {
-                    for index in 0..self.widgets[id.index].behaviours.len() {
-                        if let Some((this, mut widgets)) = Widgets::new_with_mut_behaviour(
-                            id,
-                            index,
-                            &mut self.widgets,
-                            &mut self.hierarchy,
-                            &self.fonts,
-                        ) {
-                            let mut event_handler = EventHandler::new();
-                            this.on_event(event.as_ref(), id, &mut widgets, &mut event_handler);
-                            let EventHandler { events, events_to } = event_handler;
-                            for event in events.into_iter().chain(widgets.events.into_iter()) {
-                                self.send_event(event);
-                            }
-                            event_queue.extend(events_to.into_iter().rev());
-                        }
-                    }
+                    self.send_event_to(id, event);
                 }
             }
         }
@@ -644,16 +694,70 @@ impl<R: GUIRender> GUI<R> {
                 }
                 WindowEvent::CursorLeft { .. } => {
                     if let Some(curr) = self.current_over.take() {
-                        if self.listen_mouse(curr) && !self.over_is_locked {
+                        if self.listen(curr, InputFlags::POINTER) && !self.over_is_locked {
                             self.send_mouse_event_to(curr, MouseEvent::Exit);
                             return true;
                         }
+                    }
+                }
+                WindowEvent::ReceivedCharacter(ch) => {
+                    if let Some(curr) = self.current_keyboard {
+                        if ch.is_control() {
+                            return false;
+                        }
+                        self.call_event(curr, move |this, id, widgets, event_handler| {
+                            this.on_keyboard_event(
+                                KeyboardEvent::Char(*ch),
+                                id,
+                                widgets,
+                                event_handler,
+                            )
+                        });
+                        return true;
+                    }
+                }
+                WindowEvent::ModifiersChanged(modifiers) => self.modifiers = *modifiers,
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            state: ElementState::Pressed,
+                            virtual_keycode: Some(keycode),
+                            ..
+                        },
+                    ..
+                } => {
+                    if let Some(curr) = self.current_keyboard {
+                        self.call_event(curr, |this, id, widgets, event_handler| {
+                            this.on_keyboard_event(
+                                KeyboardEvent::Pressed(*keycode),
+                                id,
+                                widgets,
+                                event_handler,
+                            )
+                        });
                     }
                 }
                 _ => {}
             }
         }
         false
+    }
+
+    pub fn set_keyboard_focus(&mut self, id: Option<Id>) {
+        if id == self.current_keyboard {
+            return;
+        }
+        if let Some(current_keyboard) = self.current_keyboard {
+            self.call_event(current_keyboard, |this, id, widgets, event_handler| {
+                this.on_keyboard_focus_change(false, id, widgets, event_handler)
+            });
+        }
+        self.current_keyboard = id;
+        if let Some(current_keyboard) = self.current_keyboard {
+            self.call_event(current_keyboard, |this, id, widgets, event_handler| {
+                this.on_keyboard_focus_change(true, id, widgets, event_handler)
+            });
+        }
     }
 
     pub fn mouse_moved(&mut self, mouse_x: f32, mouse_y: f32) {
@@ -672,12 +776,13 @@ impl<R: GUIRender> GUI<R> {
                 self.current_over = None;
             }
         }
+
         let mut curr = ROOT_ID;
         'l: loop {
-            if self.listen_mouse(curr) {
+            if self.listen(curr, InputFlags::POINTER) {
                 self.current_over = Some(curr);
             }
-            if self.listen_scroll(curr) {
+            if self.listen(curr, InputFlags::SCROLL) {
                 self.current_scroll = Some(curr);
             }
             // the interator is reversed because the last childs block the previous ones
@@ -702,15 +807,8 @@ impl<R: GUIRender> GUI<R> {
         }
     }
 
-    pub fn listen_mouse(&self, id: Id) -> bool {
-        self.widgets[id.index]
-            .input_flags
-            .contains(InputFlags::POINTER)
-    }
-    pub fn listen_scroll(&self, id: Id) -> bool {
-        self.widgets[id.index]
-            .input_flags
-            .contains(InputFlags::SCROLL)
+    fn listen(&self, id: Id, flag: InputFlags) -> bool {
+        self.widgets[id.index].input_flags.contains(flag)
     }
 
     pub fn send_mouse_event_to(&mut self, id: Id, event: MouseEvent) {
@@ -758,6 +856,7 @@ impl<R: GUIRender> GUI<R> {
                 &mut self.widgets,
                 &mut self.hierarchy,
                 &self.fonts,
+                self.modifiers,
             ) {
                 layout.compute_min_size(parent, &mut widgets);
             }
@@ -771,6 +870,7 @@ impl<R: GUIRender> GUI<R> {
                 &mut self.widgets,
                 &mut self.hierarchy,
                 &self.fonts,
+                self.modifiers,
             ) {
                 layout.update_layouts(parent, &mut widgets);
                 for event in widgets.events {
@@ -845,7 +945,7 @@ pub struct Rect {
     fill_y: RectFill,
     pub ratio_x: f32,
     pub ratio_y: f32,
-    dirty_flags: DirtyFlags,
+    pub(crate) dirty_flags: DirtyFlags,
 }
 impl Rect {
     pub fn new(anchors: [f32; 4], margins: [f32; 4]) -> Self {
@@ -956,6 +1056,12 @@ impl Rect {
     #[inline]
     pub fn set_min_size(&mut self, min_size: [f32; 2]) {
         self.min_size = min_size;
+        if self.get_width() < self.min_size[0] {
+            self.set_width(min_size[0]);
+        }
+        if self.get_height() < self.min_size[1] {
+            self.set_height(min_size[1]);
+        }
     }
 
     /// Return true if this have the size_flag::EXPAND_X flag.
@@ -1034,6 +1140,7 @@ bitflags! {
     pub struct InputFlags: u32 {
         const POINTER = 0x01;
         const SCROLL = 0x02;
+        const KEYBOARD = 0x04;
     }
 }
 
@@ -1065,6 +1172,24 @@ pub trait Behaviour {
     fn on_mouse_event(
         &mut self,
         event: MouseEvent,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+    }
+
+    fn on_keyboard_focus_change(
+        &mut self,
+        focus: bool,
+        this: Id,
+        widgets: &mut Widgets,
+        event_handler: &mut EventHandler,
+    ) {
+    }
+
+    fn on_keyboard_event(
+        &mut self,
+        event: KeyboardEvent,
         this: Id,
         widgets: &mut Widgets,
         event_handler: &mut EventHandler,

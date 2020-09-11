@@ -1,16 +1,11 @@
 use super::{DirtyFlags, Id, Widgets};
-use crate::Rect;
-use ab_glyph::{point, ScaleFont};
-use glyph_brush_draw_cache::{
-    ab_glyph::{Font, FontArc, PxScale},
-    DrawCache, DrawCacheBuilder,
+use crate::{
+    text::{FontGlyph, TextInfo},
+    Rect,
 };
-use glyph_brush_layout::{
-    ab_glyph, FontId, GlyphPositioner, HorizontalAlign, Layout, SectionGeometry, SectionGlyph,
-    SectionText, VerticalAlign,
-};
+use ab_glyph::{Font, FontArc};
+use glyph_brush_draw_cache::{DrawCache, DrawCacheBuilder};
 use sprite_render::{Camera, Renderer, SpriteInstance, SpriteRender};
-use std::cmp::Ordering;
 use std::ops::Range;
 
 pub trait GUIRender: 'static {}
@@ -38,6 +33,33 @@ impl<'a> GUISpriteRender {
         }
     }
 
+    pub fn clear_cache(&mut self, widgets: &mut Widgets) {
+        self.last_sprites.clear();
+        self.last_sprites_map.clear();
+        let mut parents = vec![crate::ROOT_ID];
+        while let Some(parent) = parents.pop() {
+            if let Some((rect, graphic)) = widgets.get_rect_and_graphic(parent) {
+                match graphic {
+                    Graphic::Panel(x) => {
+                        x.color_dirty = true;
+                    }
+                    Graphic::Texture(x) => {
+                        x.color_dirty = true;
+                    }
+                    Graphic::Text(x) => x.dirty(),
+                    Graphic::Mask => {}
+                }
+                rect.clear_dirty_flags();
+            } else {
+                widgets
+                    .get_rect(parent)
+                    .dirty_flags
+                    .insert(DirtyFlags::all());
+            }
+            parents.extend(widgets.get_children(parent).iter().rev())
+        }
+    }
+
     pub fn prepare_render(&mut self, widgets: &mut Widgets, renderer: &mut dyn SpriteRender) {
         use crate::ROOT_ID;
         let mut parents = vec![ROOT_ID];
@@ -58,45 +80,33 @@ impl<'a> GUISpriteRender {
             ])
         }
 
-        while let Some(parent) = parents.pop() {
-            let mut mask = None;
-            let mut mask_changed = false;
-            if let Some((i, m, changed)) = masks.last() {
-                if parents.len() < *i {
-                    masks.pop();
-                    if let Some((_, m, changed)) = masks.last() {
-                        mask = Some(*m);
-                        mask_changed = *changed;
-                    }
-                } else {
-                    mask = Some(*m);
-                    mask_changed = *changed;
-                }
-            }
-
-            if let Some((rect, graphic)) = widgets.get_rect_and_graphic(parent) {
-                if let Some(mask) = mask {
-                    if intersection(rect.get_rect(), &mask).is_none() {
-                        // skip all its children
+        'tree: while let Some(parent) = parents.pop() {
+            let (mask, mask_changed) = {
+                let rect = widgets.get_rect(parent);
+                let mut mask = *rect.get_rect();
+                let mut mask_changed = rect.get_dirty_flags().contains(DirtyFlags::RECT);
+                while let Some((i, m, changed)) = masks.last() {
+                    let upper_mask;
+                    if parents.len() < *i {
+                        masks.pop();
                         continue;
-                    }
-                }
-                let mut compute_sprite = true;
-                if let Graphic::Mask = graphic {
-                    compute_sprite = false;
-                    let changed = rect.get_dirty_flags().contains(DirtyFlags::RECT);
-                    if let Some(mask) = mask {
-                        match intersection(rect.get_rect(), &mask) {
-                            Some(rect) => {
-                                masks.push((parents.len(), rect, changed || mask_changed))
-                            }
-                            None => continue, // skip all its children
-                        }
                     } else {
-                        masks.push((parents.len(), *rect.get_rect(), changed));
+                        upper_mask = *m;
+                        mask_changed |= *changed;
                     }
-                }
 
+                    if let Some(intersection) = intersection(&mask, &upper_mask) {
+                        mask = intersection;
+                    } else {
+                        continue 'tree;
+                    }
+                    break;
+                }
+                masks.push((parents.len(), mask, mask_changed));
+                (mask, mask_changed)
+            };
+            let mut compute_sprite = true;
+            if let Some((rect, graphic)) = widgets.get_rect_and_graphic(parent) {
                 let len = self.sprites.len();
                 if !rect.get_dirty_flags().contains(DirtyFlags::RECT)
                     && !mask_changed
@@ -133,14 +143,10 @@ impl<'a> GUISpriteRender {
                                 Painel::new(panel.texture, panel.uv_rect, panel.border);
                             painel.set_rect(rect);
                             painel.set_color(panel.color);
-                            if let Some(mask) = mask {
-                                for mut sprite in painel.get_sprites().iter().cloned() {
-                                    if cut_sprite(&mut sprite, &mask) {
-                                        self.sprites.push(sprite);
-                                    }
+                            for mut sprite in painel.get_sprites().iter().cloned() {
+                                if cut_sprite(&mut sprite, &mask) {
+                                    self.sprites.push(sprite);
                                 }
-                            } else {
-                                self.sprites.extend(painel.get_sprites().iter().cloned());
                             }
                         }
                         Graphic::Texture(Texture {
@@ -160,11 +166,7 @@ impl<'a> GUISpriteRender {
                                 pos: [center.0, center.1],
                                 texture: *texture,
                             };
-                            if let Some(mask) = mask {
-                                if cut_sprite(&mut sprite, &mask) {
-                                    self.sprites.push(sprite);
-                                }
-                            } else {
+                            if cut_sprite(&mut sprite, &mask) {
                                 self.sprites.push(sprite);
                             }
                         }
@@ -199,25 +201,21 @@ impl<'a> GUISpriteRender {
                                     );
                                 })
                                 .unwrap();
-                            let mut rect = *rect.get_rect();
-                            if let Some(mask) = mask {
-                                rect = intersection(&rect, &mask).unwrap_or_default();
-                            }
                             for glyph in glyphs {
                                 if let Some((tex_coords, pixel_coords)) =
                                     self.draw_cache.rect_for(glyph.font_id.0, &glyph.glyph)
                                 {
-                                    if pixel_coords.min.x as f32 > rect[2]
-                                        || pixel_coords.min.y as f32 > rect[3]
-                                        || rect[0] > pixel_coords.max.x as f32
-                                        || rect[1] > pixel_coords.max.y as f32
+                                    if pixel_coords.min.x as f32 > mask[2]
+                                        || pixel_coords.min.y as f32 > mask[3]
+                                        || mask[0] > pixel_coords.max.x as f32
+                                        || mask[1] > pixel_coords.max.y as f32
                                     {
                                         // glyph is totally outside the bounds
                                     } else {
                                         self.sprites.push(to_vertex(
                                             tex_coords,
                                             pixel_coords,
-                                            rect,
+                                            mask,
                                             color,
                                         ));
                                     }
@@ -251,7 +249,8 @@ pub struct Text {
     text_dirty: bool,
     font_size: f32,
     align: (i8, i8),
-    glyphs: Vec<SectionGlyph>,
+    glyphs: Vec<FontGlyph>,
+    text_info: Option<TextInfo>,
     last_pos: [f32; 2],
     min_size: Option<[f32; 2]>,
 }
@@ -270,6 +269,7 @@ impl Text {
             font_size,
             align,
             glyphs: Vec::new(),
+            text_info: None,
             last_pos: [0.0, 0.0],
             min_size: None,
         }
@@ -278,6 +278,11 @@ impl Text {
     fn dirty(&mut self) {
         self.text_dirty = true;
         self.min_size = None;
+        self.text_info = None;
+    }
+
+    pub fn get_font_size(&mut self) -> f32 {
+        self.font_size
     }
 
     pub fn set_font_size(&mut self, font_size: f32) {
@@ -306,52 +311,37 @@ impl Text {
         anchor
     }
 
-    pub fn get_glyphs<F: Font>(&mut self, rect: &mut Rect, fonts: &[F]) -> &[SectionGlyph] {
+    fn update_glyphs<F: Font>(&mut self, rect: &mut Rect, fonts: &[F]) {
+        self.last_pos = self.get_align_anchor(*rect.get_rect());
+        let (glyphs, text_info) = crate::text::text_glyphs_and_info(
+            &self.text,
+            0,
+            self.font_size,
+            &fonts,
+            *rect.get_rect(),
+            self.align,
+        );
+        self.glyphs = glyphs;
+        self.text_info = Some(text_info);
+    }
+
+    pub fn get_text_info<F: Font>(&mut self, fonts: &[F], rect: &mut Rect) -> &TextInfo {
+        if self.text_info.is_none() {
+            self.update_glyphs(rect, fonts);
+        }
+        self.text_info.as_ref().unwrap()
+    }
+
+    pub fn get_glyphs<F: Font>(
+        &mut self,
+        rect: &mut Rect,
+        fonts: &[F],
+    ) -> &[crate::text::FontGlyph] {
         let dirty_flags = rect.get_dirty_flags();
         let width_change = dirty_flags.contains(DirtyFlags::WIDTH)
             && self.min_size.map_or(true, |x| rect.get_width() < x[0]);
         if self.text_dirty || width_change {
-            let layout = {
-                let hor = match self.align.0.cmp(&0) {
-                    Ordering::Less => HorizontalAlign::Left,
-                    Ordering::Equal => HorizontalAlign::Center,
-                    Ordering::Greater => HorizontalAlign::Right,
-                };
-                let vert = match self.align.1.cmp(&0) {
-                    Ordering::Less => VerticalAlign::Top,
-                    Ordering::Equal => VerticalAlign::Center,
-                    Ordering::Greater => VerticalAlign::Bottom,
-                };
-                Layout::default().h_align(hor).v_align(vert)
-            };
-            let screen_position = {
-                let x = match self.align.0.cmp(&0) {
-                    Ordering::Less => rect.get_rect()[0],
-                    Ordering::Equal => rect.get_center().0,
-                    Ordering::Greater => rect.get_rect()[2],
-                };
-                let y = match self.align.1.cmp(&0) {
-                    Ordering::Less => rect.get_rect()[1],
-                    Ordering::Equal => rect.get_center().1,
-                    Ordering::Greater => rect.get_rect()[3],
-                };
-                (x, y)
-            };
-
-            self.last_pos = self.get_align_anchor(*rect.get_rect());
-
-            self.glyphs = layout.calculate_glyphs(
-                &fonts,
-                &SectionGeometry {
-                    screen_position,
-                    bounds: rect.get_size(),
-                },
-                &[SectionText {
-                    text: &self.text,
-                    scale: PxScale::from(self.font_size),
-                    font_id: FontId(0),
-                }],
-            )
+            self.update_glyphs(rect, fonts);
         } else if dirty_flags.contains(DirtyFlags::RECT) && !width_change {
             let rect = *rect.get_rect();
             let anchor = self.get_align_anchor(rect);
@@ -362,69 +352,24 @@ impl Text {
                 glyph.glyph.position.x += delta[0];
                 glyph.glyph.position.y += delta[1];
             }
+            if let Some(ref mut text_info) = self.text_info {
+                text_info.move_by(delta);
+            }
         }
         &self.glyphs
     }
 
     pub fn compute_min_size<F: Font>(&mut self, fonts: &[F]) -> Option<[f32; 2]> {
         if self.min_size.is_none() {
-            let layout = {
-                let hor = match self.align.0.cmp(&0) {
-                    Ordering::Less => HorizontalAlign::Left,
-                    Ordering::Equal => HorizontalAlign::Center,
-                    Ordering::Greater => HorizontalAlign::Right,
-                };
-                let vert = match self.align.1.cmp(&0) {
-                    Ordering::Less => VerticalAlign::Top,
-                    Ordering::Equal => VerticalAlign::Center,
-                    Ordering::Greater => VerticalAlign::Bottom,
-                };
-                Layout::default().h_align(hor).v_align(vert)
-            };
-
-            let geometry = SectionGeometry::default();
-
-            let glyphs = layout.calculate_glyphs(
+            let (_, text_info) = crate::text::text_glyphs_and_info(
+                &self.text,
+                0,
+                self.font_size,
                 &fonts,
-                &geometry,
-                &[SectionText {
-                    text: &self.text,
-                    scale: PxScale::from(self.font_size),
-                    font_id: FontId(0),
-                }],
+                [0.0, 0.0, f32::INFINITY, f32::INFINITY],
+                (-1, -1),
             );
-
-            self.min_size = Some(
-                glyphs
-                    .iter()
-                    .fold(None, |b: Option<ab_glyph::Rect>, sg| {
-                        let sfont = fonts[sg.font_id.0].as_scaled(sg.glyph.scale);
-                        let pos = sg.glyph.position;
-                        let lbound = ab_glyph::Rect {
-                            min: point(
-                                pos.x - sfont.h_side_bearing(sg.glyph.id),
-                                pos.y - sfont.ascent(),
-                            ),
-                            max: point(
-                                pos.x + sfont.h_advance(sg.glyph.id),
-                                pos.y - sfont.descent(),
-                            ),
-                        };
-                        b.map(|b| {
-                            let min_x = b.min.x.min(lbound.min.x);
-                            let max_x = b.max.x.max(lbound.max.x);
-                            let min_y = b.min.y.min(lbound.min.y);
-                            let max_y = b.max.y.max(lbound.max.y);
-                            ab_glyph::Rect {
-                                min: point(min_x, min_y),
-                                max: point(max_x, max_y),
-                            }
-                        })
-                        .or_else(|| Some(lbound))
-                    })
-                    .map(|b| [b.width(), b.height()])
-                    .unwrap_or([0.0, 0.0]),
-            );
+            self.min_size = Some(text_info.get_size());
         }
         self.min_size
     }
