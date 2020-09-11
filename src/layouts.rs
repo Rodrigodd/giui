@@ -1,17 +1,17 @@
-use crate::{Id, Layout, Widgets};
+use crate::{Id, Layout, Controls};
 
 pub struct FitText;
 impl Layout for FitText {
-    fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets) {
-        let fonts = widgets.get_fonts();
-        let min_size = if let Some(graphic) = widgets.get_graphic(this) {
+    fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
+        let fonts = controls.get_fonts();
+        let min_size = if let Some(graphic) = controls.get_graphic(this) {
             graphic.compute_min_size(fonts).unwrap_or([0.0, 0.0])
         } else {
             [0.0, 0.0]
         };
-        widgets.get_rect(this).min_size = min_size;
+        controls.get_rect(this).min_size = min_size;
     }
-    fn update_layouts(&mut self, _: Id, _: &mut Widgets) {}
+    fn update_layouts(&mut self, _: Id, _: &mut Controls) {}
 }
 
 pub struct MarginLayout {
@@ -23,28 +23,28 @@ impl MarginLayout {
     }
 }
 impl Layout for MarginLayout {
-    fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets) {
+    fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
         let mut min_size = [0.0f32, 0.0];
-        for child in widgets.get_children(this) {
-            let c_min_size = widgets.get_rect(child).min_size;
+        for child in controls.get_children(this) {
+            let c_min_size = controls.get_rect(child).min_size;
             min_size[0] = min_size[0].max(c_min_size[0]);
             min_size[1] = min_size[1].max(c_min_size[1]);
         }
-        widgets.get_rect(this).min_size = [
+        controls.get_rect(this).min_size = [
             self.margins[0] + self.margins[2] + min_size[0],
             self.margins[1] + self.margins[3] + min_size[1],
         ];
     }
-    fn update_layouts(&mut self, this: Id, widgets: &mut Widgets) {
-        let rect = widgets.get_rect(this).get_rect();
+    fn update_layouts(&mut self, this: Id, controls: &mut Controls) {
+        let rect = controls.get_rect(this).get_rect();
         let des_rect = [
             rect[0] + self.margins[0],
             rect[1] + self.margins[1],
             rect[2] - self.margins[2],
             rect[3] - self.margins[3],
         ];
-        for child in widgets.get_children(this) {
-            let rect = widgets.get_rect(child);
+        for child in controls.get_children(this) {
+            let rect = controls.get_rect(child);
             rect.set_designed_rect(des_rect);
         }
     }
@@ -60,22 +60,22 @@ impl RatioLayout {
     }
 }
 impl Layout for RatioLayout {
-    fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets) {
+    fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
         let mut min_size = [0.0f32, 0.0];
-        for child in widgets.get_children(this) {
-            let c_min_size = widgets.get_rect(child).min_size;
+        for child in controls.get_children(this) {
+            let c_min_size = controls.get_rect(child).min_size;
             min_size[0] = min_size[0].max(c_min_size[0]);
             min_size[1] = min_size[1].max(c_min_size[1]);
         }
         if min_size[0] > min_size[1] * self.ratio {
-            widgets.get_rect(this).min_size = [min_size[0], min_size[0] / self.ratio];
+            controls.get_rect(this).min_size = [min_size[0], min_size[0] / self.ratio];
         } else {
-            widgets.get_rect(this).min_size = [min_size[1] * self.ratio, min_size[1]];
+            controls.get_rect(this).min_size = [min_size[1] * self.ratio, min_size[1]];
         }
     }
 
-    fn update_layouts(&mut self, this: Id, widgets: &mut Widgets) {
-        let rect = widgets.get_rect(this);
+    fn update_layouts(&mut self, this: Id, controls: &mut Controls) {
+        let rect = controls.get_rect(this);
         let mut x = rect.get_rect()[0];
         let mut y = rect.get_rect()[1];
         let des_rect = if rect.get_width() < rect.get_height() * self.ratio {
@@ -105,8 +105,8 @@ impl Layout for RatioLayout {
                 y + rect.get_height(),
             ]
         };
-        for child in widgets.get_children(this) {
-            let rect = widgets.get_rect(child);
+        for child in controls.get_children(this) {
+            let rect = controls.get_rect(child);
             rect.set_designed_rect(des_rect);
         }
     }
@@ -127,10 +127,10 @@ impl HBoxLayout {
     }
 }
 impl Layout for HBoxLayout {
-    fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets) {
-        let children = widgets.get_children(this);
+    fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
+        let children = controls.get_children(this);
         if children.is_empty() {
-            widgets.get_rect(this).set_min_size([
+            controls.get_rect(this).set_min_size([
                 self.margins[0] + self.margins[2],
                 self.margins[1] + self.margins[3],
             ]);
@@ -139,31 +139,31 @@ impl Layout for HBoxLayout {
                 self.margins[0] + self.margins[2] + (children.len() - 1) as f32 * self.spacing;
             let mut min_height: f32 = 0.0;
             for child in children {
-                let [width, height] = widgets.get_rect(child).min_size;
+                let [width, height] = controls.get_rect(child).min_size;
                 min_width += width;
                 min_height = min_height.max(height);
             }
-            widgets
+            controls
                 .get_rect(this)
                 .set_min_size([min_width, min_height + self.margins[1] + self.margins[3]]);
         }
     }
 
-    fn update_layouts(&mut self, this: Id, widgets: &mut Widgets) {
-        let children = widgets.get_children(this);
+    fn update_layouts(&mut self, this: Id, controls: &mut Controls) {
+        let children = controls.get_children(this);
         if children.is_empty() {
             return;
         }
         let mut reserved_width = self.spacing * (children.len() - 1) as f32;
         let mut max_weight = 0.0;
         for child in children {
-            let rect = widgets.get_rect(child);
+            let rect = controls.get_rect(child);
             reserved_width += rect.min_size[0];
             if rect.is_expand_x() {
                 max_weight += rect.ratio_x;
             }
         }
-        let rect = widgets.get_rect(this);
+        let rect = controls.get_rect(this);
         let width = rect.get_width() - self.margins[0] - self.margins[2];
         let rect = *rect.get_rect();
         let top = rect[1] + self.margins[1];
@@ -176,14 +176,14 @@ impl Layout for HBoxLayout {
                 1 => x += free_width,
                 _ => {}
             }
-            for child in widgets.get_children(this) {
-                let rect = widgets.get_rect(child);
+            for child in controls.get_children(this) {
+                let rect = controls.get_rect(child);
                 rect.set_designed_rect([x, top, x + rect.min_size[0], bottom]);
                 x += self.spacing + rect.min_size[0];
             }
         } else {
-            for child in widgets.get_children(this) {
-                let rect = widgets.get_rect(child);
+            for child in controls.get_children(this) {
+                let rect = controls.get_rect(child);
                 if rect.is_expand_x() {
                     // FIXME: this implementation imply that rect with same ratio,
                     // may not have the same size when expanded
@@ -214,10 +214,10 @@ impl VBoxLayout {
     }
 }
 impl Layout for VBoxLayout {
-    fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets) {
-        let children = widgets.get_children(this);
+    fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
+        let children = controls.get_children(this);
         if children.is_empty() {
-            widgets.get_rect(this).set_min_size([
+            controls.get_rect(this).set_min_size([
                 self.margins[0] + self.margins[2],
                 self.margins[1] + self.margins[3],
             ]);
@@ -226,31 +226,31 @@ impl Layout for VBoxLayout {
             let mut min_height: f32 =
                 self.margins[1] + self.margins[3] + (children.len() - 1) as f32 * self.spacing;
             for child in children {
-                let [width, height] = widgets.get_rect(child).min_size;
+                let [width, height] = controls.get_rect(child).min_size;
                 min_width = min_width.max(width);
                 min_height += height;
             }
-            widgets
+            controls
                 .get_rect(this)
                 .set_min_size([min_width + self.margins[0] + self.margins[2], min_height]);
         }
     }
 
-    fn update_layouts(&mut self, this: Id, widgets: &mut Widgets) {
-        let children = widgets.get_children(this);
+    fn update_layouts(&mut self, this: Id, controls: &mut Controls) {
+        let children = controls.get_children(this);
         if children.is_empty() {
             return;
         }
         let mut reserved_height = self.spacing * (children.len() - 1) as f32;
         let mut max_weight = 0.0;
         for child in children {
-            let rect = widgets.get_rect(child);
+            let rect = controls.get_rect(child);
             reserved_height += rect.min_size[1];
             if rect.is_expand_y() {
                 max_weight += rect.ratio_y;
             }
         }
-        let rect = widgets.get_rect(this);
+        let rect = controls.get_rect(this);
         let height = rect.get_height() - self.margins[1] - self.margins[3];
         let rect = *rect.get_rect();
         let left = rect[0] + self.margins[0];
@@ -263,14 +263,14 @@ impl Layout for VBoxLayout {
                 1 => y += free_height,
                 _ => {}
             }
-            for child in widgets.get_children(this) {
-                let rect = widgets.get_rect(child);
+            for child in controls.get_children(this) {
+                let rect = controls.get_rect(child);
                 rect.set_designed_rect([left, y, right, y + rect.min_size[1]]);
                 y += self.spacing + rect.min_size[1];
             }
         } else {
-            for child in widgets.get_children(this) {
-                let rect = widgets.get_rect(child);
+            for child in controls.get_children(this) {
+                let rect = controls.get_rect(child);
                 if rect.is_expand_y() {
                     // FIXME: this implementation imply that rect with same ratio,
                     // may not have the same size when expanded
@@ -309,12 +309,12 @@ impl GridLayout {
     }
 }
 impl Layout for GridLayout {
-    fn compute_min_size(&mut self, this: Id, widgets: &mut Widgets) {
-        let children = widgets.get_children(this);
+    fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
+        let children = controls.get_children(this);
         if children.is_empty() {
             self.rows = 0;
             self.min_sizes.clear();
-            widgets.get_rect(this).set_min_size([
+            controls.get_rect(this).set_min_size([
                 self.margins[0] + self.margins[2],
                 self.margins[1] + self.margins[3],
             ]);
@@ -329,7 +329,7 @@ impl Layout for GridLayout {
             self.weights
                 .resize(self.columns as usize + self.rows as usize, 0.0);
             for (i, child) in children.into_iter().enumerate() {
-                let rect = widgets.get_rect(child);
+                let rect = controls.get_rect(child);
                 let col = i % self.columns as usize;
                 self.min_sizes[col] = self.min_sizes[col].max(rect.min_size[0]);
                 self.expand[col] |= rect.is_expand_x();
@@ -339,7 +339,7 @@ impl Layout for GridLayout {
                 self.expand[row] |= rect.is_expand_y();
                 self.weights[row] = rect.ratio_y;
             }
-            widgets.get_rect(this).set_min_size([
+            controls.get_rect(this).set_min_size([
                 self.min_sizes[0..self.columns as usize].iter().sum::<f32>()
                     + self.spacing[0] * self.columns.min(len as u32) as f32,
                 self.min_sizes[self.columns as usize..].iter().sum::<f32>()
@@ -348,8 +348,8 @@ impl Layout for GridLayout {
         }
     }
 
-    fn update_layouts(&mut self, this: Id, widgets: &mut Widgets) {
-        let children = widgets.get_children(this);
+    fn update_layouts(&mut self, this: Id, controls: &mut Controls) {
+        let children = controls.get_children(this);
         if children.is_empty() {
             return;
         }
@@ -371,7 +371,7 @@ impl Layout for GridLayout {
                 height_weight += self.weights[i];
             }
         }
-        let rect = widgets.get_rect(this);
+        let rect = controls.get_rect(this);
         let width = rect.get_width() - self.margins[0] - self.margins[2];
         let height = rect.get_height() - self.margins[1] - self.margins[3];
         let free_width = width - reserved_width;
@@ -433,7 +433,7 @@ impl Layout for GridLayout {
                 positions[col][1],
                 positions[row][1],
             ];
-            widgets.get_rect(child).set_designed_rect(rect);
+            controls.get_rect(child).set_designed_rect(rect);
         }
     }
 }

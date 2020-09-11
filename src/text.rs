@@ -25,7 +25,7 @@ impl TextInfo {
     }
 
     /// Get the position of the caret for the given glyph index.
-    /// The position is relative to to top left corner of the widget rect.
+    /// The position is relative to to top left corner of the control rect.
     pub fn get_caret_pos(&self, index: usize) -> [f32; 2] {
         match self.carret_pos.get(index) {
             Some(x) => *x,
