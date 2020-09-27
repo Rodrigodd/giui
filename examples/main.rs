@@ -183,7 +183,7 @@ fn main() {
                 .with_anchors([0.5, 0.5, 0.5, 0.5])
                 .with_margins([-3.0, -14.0, 3.0, 14.0])
                 .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
-                .with_parent(slide_area)
+                .with_parent(slider)
                 .build();
             gui.add_behaviour(
                 slider,

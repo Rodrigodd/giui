@@ -121,7 +121,6 @@ pub fn text_glyphs_and_info<F: Font>(
             0 => (rect[1] + rect[3] - font.height()) / 2.0,
             _ => rect[1] + rect[3] - font.height(),
         };
-        println!("text is empty. [x, y]: [{}, {}]", x, y);
         #[allow(clippy::reversed_empty_ranges)]
         return (
             Vec::new(),

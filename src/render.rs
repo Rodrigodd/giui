@@ -1,4 +1,4 @@
-use super::{DirtyFlags, Id, Controls};
+use super::{Controls, Id, RenderDirtyFlags};
 use crate::{
     text::{FontGlyph, TextInfo},
     Rect,
@@ -49,12 +49,9 @@ impl<'a> GUISpriteRender {
                     Graphic::Text(x) => x.dirty(),
                     Graphic::Mask => {}
                 }
-                rect.clear_dirty_flags();
+                rect.dirty_render_dirty_flags();
             } else {
-                controls
-                    .get_rect(parent)
-                    .dirty_flags
-                    .insert(DirtyFlags::all());
+                controls.get_layouting(parent).dirty_render_dirty_flags();
             }
             parents.extend(controls.get_children(parent).iter().rev())
         }
@@ -82,9 +79,11 @@ impl<'a> GUISpriteRender {
 
         'tree: while let Some(parent) = parents.pop() {
             let (mask, mask_changed) = {
-                let rect = controls.get_rect(parent);
+                let rect = controls.get_layouting(parent);
                 let mut mask = *rect.get_rect();
-                let mut mask_changed = rect.get_dirty_flags().contains(DirtyFlags::RECT);
+                let mut mask_changed = rect
+                    .get_render_dirty_flags()
+                    .contains(RenderDirtyFlags::RECT);
                 while let Some((i, m, changed)) = masks.last() {
                     let upper_mask;
                     if parents.len() < *i {
@@ -108,7 +107,9 @@ impl<'a> GUISpriteRender {
             let mut compute_sprite = true;
             if let Some((rect, graphic)) = controls.get_rect_and_graphic(parent) {
                 let len = self.sprites.len();
-                if !rect.get_dirty_flags().contains(DirtyFlags::RECT)
+                if !rect
+                    .get_render_dirty_flags()
+                    .contains(RenderDirtyFlags::RECT)
                     && !mask_changed
                     && !graphic.need_rebuild()
                 {
@@ -159,7 +160,7 @@ impl<'a> GUISpriteRender {
                             let size = rect.get_size();
                             let center = rect.get_center();
                             let mut sprite = SpriteInstance {
-                                scale: [size.0, size.1],
+                                scale: size,
                                 angle: 0.0,
                                 uv_rect: *uv_rect,
                                 color: *color,
@@ -230,7 +231,7 @@ impl<'a> GUISpriteRender {
                     self.sprites_map.push((parent, len..self.sprites.len()));
                 }
             }
-            controls.get_rect(parent).clear_dirty_flags();
+            controls.get_layouting(parent).clear_render_dirty_flags();
             parents.extend(controls.get_children(parent).iter().rev())
         }
     }
@@ -337,12 +338,12 @@ impl Text {
         rect: &mut Rect,
         fonts: &[F],
     ) -> &[crate::text::FontGlyph] {
-        let dirty_flags = rect.get_dirty_flags();
-        let width_change = dirty_flags.contains(DirtyFlags::WIDTH)
+        let dirty_flags = rect.get_render_dirty_flags();
+        let width_change = dirty_flags.contains(RenderDirtyFlags::WIDTH)
             && self.min_size.map_or(true, |x| rect.get_width() < x[0]);
         if self.text_dirty || width_change {
             self.update_glyphs(rect, fonts);
-        } else if dirty_flags.contains(DirtyFlags::RECT) && !width_change {
+        } else if dirty_flags.contains(RenderDirtyFlags::RECT) && !width_change {
             let rect = *rect.get_rect();
             let anchor = self.get_align_anchor(rect);
             let delta = [anchor[0] - self.last_pos[0], anchor[1] - self.last_pos[1]];

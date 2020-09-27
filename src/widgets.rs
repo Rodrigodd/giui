@@ -1,6 +1,6 @@
 use crate::{
-    event, render::Graphic, text::TextInfo, Behaviour, EventHandler, Id, InputFlags, KeyboardEvent,
-    Layout, MouseEvent, Rect, Controls,
+    event, render::Graphic, text::TextInfo, Behaviour, Controls, Id, InputFlags, KeyboardEvent,
+    Layout, MouseEvent,
 };
 use copypasta::{ClipboardContext, ClipboardProvider};
 use std::any::Any;
@@ -20,43 +20,37 @@ impl Behaviour for Button {
         InputFlags::POINTER
     }
 
-    fn on_start(&mut self, this: Id, controls: &mut Controls, event_handler: &mut EventHandler) {
+    fn on_start(&mut self, this: Id, controls: &mut Controls) {
         let graphic = controls.get_graphic(this).unwrap();
         graphic.set_color([200, 200, 200, 255]);
-        event_handler.send_event(event::Redraw);
+        controls.send_event(event::Redraw);
     }
 
-    fn on_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, controls: &mut Controls) {
         match event {
             MouseEvent::Enter => {
                 let graphic = controls.get_graphic(this).unwrap();
                 graphic.set_color([180, 180, 180, 255]);
-                event_handler.send_event(event::Redraw);
+                controls.send_event(event::Redraw);
             }
             MouseEvent::Exit => {
                 self.click = false;
                 let graphic = controls.get_graphic(this).unwrap();
                 graphic.set_color([200, 200, 200, 255]);
-                event_handler.send_event(event::Redraw);
+                controls.send_event(event::Redraw);
             }
             MouseEvent::Down => {
                 self.click = true;
                 let graphic = controls.get_graphic(this).unwrap();
                 graphic.set_color([128, 128, 128, 255]);
-                event_handler.send_event(event::Redraw);
+                controls.send_event(event::Redraw);
             }
             MouseEvent::Up => {
                 let graphic = controls.get_graphic(this).unwrap();
                 graphic.set_color([180, 180, 180, 255]);
-                event_handler.send_event(event::Redraw);
+                controls.send_event(event::Redraw);
                 if self.click {
-                    event_handler.send_event(event::ButtonClicked { id: this });
+                    controls.send_event(event::ButtonClicked { id: this });
                 }
             }
             MouseEvent::Moved { .. } => {}
@@ -92,26 +86,27 @@ impl Slider {
         }
     }
 
-    fn compute_value(&mut self, rect: &Rect) {
-        let mut rel_x = rect.get_relative_x(self.mouse_x);
+    fn update_value(&mut self, controls: &mut Controls) {
+        let area_rect = controls.get_rect(self.slide_area);
+        let mut rel_x = (self.mouse_x - area_rect[0]) / (area_rect[2] - area_rect[0]);
         rel_x = rel_x.max(0.0).min(1.0);
-        let value = rel_x * (self.max_value - self.min_value) + self.min_value;
-        self.value = value;
+        self.value = rel_x * (self.max_value - self.min_value) + self.min_value;
     }
 
-    fn set_handle_pos(
-        &mut self,
-        handle: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
-        let rect = controls.get_rect(handle);
+    fn set_handle_pos(&mut self, this: Id, controls: &mut Controls) {
+        let this_rect = controls.get_rect(this);
+        let area_rect = controls.get_rect(self.slide_area);
+
         let mut rel_x = (self.value - self.min_value) / (self.max_value - self.min_value);
         rel_x = rel_x.max(0.0).min(1.0);
-        rect.anchors[0] = rel_x;
-        rect.anchors[2] = rel_x;
-        event_handler.send_event(event::Redraw);
-        event_handler.send_event(event::InvalidadeLayout { id: handle });
+
+        let margin_left = (area_rect[0] - this_rect[0]) / (this_rect[2] - this_rect[0]);
+        let margin_right = (this_rect[2] - area_rect[2]) / (this_rect[2] - this_rect[0]);
+        let x = margin_left + (1.0 - margin_left - margin_right) * rel_x;
+
+        controls.set_anchor_left(self.handle, x);
+        controls.set_anchor_right(self.handle, x);
+        controls.send_event(event::Redraw);
     }
 }
 impl Behaviour for Slider {
@@ -119,44 +114,38 @@ impl Behaviour for Slider {
         InputFlags::POINTER
     }
 
-    fn on_start(&mut self, this: Id, controls: &mut Controls, event_handler: &mut EventHandler) {
-        self.set_handle_pos(self.handle, controls, event_handler);
+    fn on_active(&mut self, this: Id, controls: &mut Controls) {
+        self.set_handle_pos(this, controls);
         let value = self.value;
-        event_handler.send_event(event::ValueSet { id: this, value });
+        controls.send_event(event::ValueSet { id: this, value });
     }
 
-    fn on_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, controls: &mut Controls) {
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {}
             MouseEvent::Down => {
                 self.dragging = true;
-                event_handler.send_event(event::LockOver);
-                self.compute_value(controls.get_rect(self.slide_area));
-                self.set_handle_pos(self.handle, controls, event_handler);
+                controls.send_event(event::LockOver);
+                self.update_value(controls);
+                self.set_handle_pos(this, controls);
                 let value = self.value;
-                event_handler.send_event(event::ValueChanged { id: this, value });
+                controls.send_event(event::ValueChanged { id: this, value });
             }
             MouseEvent::Up => {
                 self.dragging = false;
-                self.set_handle_pos(self.handle, controls, event_handler);
+                self.set_handle_pos(this, controls);
                 let value = self.value;
-                event_handler.send_event(event::ValueSet { id: this, value });
-                event_handler.send_event(event::UnlockOver);
+                controls.send_event(event::ValueSet { id: this, value });
+                controls.send_event(event::UnlockOver);
             }
             MouseEvent::Moved { x, .. } => {
                 self.mouse_x = x;
                 if self.dragging {
-                    self.compute_value(controls.get_rect(self.slide_area));
-                    self.set_handle_pos(self.handle, controls, event_handler);
+                    self.update_value(controls);
+                    self.set_handle_pos(this, controls);
                     let value = self.value;
-                    event_handler.send_event(event::ValueChanged { id: this, value });
+                    controls.send_event(event::ValueChanged { id: this, value });
                 }
             }
         }
@@ -184,8 +173,8 @@ impl Behaviour for Toggle {
         InputFlags::POINTER
     }
 
-    fn on_start(&mut self, this: Id, controls: &mut Controls, event_handler: &mut EventHandler) {
-        event_handler.send_event(event::ToggleChanged {
+    fn on_start(&mut self, this: Id, controls: &mut Controls) {
+        controls.send_event(event::ToggleChanged {
             id: this,
             value: self.enable,
         });
@@ -195,38 +184,32 @@ impl Behaviour for Toggle {
             controls.get_graphic(self.marker).unwrap().set_alpha(0)
         }
     }
-    fn on_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, controls: &mut Controls) {
         match event {
             MouseEvent::Enter => {
                 let graphic = controls.get_graphic(self.background).unwrap();
                 graphic.set_color([190, 190, 190, 255]);
-                event_handler.send_event(event::Redraw);
+                controls.send_event(event::Redraw);
             }
             MouseEvent::Exit => {
                 self.click = false;
                 let graphic = controls.get_graphic(self.background).unwrap();
                 graphic.set_color([200, 200, 200, 255]);
-                event_handler.send_event(event::Redraw);
+                controls.send_event(event::Redraw);
             }
             MouseEvent::Down => {
                 self.click = true;
                 let graphic = controls.get_graphic(self.background).unwrap();
                 graphic.set_color([170, 170, 170, 255]);
-                event_handler.send_event(event::Redraw);
+                controls.send_event(event::Redraw);
             }
             MouseEvent::Up => {
                 let graphic = controls.get_graphic(self.background).unwrap();
                 graphic.set_color([190, 190, 190, 255]);
-                event_handler.send_event(event::Redraw);
+                controls.send_event(event::Redraw);
                 if self.click {
                     self.enable = !self.enable;
-                    event_handler.send_event(event::ToggleChanged {
+                    controls.send_event(event::ToggleChanged {
                         id: this,
                         value: self.enable,
                     });
@@ -270,32 +253,26 @@ impl Behaviour for TabGroup {
         InputFlags::empty()
     }
 
-    fn on_event(
-        &mut self,
-        event: &dyn Any,
-        _this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_event(&mut self, event: &dyn Any, _this: Id, controls: &mut Controls) {
         if let Some(Select(id)) = event.downcast_ref::<Select>() {
             controls.deactive(self.pages[self.selected]);
-            event_handler.send_event_to(self.buttons[self.selected], Unselected);
+            controls.send_event_to(self.buttons[self.selected], Unselected);
             if let Some(i) = self.buttons.iter().position(|x| x == id) {
                 self.selected = i;
                 controls.active(self.pages[self.selected]);
-                event_handler.send_event_to(self.buttons[self.selected], Selected);
+                controls.send_event_to(self.buttons[self.selected], Selected);
             }
         }
     }
 
-    fn on_start(&mut self, _this: Id, controls: &mut Controls, event_handler: &mut EventHandler) {
+    fn on_start(&mut self, _this: Id, controls: &mut Controls) {
         for i in 0..self.pages.len() {
             if i == self.selected {
                 controls.active(self.pages[i]);
-                event_handler.send_event_to(self.buttons[i], Selected);
+                controls.send_event_to(self.buttons[i], Selected);
             } else {
                 controls.deactive(self.pages[i]);
-                event_handler.send_event_to(self.buttons[i], Unselected);
+                controls.send_event_to(self.buttons[i], Unselected);
             }
         }
     }
@@ -315,11 +292,11 @@ impl TabButton {
         }
     }
 
-    pub fn unselect(&mut self, this: Id, controls: &mut Controls, event_handler: &mut EventHandler) {
+    pub fn unselect(&mut self, this: Id, controls: &mut Controls) {
         self.selected = false;
         let graphic = controls.get_graphic(this).unwrap();
         graphic.set_color([200, 200, 200, 255]);
-        event_handler.send_event(event::Redraw);
+        controls.send_event(event::Redraw);
     }
 }
 impl Behaviour for TabButton {
@@ -327,39 +304,27 @@ impl Behaviour for TabButton {
         InputFlags::POINTER
     }
 
-    fn on_event(
-        &mut self,
-        event: &dyn Any,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_event(&mut self, event: &dyn Any, this: Id, controls: &mut Controls) {
         if event.is::<Unselected>() {
             let graphic = controls.get_graphic(this).unwrap();
             graphic.set_color([200, 200, 200, 255]);
-            event_handler.send_event(event::Redraw);
+            controls.send_event(event::Redraw);
             self.selected = false;
         } else if event.is::<Selected>() {
             let graphic = controls.get_graphic(this).unwrap();
             graphic.set_color([255, 255, 255, 255]);
-            event_handler.send_event(event::Redraw);
+            controls.send_event(event::Redraw);
             self.selected = true;
         }
     }
 
-    fn on_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, controls: &mut Controls) {
         match event {
             MouseEvent::Enter => {
                 if !self.selected {
                     let graphic = controls.get_graphic(this).unwrap();
                     graphic.set_color([180, 180, 180, 255]);
-                    event_handler.send_event(event::Redraw);
+                    controls.send_event(event::Redraw);
                 }
             }
             MouseEvent::Exit => {
@@ -367,7 +332,7 @@ impl Behaviour for TabButton {
                     self.click = false;
                     let graphic = controls.get_graphic(this).unwrap();
                     graphic.set_color([200, 200, 200, 255]);
-                    event_handler.send_event(event::Redraw);
+                    controls.send_event(event::Redraw);
                 }
             }
             MouseEvent::Down => {
@@ -375,7 +340,7 @@ impl Behaviour for TabButton {
                     self.click = true;
                     let graphic = controls.get_graphic(this).unwrap();
                     graphic.set_color([128, 128, 128, 255]);
-                    event_handler.send_event(event::Redraw);
+                    controls.send_event(event::Redraw);
                 }
             }
             MouseEvent::Up => {
@@ -383,11 +348,11 @@ impl Behaviour for TabButton {
                     let graphic = controls.get_graphic(this).unwrap();
 
                     if self.click {
-                        event_handler.send_event_to(self.tab_group, Select(this));
+                        controls.send_event_to(self.tab_group, Select(this));
                     } else {
                         graphic.set_color([180, 180, 180, 255]);
                     }
-                    event_handler.send_event(event::Redraw);
+                    controls.send_event(event::Redraw);
                 }
             }
             MouseEvent::Moved { .. } => {}
@@ -416,17 +381,11 @@ impl Behaviour for Hoverable {
         InputFlags::POINTER
     }
 
-    fn on_start(&mut self, _this: Id, controls: &mut Controls, _event_handler: &mut EventHandler) {
+    fn on_start(&mut self, _this: Id, controls: &mut Controls) {
         controls.deactive(self.hover);
     }
 
-    fn on_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        _this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, controls: &mut Controls) {
         match event {
             MouseEvent::Enter => {
                 controls.active(self.hover);
@@ -434,28 +393,25 @@ impl Behaviour for Hoverable {
                     .get_graphic(self.label)
                     .unwrap()
                     .set_text(&self.text);
+                controls.dirty_layout(self.label);
                 controls.move_to_front(self.hover);
                 self.is_over = true;
-                event_handler.send_event(event::InvalidadeLayout { id: self.hover });
-                event_handler.send_event(event::Redraw);
+                controls.send_event(event::Redraw);
             }
             MouseEvent::Exit => {
                 controls.deactive(self.hover);
                 self.is_over = false;
-                event_handler.send_event(event::Redraw);
+                controls.send_event(event::Redraw);
             }
             MouseEvent::Down => {}
             MouseEvent::Up => {}
             MouseEvent::Moved { x, y } => {
                 if self.is_over {
-                    // TODO: this may be buggy, if the layout has not updated yet
-                    let (width, heigth) = controls.get_rect(crate::ROOT_ID).get_size();
-                    let rect = controls.get_rect(self.hover);
+                    let [width, heigth] = controls.get_size(crate::ROOT_ID);
                     let x = x / width;
                     let y = y / heigth;
-                    rect.anchors = [x, y, x, y];
-                    event_handler.send_event(event::InvalidadeLayout { id: self.hover });
-                    event_handler.send_event(event::Redraw);
+                    controls.set_anchors(self.hover, [x, y, x, y]);
+                    controls.send_event(event::Redraw);
                 }
             }
         }
@@ -469,10 +425,10 @@ struct ScrollViewLayout {
 }
 impl Layout for ScrollViewLayout {
     fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
-        let mut min_size = controls.get_rect(self.view).min_size;
+        let mut min_size = controls.get_min_size(self.view);
 
-        let h_scroll_bar_size = controls.get_rect(self.v_scroll_bar).min_size;
-        let v_scroll_bar_size = controls.get_rect(self.v_scroll_bar).min_size;
+        let h_scroll_bar_size = controls.get_min_size(self.v_scroll_bar);
+        let v_scroll_bar_size = controls.get_min_size(self.v_scroll_bar);
 
         min_size[0] = min_size[0].max(h_scroll_bar_size[0]);
         min_size[1] = min_size[1].max(v_scroll_bar_size[1]);
@@ -480,34 +436,34 @@ impl Layout for ScrollViewLayout {
         min_size[0] += v_scroll_bar_size[0];
         min_size[1] += h_scroll_bar_size[1];
 
-        controls.get_rect(this).min_size = min_size;
+        controls.set_min_size(this, min_size);
     }
 
     fn update_layouts(&mut self, this: Id, controls: &mut Controls) {
-        let this_rect = *controls.get_rect(this).get_rect();
+        let this_rect = *controls.get_rect(this);
         let content = controls.get_children(self.view)[0];
-        let content_size = controls.get_rect(content).min_size;
-        let view_rect = *controls.get_rect(this).get_rect();
+        let content_size = controls.get_min_size(content);
+        let view_rect = *controls.get_rect(this);
         let view_width = view_rect[2] - view_rect[0];
         let view_height = view_rect[3] - view_rect[1];
 
         let mut h_active = view_width < content_size[0];
         let mut h_scroll_bar_size = if h_active {
-            controls.get_rect(self.h_scroll_bar).min_size[1]
+            controls.get_min_size(self.h_scroll_bar)[1]
         } else {
             0.0
         };
 
         let v_active = view_height - h_scroll_bar_size < content_size[1];
         let v_scroll_bar_size = if v_active {
-            controls.get_rect(self.v_scroll_bar).min_size[0]
+            controls.get_min_size(self.v_scroll_bar)[0]
         } else {
             0.0
         };
 
         if !h_active && view_width - v_scroll_bar_size < content_size[0] {
             h_active = true;
-            h_scroll_bar_size = controls.get_rect(self.h_scroll_bar).min_size[1];
+            h_scroll_bar_size = controls.get_min_size(self.h_scroll_bar)[1];
         }
 
         if controls.is_active(self.h_scroll_bar) {
@@ -527,7 +483,7 @@ impl Layout for ScrollViewLayout {
         }
 
         if h_active {
-            let h_scroll_bar_rect = controls.get_rect(self.h_scroll_bar);
+            let h_scroll_bar_rect = controls.get_layouting(self.h_scroll_bar);
             h_scroll_bar_rect.set_designed_rect([
                 this_rect[0],
                 this_rect[3] - h_scroll_bar_size,
@@ -536,7 +492,7 @@ impl Layout for ScrollViewLayout {
             ]);
         }
         if v_active {
-            let v_scroll_bar_rect = controls.get_rect(self.v_scroll_bar);
+            let v_scroll_bar_rect = controls.get_layouting(self.v_scroll_bar);
             v_scroll_bar_rect.set_designed_rect([
                 this_rect[2] - v_scroll_bar_size,
                 this_rect[1],
@@ -545,7 +501,7 @@ impl Layout for ScrollViewLayout {
             ]);
         }
 
-        controls.get_rect(self.view).set_designed_rect([
+        controls.get_layouting(self.view).set_designed_rect([
             this_rect[0],
             this_rect[1],
             this_rect[2] - v_scroll_bar_size,
@@ -555,6 +511,7 @@ impl Layout for ScrollViewLayout {
 }
 
 struct ScrollContentLayout {
+    scroll_view: Id,
     delta_x: f32,
     delta_y: f32,
     h_scroll_bar_handle: Id,
@@ -569,9 +526,11 @@ impl Layout for ScrollContentLayout {
             "The view of the scroll view must have only one child, wich is the content."
         );
 
+        controls.dirty_layout(self.scroll_view);
+
         let content = controls.get_children(this)[0];
-        let content_size = controls.get_rect(content).min_size;
-        let view_rect = *controls.get_rect(this).get_rect();
+        let content_size = controls.get_min_size(content);
+        let view_rect = *controls.get_rect(this);
         let view_width = view_rect[2] - view_rect[0];
         let view_height = view_rect[3] - view_rect[1];
 
@@ -604,15 +563,19 @@ impl Layout for ScrollContentLayout {
             content_rect[3] = view_rect[1] - self.delta_y + content_size[1];
         }
 
-        let h_scroll_bar_handle = controls.get_rect(self.h_scroll_bar_handle);
-        h_scroll_bar_handle.anchors[0] = self.delta_x / content_size[0];
-        h_scroll_bar_handle.anchors[2] = ((self.delta_x + view_width) / content_size[0]).min(1.0);
+        controls.set_anchor_left(self.h_scroll_bar_handle, self.delta_x / content_size[0]);
+        controls.set_anchor_right(
+            self.h_scroll_bar_handle,
+            ((self.delta_x + view_width) / content_size[0]).min(1.0),
+        );
 
-        let v_scroll_bar_handle = controls.get_rect(self.v_scroll_bar_handle);
-        v_scroll_bar_handle.anchors[1] = self.delta_y / content_size[1];
-        v_scroll_bar_handle.anchors[3] = ((self.delta_y + view_height) / content_size[1]).min(1.0);
+        controls.set_anchor_top(self.v_scroll_bar_handle, self.delta_y / content_size[1]);
+        controls.set_anchor_bottom(
+            self.v_scroll_bar_handle,
+            ((self.delta_y + view_height) / content_size[1]).min(1.0),
+        );
 
-        controls.get_rect(content).set_rect(content_rect);
+        controls.get_layouting(content).set_rect(content_rect);
     }
 }
 
@@ -648,33 +611,27 @@ impl Behaviour for ScrollBar {
         InputFlags::POINTER
     }
 
-    fn on_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        _this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, controls: &mut Controls) {
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {
                 if let Some(handle) = controls.get_graphic(self.handle) {
                     handle.set_color([220, 220, 220, 255]);
-                    event_handler.send_event(event::Redraw);
+                    controls.send_event(event::Redraw);
                 }
             }
             MouseEvent::Down => {
                 self.dragging = true;
                 if let Some(handle) = controls.get_graphic(self.handle) {
                     handle.set_color([180, 180, 180, 255]);
-                    event_handler.send_event(event::Redraw);
+                    controls.send_event(event::Redraw);
                 }
-                event_handler.send_event(event::LockOver);
-                let handle_rect = *controls.get_rect(self.handle).get_rect();
+                controls.send_event(event::LockOver);
+                let handle_rect = *controls.get_rect(self.handle);
                 let area = controls
                     .get_parent(self.handle)
                     .expect("the handle of the scrollbar must have a parent");
-                let area_rect = *controls.get_rect(area).get_rect();
+                let area_rect = *controls.get_rect(area);
                 self.drag_start = self.mouse_pos;
                 if !self.vertical {
                     let handle_size = handle_rect[2] - handle_rect[0];
@@ -682,7 +639,7 @@ impl Behaviour for ScrollBar {
                     if self.mouse_pos < handle_rect[0] || self.mouse_pos > handle_rect[2] {
                         self.curr_value =
                             (self.mouse_pos - (area_rect[0] + handle_size / 2.0)) / area_size;
-                        event_handler.send_event_to(
+                        controls.send_event_to(
                             self.scroll_view,
                             SetScrollPosition {
                                 vertical: false,
@@ -698,7 +655,7 @@ impl Behaviour for ScrollBar {
                     if self.mouse_pos < handle_rect[1] || self.mouse_pos > handle_rect[3] {
                         self.curr_value =
                             (self.mouse_pos - (area_rect[1] + handle_size / 2.0)) / area_size;
-                        event_handler.send_event_to(
+                        controls.send_event_to(
                             self.scroll_view,
                             SetScrollPosition {
                                 vertical: true,
@@ -713,21 +670,21 @@ impl Behaviour for ScrollBar {
             MouseEvent::Up => {
                 if self.dragging {
                     self.dragging = false;
-                    event_handler.send_event(event::UnlockOver);
+                    controls.send_event(event::UnlockOver);
                     if let Some(graphic) = controls.get_graphic(self.handle) {
                         graphic.set_color([200, 200, 200, 255]);
-                        event_handler.send_event(event::Redraw);
+                        controls.send_event(event::Redraw);
                     }
                 }
             }
             MouseEvent::Moved { x, y } => {
                 self.mouse_pos = if self.vertical { y } else { x };
                 if self.dragging {
-                    let handle_rect = *controls.get_rect(self.handle).get_rect();
+                    let handle_rect = *controls.get_rect(self.handle);
                     let area = controls
                         .get_parent(self.handle)
                         .expect("handle must have a parent");
-                    let area_rect = *controls.get_rect(area).get_rect();
+                    let area_rect = *controls.get_rect(area);
 
                     let handle_size = if !self.vertical {
                         handle_rect[2] - handle_rect[0]
@@ -746,7 +703,7 @@ impl Behaviour for ScrollBar {
                         0.0
                     };
 
-                    event_handler.send_event_to(
+                    controls.send_event_to(
                         self.scroll_view,
                         SetScrollPosition {
                             vertical: self.vertical,
@@ -754,14 +711,14 @@ impl Behaviour for ScrollBar {
                         },
                     )
                 } else if controls.get_graphic(self.handle).is_some() {
-                    let handle_rect = *controls.get_rect(self.handle).get_rect();
+                    let handle_rect = *controls.get_rect(self.handle);
                     let graphic = controls.get_graphic(self.handle).unwrap();
                     if self.mouse_pos < handle_rect[1] || self.mouse_pos > handle_rect[3] {
                         graphic.set_color([220, 220, 220, 255]);
                     } else {
                         graphic.set_color([200, 200, 200, 255]);
                     }
-                    event_handler.send_event(event::Redraw);
+                    controls.send_event(event::Redraw);
                 }
             }
         }
@@ -799,14 +756,22 @@ impl ScrollView {
             v_scroll_bar_handle,
         }
     }
+
+    fn get_view_layout<'a>(&self, controls: &'a mut Controls) -> &'a mut ScrollContentLayout {
+        controls
+        .get_layout(self.view)
+        .and_then(|x| x.downcast_mut::<ScrollContentLayout>())
+        .expect("the control refered by ScrollView::view must always have a ScrollContentLayout as layout, which this behaviour automaticly add at on_start")
+    }
 }
 impl Behaviour for ScrollView {
     fn input_flags(&self) -> InputFlags {
         InputFlags::SCROLL
     }
 
-    fn on_start(&mut self, this: Id, controls: &mut Controls, _: &mut EventHandler) {
+    fn on_start(&mut self, this: Id, controls: &mut Controls) {
         let scroll_content_layout = ScrollContentLayout {
+            scroll_view: this,
             delta_x: self.delta_x,
             delta_y: self.delta_y,
             v_scroll_bar_handle: self.v_scroll_bar_handle,
@@ -824,76 +789,51 @@ impl Behaviour for ScrollView {
         controls.set_layout(this, Box::new(scroll_view_layout));
     }
 
-    fn on_active(&mut self, _: Id, controls: &mut Controls, event_handler: &mut EventHandler) {
-        let content_size = controls.get_rect(self.content).min_size;
+    fn on_active(&mut self, _: Id, controls: &mut Controls) {
+        let content_size = controls.get_min_size(self.content);
 
-        let view = controls.get_rect(self.view);
-        let view_rect = view.get_rect();
+        let view_rect = controls.get_rect(self.view);
 
-        let width = view_rect[2] - view_rect[0];
-        let height = view_rect[3] - view_rect[1];
+        let view_width = view_rect[2] - view_rect[0];
+        let view_height = view_rect[3] - view_rect[1];
 
-        let view_size = [content_size[0].max(width), content_size[1].max(height)];
+        controls.set_anchor_left(self.h_scroll_bar_handle, self.delta_x / content_size[0]);
+        controls.set_anchor_right(
+            self.h_scroll_bar_handle,
+            ((self.delta_x + view_width) / content_size[0]).min(1.0),
+        );
 
-        //TODO: this can be removed i guess
-        let v_scroll_bar_handle = controls.get_rect(self.v_scroll_bar_handle);
-        v_scroll_bar_handle.anchors[1] = self.delta_y / view_size[1];
-        v_scroll_bar_handle.anchors[3] = (self.delta_y + height) / view_size[1];
-
-        event_handler.send_event(event::InvalidadeLayout {
-            id: self.h_scroll_bar_handle,
-        });
+        controls.set_anchor_top(self.v_scroll_bar_handle, self.delta_y / content_size[1]);
+        controls.set_anchor_bottom(
+            self.v_scroll_bar_handle,
+            ((self.delta_y + view_height) / content_size[1]).min(1.0),
+        );
     }
 
-    fn on_scroll_event(
-        &mut self,
-        delta: [f32; 2],
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
-        let scroll_view_layout = controls
-            .get_layout(self.view)
-            .unwrap()
-            .downcast_mut::<ScrollContentLayout>()
-            .unwrap();
+    fn on_scroll_event(&mut self, delta: [f32; 2], _: Id, controls: &mut Controls) {
+        let scroll_view_layout = self.get_view_layout(controls);
         scroll_view_layout.delta_x += delta[0];
         scroll_view_layout.delta_y -= delta[1];
 
-        event_handler.send_event(event::InvalidadeLayout { id: this });
-        event_handler.send_event(event::Redraw);
+        controls.dirty_layout(self.view);
+        controls.send_event(event::Redraw);
     }
 
-    fn on_event(
-        &mut self,
-        event: &dyn Any,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_event(&mut self, event: &dyn Any, _: Id, controls: &mut Controls) {
         if let Some(event) = event.downcast_ref::<SetScrollPosition>() {
             if !event.vertical {
-                let total_size = controls.get_rect(self.content).get_width()
-                    - controls.get_rect(self.view).get_width();
-                let scroll_view_layout = controls
-                    .get_layout(self.view)
-                    .unwrap()
-                    .downcast_mut::<ScrollContentLayout>()
-                    .unwrap();
+                let total_size =
+                    controls.get_size(self.content)[0] - controls.get_size(self.view)[0];
+                let scroll_view_layout = self.get_view_layout(controls);
                 scroll_view_layout.delta_x = event.value * total_size;
             } else {
-                let total_size = controls.get_rect(self.content).get_height()
-                    - controls.get_rect(self.view).get_height();
-                let scroll_view_layout = controls
-                    .get_layout(self.view)
-                    .unwrap()
-                    .downcast_mut::<ScrollContentLayout>()
-                    .unwrap();
+                let total_size =
+                    controls.get_size(self.content)[1] - controls.get_size(self.view)[1];
+                let scroll_view_layout = self.get_view_layout(controls);
                 scroll_view_layout.delta_y = event.value * total_size;
             }
-
-            event_handler.send_event(event::InvalidadeLayout { id: this });
-            event_handler.send_event(event::Redraw);
+            controls.dirty_layout(self.view);
+            controls.send_event(event::Redraw);
         }
     }
 }
@@ -929,7 +869,7 @@ impl TextField {
     }
 }
 impl TextField {
-    fn update_text(&mut self, this: Id, controls: &mut Controls, event_handler: &mut EventHandler) {
+    fn update_text(&mut self, this: Id, controls: &mut Controls) {
         let fonts = controls.get_fonts();
         if let Some((ref mut rect, Graphic::Text(text))) = controls.get_rect_and_graphic(self.label)
         {
@@ -939,18 +879,12 @@ impl TextField {
             self.text_width = min_size[0];
             rect.set_min_size(min_size);
             self.text_info = text.get_text_info(fonts, rect).clone();
-            self.update_carret(this, controls, event_handler, true);
+            self.update_carret(this, controls, true);
         }
     }
 
-    fn update_carret(
-        &mut self,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-        focus_caret: bool,
-    ) {
-        let this_rect = *controls.get_rect(this).get_rect();
+    fn update_carret(&mut self, this: Id, controls: &mut Controls, focus_caret: bool) {
+        let this_rect = *controls.get_rect(this);
 
         let mut caret_pos = self.text_info.get_caret_pos(self.caret_index);
 
@@ -975,7 +909,7 @@ impl TextField {
             }
         }
 
-        controls.get_rect(self.label).margins[0] = -self.x_scroll;
+        controls.set_margin_left(self.label, -self.x_scroll);
 
         caret_pos[0] -= self.x_scroll;
 
@@ -986,8 +920,7 @@ impl TextField {
                 .set_color([51, 153, 255, 255]);
             let mut selection_pos = self.text_info.get_caret_pos(selection_index);
             selection_pos[0] -= self.x_scroll;
-            let margins = &mut controls.get_rect(self.caret).margins;
-            *margins = [
+            let mut margins = [
                 caret_pos[0],
                 caret_pos[1] - self.text_info.get_line_heigth(),
                 selection_pos[0],
@@ -999,24 +932,27 @@ impl TextField {
             if margins[1] > margins[3] {
                 margins.swap(1, 3);
             }
+            controls.set_margins(self.caret, margins);
         } else {
             controls
                 .get_graphic(self.caret)
                 .unwrap()
                 .set_color([0, 0, 0, 255]);
             if self.on_focus {
-                controls.get_rect(self.caret).margins = [
-                    caret_pos[0],
-                    caret_pos[1] - self.text_info.get_line_heigth(),
-                    caret_pos[0] + 1.0,
-                    caret_pos[1],
-                ];
+                controls.set_margins(
+                    self.caret,
+                    [
+                        caret_pos[0],
+                        caret_pos[1] - self.text_info.get_line_heigth(),
+                        caret_pos[0] + 1.0,
+                        caret_pos[1],
+                    ],
+                );
             } else {
-                controls.get_rect(self.caret).margins = [0.0, 0.0, 0.0, 0.0];
+                controls.set_margins(self.caret, [0.0, 0.0, 0.0, 0.0]);
             }
         }
-        event_handler.send_event(event::Redraw);
-        event_handler.send_event(event::InvalidadeLayout { id: this });
+        controls.send_event(event::Redraw);
     }
 
     fn move_caret(&mut self, caret: usize, controls: &mut Controls) {
@@ -1042,12 +978,7 @@ impl TextField {
         self.caret_index = caret;
     }
 
-    fn delete_selection(
-        &mut self,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn delete_selection(&mut self, this: Id, controls: &mut Controls) {
         let selection_index = self.selection_index.unwrap();
         let a = self.text_info.get_indice(self.caret_index);
         let b = self.text_info.get_indice(selection_index);
@@ -1057,20 +988,14 @@ impl TextField {
         }
         self.selection_index = None;
         self.text.replace_range(range, "");
-        self.update_text(this, controls, event_handler);
+        self.update_text(this, controls);
     }
 
-    fn insert_char(
-        &mut self,
-        ch: char,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn insert_char(&mut self, ch: char, this: Id, controls: &mut Controls) {
         self.text
             .insert(self.text_info.get_indice(self.caret_index), ch);
         self.caret_index += 1;
-        self.update_text(this, controls, event_handler);
+        self.update_text(this, controls);
     }
 }
 impl Behaviour for TextField {
@@ -1078,72 +1003,54 @@ impl Behaviour for TextField {
         InputFlags::KEYBOARD | InputFlags::POINTER | InputFlags::SCROLL
     }
 
-    fn on_start(&mut self, this: Id, controls: &mut Controls, event_handler: &mut EventHandler) {
-        self.update_text(this, controls, event_handler);
+    fn on_start(&mut self, this: Id, controls: &mut Controls) {
+        self.update_text(this, controls);
         controls.move_to_front(self.label);
     }
 
-    fn on_event(
-        &mut self,
-        event: &dyn Any,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_event(&mut self, event: &dyn Any, this: Id, controls: &mut Controls) {
         if event.is::<event::ClearText>() {
             self.text.clear();
             self.caret_index = 0;
             self.selection_index = None;
-            self.update_text(this, controls, event_handler);
+            self.update_text(this, controls);
         }
     }
 
-    fn on_scroll_event(
-        &mut self,
-        delta: [f32; 2],
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, controls: &mut Controls) {
         let delta = if delta[0].abs() > delta[1].abs() {
             delta[0]
         } else {
             delta[1]
         };
         self.x_scroll -= delta;
-        self.update_carret(this, controls, event_handler, false);
+        self.update_carret(this, controls, false);
     }
 
-    fn on_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, controls: &mut Controls) {
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {}
             MouseEvent::Down => {
                 if !self.on_focus {
-                    event_handler.send_event(event::RequestKeyboardFocus { id: this });
+                    controls.send_event(event::RequestKeyboardFocus { id: this });
                 }
-                let left = controls.get_rect(this).get_rect()[0] - self.x_scroll;
+                let left = controls.get_rect(this)[0] - self.x_scroll;
                 let x = self.mouse_x - left;
                 self.caret_index = self.text_info.get_caret_index_at_pos(0, x);
                 self.mouse_down = true;
                 self.selection_index = None;
-                self.update_carret(this, controls, event_handler, true);
-                event_handler.send_event(event::LockOver);
+                self.update_carret(this, controls, true);
+                controls.send_event(event::LockOver);
             }
             MouseEvent::Up => {
                 self.mouse_down = false;
-                event_handler.send_event(event::UnlockOver);
+                controls.send_event(event::UnlockOver);
             }
             MouseEvent::Moved { x, .. } => {
                 self.mouse_x = x;
                 if self.mouse_down {
-                    let left = controls.get_rect(this).get_rect()[0] - self.x_scroll;
+                    let left = controls.get_rect(this)[0] - self.x_scroll;
                     let x = self.mouse_x - left;
                     let caret_index = self.text_info.get_caret_index_at_pos(0, x);
                     if caret_index == self.caret_index {
@@ -1157,38 +1064,25 @@ impl Behaviour for TextField {
                         self.selection_index = Some(self.caret_index);
                     }
                     self.caret_index = caret_index;
-                    self.update_carret(this, controls, event_handler, true);
+                    self.update_carret(this, controls, true);
                 }
             }
         }
     }
 
-    fn on_keyboard_focus_change(
-        &mut self,
-        focus: bool,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_keyboard_focus_change(&mut self, focus: bool, this: Id, controls: &mut Controls) {
         self.on_focus = focus;
-        self.update_carret(this, controls, event_handler, true);
-        event_handler.send_event(event::InvalidadeLayout { id: this });
-        event_handler.send_event(event::Redraw);
+        self.update_carret(this, controls, true);
+        controls.send_event(event::Redraw);
     }
 
-    fn on_keyboard_event(
-        &mut self,
-        event: KeyboardEvent,
-        this: Id,
-        controls: &mut Controls,
-        event_handler: &mut EventHandler,
-    ) {
+    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, controls: &mut Controls) {
         match event {
             KeyboardEvent::Char(ch) => {
                 if self.selection_index.is_some() {
-                    self.delete_selection(this, controls, event_handler);
+                    self.delete_selection(this, controls);
                 }
-                self.insert_char(ch, this, controls, event_handler);
+                self.insert_char(ch, this, controls);
                 println!("receive char {:?}", ch);
             }
             KeyboardEvent::Pressed(key_code) => match key_code {
@@ -1201,7 +1095,7 @@ impl Behaviour for TextField {
                             let mut ctx = ClipboardContext::new().unwrap();
                             let _ = ctx.set_contents(self.text[range].to_owned());
                             if key_code == VirtualKeyCode::X {
-                                self.delete_selection(this, controls, event_handler);
+                                self.delete_selection(this, controls);
                             }
                         }
                     }
@@ -1218,16 +1112,16 @@ impl Behaviour for TextField {
                                 let range = if a < b { a..b } else { b..a };
                                 self.text.replace_range(range.clone(), &text);
                                 self.selection_index = None;
-                                self.update_text(this, controls, event_handler); // TODO: is is not working?
+                                self.update_text(this, controls); // TODO: is is not working?
                                 self.caret_index =
                                     self.text_info.get_caret_index(range.start + text.len());
                             } else {
                                 self.text.insert_str(indice, &text);
-                                self.update_text(this, controls, event_handler);
+                                self.update_text(this, controls);
                                 self.caret_index =
                                     self.text_info.get_caret_index(indice + text.len());
                             }
-                            self.update_carret(this, controls, event_handler, true);
+                            self.update_carret(this, controls, true);
                         }
                     }
                 }
@@ -1240,17 +1134,17 @@ impl Behaviour for TextField {
                             .map_or(0, |x| x.end.saturating_sub(1));
                         self.selection_index = Some(start);
                         self.caret_index = end;
-                        self.update_carret(this, controls, event_handler, false);
+                        self.update_carret(this, controls, false);
                     }
                 }
                 VirtualKeyCode::Return => {
-                    event_handler.send_event(event::SubmitText {
+                    controls.send_event(event::SubmitText {
                         id: this,
                         text: self.text.clone(),
                     });
                 }
                 VirtualKeyCode::Back | VirtualKeyCode::Delete if self.selection_index.is_some() => {
-                    self.delete_selection(this, controls, event_handler);
+                    self.delete_selection(this, controls);
                 }
                 VirtualKeyCode::Back => {
                     if self.caret_index == 0 {
@@ -1259,13 +1153,13 @@ impl Behaviour for TextField {
                     self.caret_index -= 1;
                     self.text
                         .remove(self.text_info.get_indice(self.caret_index));
-                    self.update_text(this, controls, event_handler);
+                    self.update_text(this, controls);
                 }
                 VirtualKeyCode::Delete => {
                     if self.caret_index + 1 < self.text_info.len() {
                         self.text
                             .remove(self.text_info.get_indice(self.caret_index));
-                        self.update_text(this, controls, event_handler);
+                        self.update_text(this, controls);
                     }
                 }
                 VirtualKeyCode::Left => {
@@ -1294,7 +1188,7 @@ impl Behaviour for TextField {
                     } else {
                         self.move_caret(self.caret_index - 1, controls);
                     }
-                    self.update_carret(this, controls, event_handler, true);
+                    self.update_carret(this, controls, true);
                 }
                 VirtualKeyCode::Right => {
                     if self.caret_index + 1 >= self.text_info.len() {
@@ -1324,11 +1218,11 @@ impl Behaviour for TextField {
                     } else {
                         self.move_caret(self.caret_index + 1, controls);
                     }
-                    self.update_carret(this, controls, event_handler, true);
+                    self.update_carret(this, controls, true);
                 }
                 VirtualKeyCode::Home => {
                     self.move_caret(0, controls);
-                    self.update_carret(this, controls, event_handler, true);
+                    self.update_carret(this, controls, true);
                 }
                 VirtualKeyCode::End => {
                     self.move_caret(
@@ -1337,7 +1231,7 @@ impl Behaviour for TextField {
                             .map_or(0, |x| x.end.saturating_sub(1)),
                         controls,
                     );
-                    self.update_carret(this, controls, event_handler, true);
+                    self.update_carret(this, controls, true);
                 }
                 _ => {}
             },

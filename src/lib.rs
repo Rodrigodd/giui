@@ -2,6 +2,7 @@
 extern crate bitflags;
 
 mod text;
+mod util;
 
 mod gui;
 pub mod layouts;
