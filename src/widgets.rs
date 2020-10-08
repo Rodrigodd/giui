@@ -1,6 +1,6 @@
 use crate::{
     event, render::Graphic, text::TextInfo, Behaviour, Controls, Id, InputFlags, KeyboardEvent,
-    Layout, MouseEvent,
+    MouseEvent,
 };
 use copypasta::{ClipboardContext, ClipboardProvider};
 use std::any::Any;
@@ -229,70 +229,51 @@ pub struct Unselected;
 pub struct Selected;
 pub struct Select(Id);
 
-pub struct TabGroup {
-    buttons: Vec<Id>,
-    pages: Vec<Id>,
-    selected: usize,
-}
-impl TabGroup {
-    pub fn new(buttons: Vec<Id>, pages: Vec<Id>) -> Self {
-        assert_eq!(
-            buttons.len(),
-            pages.len(),
-            "buttons len need be equal to pages len"
-        );
-        Self {
-            buttons,
-            pages,
-            selected: 0,
-        }
+#[derive(Default, Clone)]
+/// It is basically a Rc<RefCell<Option<Id>>>.
+pub struct ButtonGroup(std::rc::Rc<std::cell::RefCell<Option<Id>>>);
+impl ButtonGroup {
+    pub fn new() -> ButtonGroup {
+        ButtonGroup::default()
     }
-}
-impl Behaviour for TabGroup {
-    fn input_flags(&self) -> InputFlags {
-        InputFlags::empty()
+    pub fn selected(&self) -> Option<Id> {
+        *self.0.borrow()
     }
-
-    fn on_event(&mut self, event: &dyn Any, _this: Id, controls: &mut Controls) {
-        if let Some(Select(id)) = event.downcast_ref::<Select>() {
-            controls.deactive(self.pages[self.selected]);
-            controls.send_event_to(self.buttons[self.selected], Unselected);
-            if let Some(i) = self.buttons.iter().position(|x| x == id) {
-                self.selected = i;
-                controls.active(self.pages[self.selected]);
-                controls.send_event_to(self.buttons[self.selected], Selected);
-            }
-        }
-    }
-
-    fn on_start(&mut self, _this: Id, controls: &mut Controls) {
-        for i in 0..self.pages.len() {
-            if i == self.selected {
-                controls.active(self.pages[i]);
-                controls.send_event_to(self.buttons[i], Selected);
-            } else {
-                controls.deactive(self.pages[i]);
-                controls.send_event_to(self.buttons[i], Unselected);
-            }
-        }
+    pub fn set_selected(&mut self, selected: Option<Id>) {
+        *self.0.borrow_mut() = selected;
     }
 }
 
 pub struct TabButton {
-    tab_group: Id,
+    tab_group: ButtonGroup,
+    page: Id,
     selected: bool,
     click: bool,
 }
 impl TabButton {
-    pub fn new(tab_group: Id) -> Self {
+    pub fn new(tab_group: ButtonGroup, page: Id, selected: bool) -> Self {
         Self {
             tab_group,
-            selected: false,
+            page,
+            selected,
             click: false,
         }
     }
 
+    pub fn select(&mut self, this: Id, controls: &mut Controls) {
+        if let Some(selected) = self.tab_group.selected() {
+            controls.send_event_to(selected, Unselected);
+        }
+        controls.active(self.page);
+        self.selected = true;
+        self.tab_group.set_selected(Some(this));
+        let graphic = controls.get_graphic(this).unwrap();
+        graphic.set_color([255, 255, 255, 255]);
+        controls.send_event(event::Redraw);
+    }
+
     pub fn unselect(&mut self, this: Id, controls: &mut Controls) {
+        controls.deactive(self.page);
         self.selected = false;
         let graphic = controls.get_graphic(this).unwrap();
         graphic.set_color([200, 200, 200, 255]);
@@ -304,17 +285,19 @@ impl Behaviour for TabButton {
         InputFlags::POINTER
     }
 
+    fn on_start(&mut self, this: Id, controls: &mut Controls) {
+        if self.selected {
+            self.select(this, controls);
+        } else {
+            self.unselect(this, controls);
+        }
+    }
+
     fn on_event(&mut self, event: &dyn Any, this: Id, controls: &mut Controls) {
         if event.is::<Unselected>() {
-            let graphic = controls.get_graphic(this).unwrap();
-            graphic.set_color([200, 200, 200, 255]);
-            controls.send_event(event::Redraw);
-            self.selected = false;
+            self.unselect(this, controls)
         } else if event.is::<Selected>() {
-            let graphic = controls.get_graphic(this).unwrap();
-            graphic.set_color([255, 255, 255, 255]);
-            controls.send_event(event::Redraw);
-            self.selected = true;
+            self.select(this, controls);
         }
     }
 
@@ -348,7 +331,7 @@ impl Behaviour for TabButton {
                     let graphic = controls.get_graphic(this).unwrap();
 
                     if self.click {
-                        controls.send_event_to(self.tab_group, Select(this));
+                        self.select(this, controls);
                     } else {
                         graphic.set_color([180, 180, 180, 255]);
                     }
@@ -415,167 +398,6 @@ impl Behaviour for Hoverable {
                 }
             }
         }
-    }
-}
-
-struct ScrollViewLayout {
-    view: Id,
-    h_scroll_bar: Id,
-    v_scroll_bar: Id,
-}
-impl Layout for ScrollViewLayout {
-    fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
-        let mut min_size = controls.get_min_size(self.view);
-
-        let h_scroll_bar_size = controls.get_min_size(self.v_scroll_bar);
-        let v_scroll_bar_size = controls.get_min_size(self.v_scroll_bar);
-
-        min_size[0] = min_size[0].max(h_scroll_bar_size[0]);
-        min_size[1] = min_size[1].max(v_scroll_bar_size[1]);
-
-        min_size[0] += v_scroll_bar_size[0];
-        min_size[1] += h_scroll_bar_size[1];
-
-        controls.set_min_size(this, min_size);
-    }
-
-    fn update_layouts(&mut self, this: Id, controls: &mut Controls) {
-        let this_rect = *controls.get_rect(this);
-        let content = controls.get_children(self.view)[0];
-        let content_size = controls.get_min_size(content);
-        let view_rect = *controls.get_rect(this);
-        let view_width = view_rect[2] - view_rect[0];
-        let view_height = view_rect[3] - view_rect[1];
-
-        let mut h_active = view_width < content_size[0];
-        let mut h_scroll_bar_size = if h_active {
-            controls.get_min_size(self.h_scroll_bar)[1]
-        } else {
-            0.0
-        };
-
-        let v_active = view_height - h_scroll_bar_size < content_size[1];
-        let v_scroll_bar_size = if v_active {
-            controls.get_min_size(self.v_scroll_bar)[0]
-        } else {
-            0.0
-        };
-
-        if !h_active && view_width - v_scroll_bar_size < content_size[0] {
-            h_active = true;
-            h_scroll_bar_size = controls.get_min_size(self.h_scroll_bar)[1];
-        }
-
-        if controls.is_active(self.h_scroll_bar) {
-            if !h_active {
-                controls.deactive(self.h_scroll_bar);
-            }
-        } else if h_active {
-            controls.active(self.h_scroll_bar);
-        }
-
-        if controls.is_active(self.v_scroll_bar) {
-            if !v_active {
-                controls.deactive(self.v_scroll_bar);
-            }
-        } else if v_active {
-            controls.active(self.v_scroll_bar);
-        }
-
-        if h_active {
-            let h_scroll_bar_rect = controls.get_layouting(self.h_scroll_bar);
-            h_scroll_bar_rect.set_designed_rect([
-                this_rect[0],
-                this_rect[3] - h_scroll_bar_size,
-                this_rect[2] - v_scroll_bar_size,
-                this_rect[3],
-            ]);
-        }
-        if v_active {
-            let v_scroll_bar_rect = controls.get_layouting(self.v_scroll_bar);
-            v_scroll_bar_rect.set_designed_rect([
-                this_rect[2] - v_scroll_bar_size,
-                this_rect[1],
-                this_rect[2],
-                this_rect[3] - h_scroll_bar_size,
-            ]);
-        }
-
-        controls.get_layouting(self.view).set_designed_rect([
-            this_rect[0],
-            this_rect[1],
-            this_rect[2] - v_scroll_bar_size,
-            this_rect[3] - h_scroll_bar_size,
-        ])
-    }
-}
-
-struct ScrollContentLayout {
-    scroll_view: Id,
-    delta_x: f32,
-    delta_y: f32,
-    h_scroll_bar_handle: Id,
-    v_scroll_bar_handle: Id,
-}
-impl Layout for ScrollContentLayout {
-    fn compute_min_size(&mut self, _: Id, _: &mut Controls) {}
-
-    fn update_layouts(&mut self, this: Id, controls: &mut Controls) {
-        debug_assert!(
-            controls.get_children(this).len() == 1,
-            "The view of the scroll view must have only one child, wich is the content."
-        );
-
-        controls.dirty_layout(self.scroll_view);
-
-        let content = controls.get_children(this)[0];
-        let content_size = controls.get_min_size(content);
-        let view_rect = *controls.get_rect(this);
-        let view_width = view_rect[2] - view_rect[0];
-        let view_height = view_rect[3] - view_rect[1];
-
-        let mut content_rect = [0.0; 4];
-
-        if self.delta_x < 0.0 || view_width > content_size[0] {
-            self.delta_x = 0.0;
-        } else if self.delta_x > content_size[0] - view_width {
-            self.delta_x = content_size[0] - view_width;
-        }
-        if self.delta_y < 0.0 || view_height > content_size[1] {
-            self.delta_y = 0.0;
-        } else if self.delta_y > content_size[1] - view_height {
-            self.delta_y = content_size[1] - view_height;
-        }
-
-        if content_size[0] < view_width {
-            content_rect[0] = view_rect[0];
-            content_rect[2] = view_rect[0] + view_width;
-        } else {
-            content_rect[0] = view_rect[0] - self.delta_x;
-            content_rect[2] = view_rect[0] - self.delta_x + content_size[0];
-        }
-
-        if content_size[1] < view_height {
-            content_rect[1] = view_rect[1];
-            content_rect[3] = view_rect[3] + view_height;
-        } else {
-            content_rect[1] = view_rect[1] - self.delta_y;
-            content_rect[3] = view_rect[1] - self.delta_y + content_size[1];
-        }
-
-        controls.set_anchor_left(self.h_scroll_bar_handle, self.delta_x / content_size[0]);
-        controls.set_anchor_right(
-            self.h_scroll_bar_handle,
-            ((self.delta_x + view_width) / content_size[0]).min(1.0),
-        );
-
-        controls.set_anchor_top(self.v_scroll_bar_handle, self.delta_y / content_size[1]);
-        controls.set_anchor_bottom(
-            self.v_scroll_bar_handle,
-            ((self.delta_y + view_height) / content_size[1]).min(1.0),
-        );
-
-        controls.get_layouting(content).set_rect(content_rect);
     }
 }
 
@@ -725,6 +547,13 @@ impl Behaviour for ScrollBar {
     }
 }
 
+pub struct NoneLayout;
+impl Behaviour for NoneLayout {
+    fn layout_children(&self) -> bool {
+        true
+    }
+}
+
 pub struct ScrollView {
     pub delta_x: f32,
     pub delta_y: f32,
@@ -756,37 +585,151 @@ impl ScrollView {
             v_scroll_bar_handle,
         }
     }
-
-    fn get_view_layout<'a>(&self, controls: &'a mut Controls) -> &'a mut ScrollContentLayout {
-        controls
-        .get_layout(self.view)
-        .and_then(|x| x.downcast_mut::<ScrollContentLayout>())
-        .expect("the control refered by ScrollView::view must always have a ScrollContentLayout as layout, which this behaviour automaticly add at on_start")
-    }
 }
 impl Behaviour for ScrollView {
+    fn layout_children(&self) -> bool {
+        true
+    }
+
+    fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
+        let mut min_size = controls.get_min_size(self.view);
+
+        let h_scroll_bar_size = controls.get_min_size(self.v_scroll_bar);
+        let v_scroll_bar_size = controls.get_min_size(self.v_scroll_bar);
+
+        min_size[0] = min_size[0].max(h_scroll_bar_size[0]);
+        min_size[1] = min_size[1].max(v_scroll_bar_size[1]);
+
+        min_size[0] += v_scroll_bar_size[0];
+        min_size[1] += h_scroll_bar_size[1];
+
+        controls.set_min_size(this, min_size);
+    }
+
+    fn update_layouts(&mut self, this: Id, controls: &mut Controls) {
+        let this_rect = *controls.get_rect(this);
+        let content = controls.get_children(self.view)[0];
+        let content_size = controls.get_min_size(content);
+        let view_rect = *controls.get_rect(this);
+        let view_width = view_rect[2] - view_rect[0];
+        let view_height = view_rect[3] - view_rect[1];
+
+        let mut h_active = view_width < content_size[0];
+        let mut h_scroll_bar_size = if h_active {
+            controls.get_min_size(self.h_scroll_bar)[1]
+        } else {
+            0.0
+        };
+
+        let v_active = view_height - h_scroll_bar_size < content_size[1];
+        let v_scroll_bar_size = if v_active {
+            controls.get_min_size(self.v_scroll_bar)[0]
+        } else {
+            0.0
+        };
+
+        if !h_active && view_width - v_scroll_bar_size < content_size[0] {
+            h_active = true;
+            h_scroll_bar_size = controls.get_min_size(self.h_scroll_bar)[1];
+        }
+
+        if controls.is_active(self.h_scroll_bar) {
+            if !h_active {
+                controls.deactive(self.h_scroll_bar);
+            }
+        } else if h_active {
+            controls.active(self.h_scroll_bar);
+        }
+
+        if controls.is_active(self.v_scroll_bar) {
+            if !v_active {
+                controls.deactive(self.v_scroll_bar);
+            }
+        } else if v_active {
+            controls.active(self.v_scroll_bar);
+        }
+
+        if h_active {
+            let h_scroll_bar_rect = controls.get_layouting(self.h_scroll_bar);
+            h_scroll_bar_rect.set_designed_rect([
+                this_rect[0],
+                this_rect[3] - h_scroll_bar_size,
+                this_rect[2] - v_scroll_bar_size,
+                this_rect[3],
+            ]);
+        }
+        if v_active {
+            let v_scroll_bar_rect = controls.get_layouting(self.v_scroll_bar);
+            v_scroll_bar_rect.set_designed_rect([
+                this_rect[2] - v_scroll_bar_size,
+                this_rect[1],
+                this_rect[2],
+                this_rect[3] - h_scroll_bar_size,
+            ]);
+        }
+
+        controls.get_layouting(self.view).set_designed_rect([
+            this_rect[0],
+            this_rect[1],
+            this_rect[2] - v_scroll_bar_size,
+            this_rect[3] - h_scroll_bar_size,
+        ]);
+
+        let mut content_rect = [0.0; 4];
+
+        if self.delta_x < 0.0 || view_width > content_size[0] {
+            self.delta_x = 0.0;
+        } else if self.delta_x > content_size[0] - view_width {
+            self.delta_x = content_size[0] - view_width;
+        }
+        if self.delta_y < 0.0 || view_height > content_size[1] {
+            self.delta_y = 0.0;
+        } else if self.delta_y > content_size[1] - view_height {
+            self.delta_y = content_size[1] - view_height;
+        }
+
+        if content_size[0] < view_width {
+            content_rect[0] = view_rect[0];
+            content_rect[2] = view_rect[0] + view_width;
+        } else {
+            content_rect[0] = view_rect[0] - self.delta_x;
+            content_rect[2] = view_rect[0] - self.delta_x + content_size[0];
+        }
+
+        if content_size[1] < view_height {
+            content_rect[1] = view_rect[1];
+            content_rect[3] = view_rect[3] + view_height;
+        } else {
+            content_rect[1] = view_rect[1] - self.delta_y;
+            content_rect[3] = view_rect[1] - self.delta_y + content_size[1];
+        }
+
+        controls.set_anchor_left(self.h_scroll_bar_handle, self.delta_x / content_size[0]);
+        controls.set_anchor_right(
+            self.h_scroll_bar_handle,
+            ((self.delta_x + view_width) / content_size[0]).min(1.0),
+        );
+
+        controls.set_anchor_top(self.v_scroll_bar_handle, self.delta_y / content_size[1]);
+        controls.set_anchor_bottom(
+            self.v_scroll_bar_handle,
+            ((self.delta_y + view_height) / content_size[1]).min(1.0),
+        );
+
+        println!("set content {}", content.get_index());
+        controls.get_layouting(content).set_rect(content_rect);
+
+        // controls.set_anchor_left(content, self.delta_x);
+        // controls.set_anchor_right(content, self.delta_y);
+    }
+
     fn input_flags(&self) -> InputFlags {
         InputFlags::SCROLL
     }
 
-    fn on_start(&mut self, this: Id, controls: &mut Controls) {
-        let scroll_content_layout = ScrollContentLayout {
-            scroll_view: this,
-            delta_x: self.delta_x,
-            delta_y: self.delta_y,
-            v_scroll_bar_handle: self.v_scroll_bar_handle,
-            h_scroll_bar_handle: self.h_scroll_bar_handle,
-        };
+    fn on_start(&mut self, _this: Id, controls: &mut Controls) {
         controls.move_to_front(self.v_scroll_bar);
         controls.move_to_front(self.h_scroll_bar);
-        controls.set_layout(self.view, Box::new(scroll_content_layout));
-
-        let scroll_view_layout = ScrollViewLayout {
-            view: self.view,
-            h_scroll_bar: self.h_scroll_bar,
-            v_scroll_bar: self.v_scroll_bar,
-        };
-        controls.set_layout(this, Box::new(scroll_view_layout));
     }
 
     fn on_active(&mut self, _: Id, controls: &mut Controls) {
@@ -811,9 +754,8 @@ impl Behaviour for ScrollView {
     }
 
     fn on_scroll_event(&mut self, delta: [f32; 2], _: Id, controls: &mut Controls) {
-        let scroll_view_layout = self.get_view_layout(controls);
-        scroll_view_layout.delta_x += delta[0];
-        scroll_view_layout.delta_y -= delta[1];
+        self.delta_x += delta[0];
+        self.delta_y += delta[1];
 
         controls.dirty_layout(self.view);
         controls.send_event(event::Redraw);
@@ -824,13 +766,11 @@ impl Behaviour for ScrollView {
             if !event.vertical {
                 let total_size =
                     controls.get_size(self.content)[0] - controls.get_size(self.view)[0];
-                let scroll_view_layout = self.get_view_layout(controls);
-                scroll_view_layout.delta_x = event.value * total_size;
+                self.delta_x = event.value * total_size;
             } else {
                 let total_size =
                     controls.get_size(self.content)[1] - controls.get_size(self.view)[1];
-                let scroll_view_layout = self.get_view_layout(controls);
-                scroll_view_layout.delta_y = event.value * total_size;
+                self.delta_y = event.value * total_size;
             }
             controls.dirty_layout(self.view);
             controls.send_event(event::Redraw);

@@ -1,6 +1,6 @@
 use crate::{render::Graphic, util::cmp_float, GUIRender};
 use ab_glyph::FontArc;
-use std::any::{Any, TypeId};
+use std::any::Any;
 use std::collections::VecDeque;
 use winit::event::{
     ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent,
@@ -106,13 +106,27 @@ impl Hierarchy {
     }
 
     #[inline]
-    fn active(&mut self, id: Id) {
-        self.active[id.index] = true;
+    /// Set the widget with that id to active = true.
+    /// Return true if the active was false.
+    fn active(&mut self, id: Id) -> bool {
+        if self.active[id.index] {
+            false
+        } else {
+            self.active[id.index] = true;
+            true
+        }
     }
 
     #[inline]
-    fn deactive(&mut self, id: Id) {
-        self.active[id.index] = false;
+    /// Set the widget with that id to active = false.
+    /// Return true if the active was true.
+    fn deactive(&mut self, id: Id) -> bool {
+        if self.active[id.index] {
+            self.active[id.index] = false;
+            true
+        } else {
+            false
+        }
     }
 
     fn move_to_front(&mut self, id: Id) {
@@ -142,8 +156,7 @@ pub struct ControlBuilder<'a, R: GUIRender> {
     input_flags: InputFlags,
     rect: Rect,
     graphic: Option<Graphic>,
-    behaviours: Vec<Box<dyn Behaviour>>,
-    layout: Option<Box<dyn Layout>>,
+    behaviour: Option<Box<dyn Behaviour>>,
     parent: Option<Id>,
 }
 impl<'a, R: GUIRender> ControlBuilder<'a, R> {
@@ -153,8 +166,7 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
             input_flags: InputFlags::empty(),
             rect: Rect::default(),
             graphic: None,
-            behaviours: Vec::new(),
-            layout: None,
+            behaviour: None,
             parent: None,
         }
     }
@@ -188,11 +200,9 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
     }
     pub fn with_behaviour(mut self, behaviour: Box<dyn Behaviour>) -> Self {
         self.input_flags |= behaviour.input_flags();
-        self.behaviours.push(behaviour);
-        self
-    }
-    pub fn with_layout(mut self, layout: Box<dyn Layout>) -> Self {
-        self.layout = Some(layout);
+        // TODO: remove this in production!!
+        debug_assert!(self.behaviour.is_none());
+        self.behaviour = Some(behaviour);
         self
     }
     pub fn with_graphic(mut self, graphic: Graphic) -> Self {
@@ -209,8 +219,7 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
             input_flags,
             rect,
             graphic,
-            behaviours,
-            layout,
+            behaviour,
             parent,
         } = self;
         gui.add_control(
@@ -218,8 +227,7 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
                 input_flags,
                 rect,
                 graphic,
-                layout,
-                behaviours,
+                behaviour,
             },
             parent,
         )
@@ -230,8 +238,7 @@ pub struct Control {
     input_flags: InputFlags,
     rect: Rect,
     graphic: Option<Graphic>,
-    layout: Option<Box<dyn Layout>>,
-    behaviours: Vec<Box<dyn Behaviour>>,
+    behaviour: Option<Box<dyn Behaviour>>,
 }
 impl Control {
     /// create a control with no behaviour
@@ -240,32 +247,20 @@ impl Control {
             input_flags: InputFlags::empty(),
             rect,
             graphic,
-            layout: None,
-            behaviours: Vec::new(),
+            behaviour: None,
         }
     }
     /// add one more behaviour to the control
     pub fn with_behaviour(mut self, behaviour: Box<dyn Behaviour>) -> Self {
         self.input_flags |= behaviour.input_flags();
-        self.behaviours.push(behaviour);
+        self.behaviour = Some(behaviour);
         self
     }
 
     /// add one more behaviour to the control
-    pub fn add_behaviour(&mut self, behaviour: Box<dyn Behaviour>) {
+    pub fn set_behaviour(&mut self, behaviour: Box<dyn Behaviour>) {
         self.input_flags |= behaviour.input_flags();
-        self.behaviours.push(behaviour);
-    }
-
-    /// set the layout of the control
-    pub fn with_layout(mut self, layout: Box<dyn Layout>) -> Self {
-        self.layout = Some(layout);
-        self
-    }
-
-    /// set the layout of the control
-    pub fn set_layout(&mut self, layout: Box<dyn Layout>) {
-        self.layout = Some(layout);
+        self.behaviour = Some(behaviour);
     }
 }
 
@@ -297,15 +292,16 @@ impl<'a> Controls<'a> {
         }
     }
 
-    pub fn new_with_mut_layout(
+    pub fn new_with_mut_behaviour(
         this: Id,
         controls: &'a mut [Control],
         hierarchy: &'a mut Hierarchy,
         fonts: &'a [FontArc],
         modifiers: ModifiersState,
-    ) -> Option<(&'a mut dyn Layout, Self)> {
-        let this_one =
-            unsafe { &mut *(controls[this.index].layout.as_mut()?.as_mut() as *mut dyn Layout) };
+    ) -> Option<(&'a mut dyn Behaviour, Self)> {
+        let this_one = unsafe {
+            &mut *(controls[this.index].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
+        };
         Some((
             this_one,
             Self {
@@ -320,17 +316,19 @@ impl<'a> Controls<'a> {
         ))
     }
 
-    pub fn new_with_mut_behaviour(
+    pub fn new_with_mut_layout(
         this: Id,
-        index: usize,
         controls: &'a mut [Control],
         hierarchy: &'a mut Hierarchy,
         fonts: &'a [FontArc],
         modifiers: ModifiersState,
     ) -> Option<(&'a mut dyn Behaviour, Self)> {
         let this_one = unsafe {
-            &mut *(controls[this.index].behaviours.get_mut(index)?.as_mut() as *mut dyn Behaviour)
+            &mut *(controls[this.index].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
         };
+        if !this_one.layout_children() {
+            return None;
+        }
         Some((
             this_one,
             Self {
@@ -365,7 +363,9 @@ impl<'a> Controls<'a> {
     }
 
     pub fn dirty_layout(&mut self, id: Id) {
-        self.dirtys.push(id);
+        if !self.dirtys.iter().any(|x| *x == id) {
+            self.dirtys.push(id);
+        }
     }
 
     pub fn get_rect(&self, id: Id) -> &[f32; 4] {
@@ -452,16 +452,6 @@ impl<'a> Controls<'a> {
         Some((&mut control.rect, control.graphic.as_mut()?))
     }
 
-    pub fn get_layout(&mut self, id: Id) -> Option<&mut dyn Layout> {
-        //TODO: this is unsafe, when this is called from inside a Layout with the id 'this'
-        Some(self.controls[id.index].layout.as_mut()?.as_mut())
-    }
-
-    pub fn set_layout(&mut self, id: Id, layout: Box<dyn Layout>) {
-        //TODO: this is unsafe, when this is called from inside a Layout with the id 'this'
-        self.controls[id.index].layout = Some(layout);
-    }
-
     pub fn is_active(&mut self, id: Id) -> bool {
         self.hierarchy.is_active(id)
     }
@@ -491,10 +481,17 @@ impl<'a> Controls<'a> {
     }
 }
 
+#[derive(Default)]
+struct Input {
+    mouse_x: f32,
+    mouse_y: f32,
+}
+
 pub struct GUI<R: GUIRender> {
     controls: Vec<Control>,
     hierarchy: Hierarchy,
     modifiers: ModifiersState,
+    input: Input,
     current_over: Option<Id>,
     current_scroll: Option<Id>,
     current_keyboard: Option<Id>,
@@ -517,10 +514,10 @@ impl<R: GUIRender> GUI<R> {
                     ..Default::default()
                 },
                 graphic: None,
-                layout: None,
-                behaviours: Vec::new(),
+                behaviour: None,
             }],
             hierarchy: Hierarchy::default(),
+            input: Input::default(),
             current_over: None,
             current_scroll: None,
             current_keyboard: None,
@@ -548,19 +545,39 @@ impl<R: GUIRender> GUI<R> {
     }
 
     pub fn active_control(&mut self, id: Id) {
-        self.hierarchy.active(id);
+        if !self.hierarchy.active(id) {
+            return;
+        }
         self.update_layout(id);
         self.send_event(Box::new(event::Redraw));
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
             self.call_event(id, |this, id, controls| this.on_active(id, controls));
+            if self.current_keyboard == Some(id) {
+                self.current_keyboard = None;
+            }
+            if self.current_scroll == Some(id) {
+                self.current_scroll = None;
+            }
             parents.extend(self.hierarchy.get_children(id).iter().rev());
         }
+        // TODO: fix this error there
+        self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
     }
 
     pub fn deactive_control(&mut self, id: Id) {
-        self.hierarchy.deactive(id);
+        if !self.hierarchy.deactive(id) {
+            return;
+        }
         self.update_layout(id);
+        let mut parents = vec![id];
+        self.send_event(Box::new(event::Redraw));
+        while let Some(id) = parents.pop() {
+            self.call_event(id, |this, id, controls| this.on_deactive(id, controls));
+            parents.extend(self.hierarchy.get_children(id).iter().rev());
+        }
+        // TODO: fix this error there
+        self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
     }
 
     pub fn get_fonts(&mut self) -> Vec<FontArc> {
@@ -591,11 +608,7 @@ impl<R: GUIRender> GUI<R> {
     }
 
     pub fn add_behaviour(&mut self, id: Id, behaviour: Box<dyn Behaviour>) {
-        self.controls[id.index].add_behaviour(behaviour);
-    }
-
-    pub fn add_layout(&mut self, id: Id, layout: Box<dyn Layout>) {
-        self.controls[id.index].set_layout(layout);
+        self.controls[id.index].set_behaviour(behaviour);
     }
 
     pub fn get_graphic(&mut self, id: Id) -> Option<&mut Graphic> {
@@ -633,62 +646,56 @@ impl<R: GUIRender> GUI<R> {
     }
 
     pub fn send_event_to(&mut self, id: Id, event: Box<dyn Any>) {
-        for index in 0..self.controls[id.index].behaviours.len() {
-            if let Some((this, mut controls)) = Controls::new_with_mut_behaviour(
-                id,
-                index,
-                &mut self.controls,
-                &mut self.hierarchy,
-                &self.fonts,
-                self.modifiers,
-            ) {
-                this.on_event(event.as_ref(), id, &mut controls);
-                let Controls {
-                    events,
-                    events_to,
-                    dirtys,
-                    ..
-                } = controls;
-                for event in events {
-                    self.send_event(event);
-                }
-                for (id, event) in events_to {
-                    self.send_event_to(id, event);
-                }
-                for dirty in dirtys {
-                    self.update_layout(dirty);
-                }
+        if let Some((this, mut controls)) = Controls::new_with_mut_behaviour(
+            id,
+            &mut self.controls,
+            &mut self.hierarchy,
+            &self.fonts,
+            self.modifiers,
+        ) {
+            this.on_event(event.as_ref(), id, &mut controls);
+            let Controls {
+                events,
+                events_to,
+                dirtys,
+                ..
+            } = controls;
+            for event in events {
+                self.send_event(event);
+            }
+            for (id, event) in events_to {
+                self.send_event_to(id, event);
+            }
+            for dirty in dirtys {
+                self.update_layout(dirty);
             }
         }
     }
 
     pub fn call_event<F: Fn(&mut dyn Behaviour, Id, &mut Controls)>(&mut self, id: Id, event: F) {
-        for index in 0..self.controls[id.index].behaviours.len() {
-            if let Some((this, mut controls)) = Controls::new_with_mut_behaviour(
-                id,
-                index,
-                &mut self.controls,
-                &mut self.hierarchy,
-                &self.fonts,
-                self.modifiers,
-            ) {
-                event(this, id, &mut controls);
-                let Controls {
-                    events,
-                    events_to,
-                    dirtys,
-                    ..
-                } = controls;
-                for event in events {
-                    self.send_event(event);
-                }
-                let mut event_queue = VecDeque::from(events_to);
-                while let Some((id, event)) = event_queue.pop_back() {
-                    self.send_event_to(id, event);
-                }
-                for dirty in dirtys {
-                    self.update_layout(dirty);
-                }
+        if let Some((this, mut controls)) = Controls::new_with_mut_behaviour(
+            id,
+            &mut self.controls,
+            &mut self.hierarchy,
+            &self.fonts,
+            self.modifiers,
+        ) {
+            event(this, id, &mut controls);
+            let Controls {
+                events,
+                events_to,
+                dirtys,
+                ..
+            } = controls;
+            for event in events {
+                self.send_event(event);
+            }
+            let mut event_queue = VecDeque::from(events_to);
+            while let Some((id, event)) = event_queue.pop_back() {
+                self.send_event_to(id, event);
+            }
+            for dirty in dirtys {
+                self.update_layout(dirty);
             }
         }
     }
@@ -728,6 +735,8 @@ impl<R: GUIRender> GUI<R> {
         if let Event::WindowEvent { event, .. } = event {
             match event {
                 WindowEvent::CursorMoved { position, .. } => {
+                    self.input.mouse_x = position.x as f32;
+                    self.input.mouse_y = position.y as f32;
                     self.mouse_moved(position.x as f32, position.y as f32);
                     return true;
                 }
@@ -876,6 +885,7 @@ impl<R: GUIRender> GUI<R> {
         // if min_size is dirty and parent has layout, update parent min_size, and recurse it
         // from the highter parent, update layout of its children. For each dirty chldren, update them, recursivily
 
+        println!("update layout of {}", id.get_index());
         if let Some((layout, mut controls)) = Controls::new_with_mut_layout(
             id,
             &mut self.controls,
@@ -886,6 +896,7 @@ impl<R: GUIRender> GUI<R> {
             layout.compute_min_size(id, &mut controls);
         }
         while let Some(parent) = self.hierarchy.get_parent(id) {
+            println!("^ {}", parent.get_index());
             self.controls[id.index]
                 .rect
                 .layout_dirty_flags
@@ -931,10 +942,15 @@ impl<R: GUIRender> GUI<R> {
                     }
                 }
                 for dirty in dirtys {
-                    if dirty == id {
-                        panic!("Layout cannot modify its own control");
-                    } else {
-                        self.update_layout(dirty);
+                    // if dirty == id {
+                    //     panic!("Layout cannot modify its own control");
+                    // } else {
+                    //     self.update_layout(dirty);
+                    // }
+                    // TODO: RETHINK THIS!!!!
+                    if let Some(dirty_parent) = self.hierarchy.get_parent(dirty) {
+                        assert!(dirty_parent != id, "A layout cannot dirty its own child!");
+                        parents.push(dirty_parent);
                     }
                 }
             } else {
@@ -949,13 +965,13 @@ impl<R: GUIRender> GUI<R> {
                     for i in 0..4 {
                         new_rect[i] = pos[i % 2] + size[i % 2] * rect.anchors[i] + rect.margins[i];
                     }
-                    rect.set_rect(new_rect);
-                    if rect.get_width() < rect.get_min_size()[0] {
-                        rect.set_width(rect.get_min_size()[0]);
+                    if new_rect[2] - new_rect[0] < rect.get_min_size()[0] {
+                        new_rect[2] = new_rect[0] + rect.get_min_size()[0];
                     }
-                    if rect.get_height() < rect.get_min_size()[1] {
-                        rect.set_height(rect.get_min_size()[1]);
+                    if new_rect[3] - new_rect[1] < rect.get_min_size()[1] {
+                        new_rect[3] = new_rect[1] + rect.get_min_size()[1];
                     }
+                    rect.set_designed_rect(new_rect);
                 }
             }
 
@@ -1354,10 +1370,23 @@ bitflags! {
 
 #[allow(unused_variables)]
 pub trait Behaviour {
-    fn input_flags(&self) -> InputFlags;
+    /// Tell if this widget control the layout of its children.
+    // If it is false, its children use anchor/margin for layout.
+    fn layout_children(&self) -> bool {
+        false
+    }
+    /// Compute its own min size, based on the min size of its children.
+    fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {}
+    /// Update the position and size of its children.
+    fn update_layouts(&mut self, this: Id, controls: &mut Controls) {}
+
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::empty()
+    }
 
     fn on_start(&mut self, this: Id, controls: &mut Controls) {}
     fn on_active(&mut self, this: Id, controls: &mut Controls) {}
+    fn on_deactive(&mut self, this: Id, controls: &mut Controls) {}
 
     fn on_event(&mut self, event: &dyn Any, this: Id, controls: &mut Controls) {}
 
@@ -1368,48 +1397,4 @@ pub trait Behaviour {
     fn on_keyboard_focus_change(&mut self, focus: bool, this: Id, controls: &mut Controls) {}
 
     fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, controls: &mut Controls) {}
-}
-
-#[allow(unused_variables)]
-pub trait Layout: 'static {
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Self>()
-    }
-    /// Cmpute its own min size, based on the min size of its children.
-    fn compute_min_size(&mut self, this: Id, controls: &mut Controls);
-
-    /// Update the position and size of its children.
-    fn update_layouts(&mut self, this: Id, controls: &mut Controls);
-}
-impl dyn Layout {
-    #[inline]
-    pub fn is<T: Any>(&self) -> bool {
-        let t = TypeId::of::<T>();
-        let concrete = self.type_id();
-        t == concrete
-    }
-
-    #[inline]
-    pub fn downcast_ref<T: Layout>(&self) -> Option<&T> {
-        if self.is::<T>() {
-            // SAFETY: just checked whether we are pointing to the correct type, and we can rely on
-            // that check for memory safety because we have implemented Any for all types; no other
-            // impls can exist as they would conflict with our impl.
-            unsafe { Some(&*(self as *const dyn Layout as *const T)) }
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
-        if self.is::<T>() {
-            // SAFETY: just checked whether we are pointing to the correct type, and we can rely on
-            // that check for memory safety because we have implemented Any for all types; no other
-            // impls can exist as they would conflict with our impl.
-            unsafe { Some(&mut *(self as *mut dyn Layout as *mut T)) }
-        } else {
-            None
-        }
-    }
 }

@@ -6,7 +6,8 @@ use ui_engine::{
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
     render::{GUISpriteRender, Graphic, Panel, Text, Texture},
     widgets::{
-        Button, Hoverable, ScrollBar, ScrollView, Slider, TabButton, TabGroup, TextField, Toggle,
+        Button, ButtonGroup, Hoverable, NoneLayout, ScrollBar, ScrollView, Slider, TabButton,
+        TextField, Toggle,
     },
     GUIRender, Id, RectFill, GUI,
 };
@@ -63,7 +64,7 @@ fn main() {
             .with_anchors([0.0, 0.0, 0.0, 0.0])
             .with_graphic(graphic)
             .with_margins([3.0, 6.0, 6.0, 9.0])
-            .with_layout(Box::new(MarginLayout::new([3.0, 3.0, 3.0, 3.0])))
+            .with_behaviour(Box::new(MarginLayout::new([3.0, 3.0, 3.0, 3.0])))
             .build();
         let graphic = Text::new(
             [255, 255, 255, 255],
@@ -76,7 +77,7 @@ fn main() {
             .create_control()
             .with_graphic(graphic)
             .with_parent(hover)
-            .with_layout(Box::new(FitText))
+            .with_behaviour(Box::new(FitText))
             .build();
 
         (hover, label)
@@ -89,7 +90,7 @@ fn main() {
                 .with_anchors([0.0, 0.0, 0.0, 1.0])
                 .with_margins([10.0, 0.0, 190.0, -10.0])
                 .with_graphic(graphic)
-                .with_layout(Box::new(VBoxLayout::new(5.0, [5.0, 5.0, 5.0, 5.0], -1)))
+                .with_behaviour(Box::new(VBoxLayout::new(5.0, [5.0, 5.0, 5.0, 5.0], -1)))
                 .with_parent(page_1)
                 .build()
         };
@@ -148,11 +149,6 @@ fn main() {
                 .with_min_size([0.0, 30.0])
                 .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
                 .with_behaviour(Box::new(Button::new()))
-                .with_behaviour(Box::new(Hoverable::new(
-                    hover,
-                    hover_label,
-                    "This is\na button".to_owned(),
-                )))
                 .with_parent(menu)
                 .build();
             let graphic =
@@ -245,7 +241,7 @@ fn main() {
             .with_margins([10.0, 0.0, -10.0, -10.0])
             .with_graphic(painel.clone())
             .with_parent(page_area)
-            .with_layout(Box::new(GridLayout::new(
+            .with_behaviour(Box::new(GridLayout::new(
                 [10.0, 15.0],
                 [10.0, 10.0, 10.0, 10.0],
                 3,
@@ -258,7 +254,7 @@ fn main() {
                 .with_expand_x(expand[0])
                 .with_expand_y(expand[1])
                 .with_graphic(painel.clone().with_color([100, 100, 100, 255]))
-                .with_layout(Box::new(VBoxLayout::new(5.0, [0.0, 0.0, 0.0, 0.0], align)))
+                .with_behaviour(Box::new(VBoxLayout::new(5.0, [0.0, 0.0, 0.0, 0.0], align)))
                 .build()
         };
 
@@ -460,20 +456,20 @@ fn main() {
             .create_control()
             .with_graphic(painel.clone())
             .with_parent(page_area)
-            .with_layout(Box::new(VBoxLayout::new(5.0, [10.0, 10.0, 10.0, 10.0], -1)))
+            .with_behaviour(Box::new(VBoxLayout::new(5.0, [10.0, 10.0, 10.0, 10.0], -1)))
             .build();
         let input_box = {
             let hbox = gui
                 .create_control()
                 .with_parent(page_3)
-                .with_layout(Box::new(HBoxLayout::new(0.0, Default::default(), -1)))
+                .with_behaviour(Box::new(HBoxLayout::new(0.0, Default::default(), -1)))
                 .build();
             let _label = gui
                 .create_control()
                 .with_graphic(
                     Text::new([0, 0, 0, 255], "Add new: ".to_owned(), 16.0, (-1, 0)).into(),
                 )
-                .with_layout(Box::new(FitText))
+                .with_behaviour(Box::new(FitText))
                 .with_parent(hbox)
                 .build();
             let input_box = gui
@@ -512,6 +508,7 @@ fn main() {
             .create_control()
             .with_graphic(Graphic::Mask)
             .with_parent(scroll_view)
+            .with_behaviour(Box::new(NoneLayout))
             .build();
         let h_scroll_bar = gui
             .create_control()
@@ -565,7 +562,7 @@ fn main() {
         );
         let list = gui
             .create_control()
-            .with_layout(Box::new(VBoxLayout::new(3.0, [5.0, 5.0, 5.0, 5.0], -1)))
+            .with_behaviour(Box::new(VBoxLayout::new(3.0, [5.0, 5.0, 5.0, 5.0], -1)))
             .with_parent(view)
             .build();
         gui.add_behaviour(
@@ -585,7 +582,7 @@ fn main() {
                 .with_min_size([100.0, 35.0])
                 .with_graphic(painel.clone().with_border(0.0).with_color(color))
                 .with_parent(list)
-                .with_layout(Box::new(MarginLayout::new([5.0, 0.0, 5.0, 0.0])))
+                .with_behaviour(Box::new(MarginLayout::new([5.0, 0.0, 5.0, 0.0])))
                 .build();
             //TODO: there must be a better way to increase the min_size height
             gui.create_control()
@@ -595,7 +592,7 @@ fn main() {
             gui.create_control()
                 .with_parent(item)
                 .with_graphic(Text::new([0, 0, 0, 255], text, 16.0, (-1, 0)).into())
-                .with_layout(Box::new(FitText))
+                .with_behaviour(Box::new(FitText))
                 .build();
             item
         };
@@ -614,7 +611,7 @@ fn main() {
         let page_4 = gui
             .create_control()
             .with_parent(page_area)
-            .with_layout(Box::new(RatioLayout::new(1.0, (0, 0))))
+            .with_behaviour(Box::new(RatioLayout::new(1.0, (0, 0))))
             .build();
         let graphic = Texture::new(font_texture, [0.0, 0.0, 1.0, 1.0]).into();
         gui.create_control()
@@ -643,34 +640,32 @@ fn main() {
             .create_control()
             .with_anchors([0.0, 0.0, 1.0, 0.0])
             .with_margins([10.0, 10.0, -10.0, 40.0])
-            .with_layout(Box::new(HBoxLayout::new(3.0, [0.0, 0.0, 0.0, 0.0], -1)))
+            .with_behaviour(Box::new(HBoxLayout::new(3.0, [0.0, 0.0, 0.0, 0.0], -1)))
             .build();
-        let create_button = |gui: &mut GUI<GUISpriteRender>, label: String| {
-            let button = gui
-                .create_control()
-                .with_graphic(painel.clone())
-                .with_parent(header)
-                .with_expand_x(true)
-                .with_behaviour(Box::new(TabButton::new(header)))
-                .with_layout(Box::new(MarginLayout::new([3.0, 0.0, 3.0, 0.0])))
-                .build();
-            let graphic = Text::new([40, 40, 100, 255], label, 16.0, (0, 0)).into();
-            gui.create_control()
-                .with_graphic(graphic)
-                .with_parent(button)
-                .with_layout(Box::new(FitText))
-                .build();
-            button
-        };
-        let buttons = vec![
-            create_button(&mut gui, "Random Controls".to_owned()),
-            create_button(&mut gui, "Grid Layout".to_owned()),
-            create_button(&mut gui, "ScrollView".to_owned()),
-            create_button(&mut gui, "Font Texture".to_owned()),
-            create_button(&mut gui, "To be continued...".to_owned()),
-        ];
-        let pages = vec![page_1, page_2, page_3, page_4, page_na];
-        gui.add_behaviour(header, Box::new(TabGroup::new(buttons, pages)));
+
+        let tab_group = ButtonGroup::new();
+        let create_button =
+            |gui: &mut GUI<GUISpriteRender>, page: Id, selected: bool, label: String| {
+                let button = gui
+                    .create_control()
+                    .with_graphic(painel.clone())
+                    .with_parent(header)
+                    .with_expand_x(true)
+                    .with_behaviour(Box::new(TabButton::new(tab_group.clone(), page, selected)))
+                    .build();
+                let graphic = Text::new([40, 40, 100, 255], label, 16.0, (0, 0)).into();
+                gui.create_control()
+                    .with_graphic(graphic)
+                    .with_parent(button)
+                    .with_behaviour(Box::new(FitText))
+                    .build();
+                button
+            };
+        create_button(&mut gui, page_1, true, "Random Controls".to_owned());
+        create_button(&mut gui, page_2, false, "Grid Layout".to_owned());
+        create_button(&mut gui, page_3, false, "ScrollView".to_owned());
+        create_button(&mut gui, page_4, false, "Font Texture".to_owned());
+        create_button(&mut gui, page_na, false, "To be continued...".to_owned());
     };
 
     println!("Starting");
@@ -741,7 +736,7 @@ fn main() {
                                 .with_color([200, 230, 255, 255]),
                         )
                         .with_parent(list)
-                        .with_layout(Box::new(MarginLayout::new([5.0, 0.0, 5.0, 0.0])))
+                        .with_behaviour(Box::new(MarginLayout::new([5.0, 0.0, 5.0, 0.0])))
                         .build();
                     //TODO: there must be a better way to increase the min_size height
                     gui.create_control()
@@ -751,7 +746,7 @@ fn main() {
                     gui.create_control()
                         .with_parent(item)
                         .with_graphic(Text::new([0, 0, 0, 255], text, 16.0, (-1, 0)).into())
-                        .with_layout(Box::new(FitText))
+                        .with_behaviour(Box::new(FitText))
                         .build();
                 }
             }

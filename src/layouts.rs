@@ -1,7 +1,12 @@
-use crate::{Controls, Id, Layout};
+use crate::{Controls, Id, Behaviour};
 
 pub struct FitText;
-impl Layout for FitText {
+impl Behaviour for FitText {
+
+    fn layout_children(&self) -> bool {
+        true
+    }
+
     fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
         let fonts = controls.get_fonts();
         let min_size = if let Some(graphic) = controls.get_graphic(this) {
@@ -22,7 +27,12 @@ impl MarginLayout {
         Self { margins }
     }
 }
-impl Layout for MarginLayout {
+impl Behaviour for MarginLayout {
+
+    fn layout_children(&self) -> bool {
+        true
+    }
+
     fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
         let mut min_size = [0.0f32, 0.0];
         for child in controls.get_children(this) {
@@ -59,7 +69,12 @@ impl RatioLayout {
         Self { ratio, align }
     }
 }
-impl Layout for RatioLayout {
+impl Behaviour for RatioLayout {
+
+    fn layout_children(&self) -> bool {
+        true
+    }
+
     fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
         let mut min_size = [0.0f32, 0.0];
         for child in controls.get_children(this) {
@@ -130,7 +145,12 @@ impl HBoxLayout {
         }
     }
 }
-impl Layout for HBoxLayout {
+impl Behaviour for HBoxLayout {
+
+    fn layout_children(&self) -> bool {
+        true
+    }
+
     fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
         let children = controls.get_children(this);
         if children.is_empty() {
@@ -217,7 +237,12 @@ impl VBoxLayout {
         }
     }
 }
-impl Layout for VBoxLayout {
+impl Behaviour for VBoxLayout {
+
+    fn layout_children(&self) -> bool {
+        true
+    }
+
     fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
         let children = controls.get_children(this);
         if children.is_empty() {
@@ -312,7 +337,12 @@ impl GridLayout {
         }
     }
 }
-impl Layout for GridLayout {
+impl Behaviour for GridLayout {
+
+    fn layout_children(&self) -> bool {
+        true
+    }
+
     fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {
         let children = controls.get_children(this);
         if children.is_empty() {
