@@ -1,4 +1,4 @@
-use super::{Controls, Id, RenderDirtyFlags};
+use super::{Context, Id, RenderDirtyFlags};
 use crate::{
     text::{FontGlyph, TextInfo},
     Rect,
@@ -33,12 +33,12 @@ impl<'a> GUISpriteRender {
         }
     }
 
-    pub fn clear_cache(&mut self, controls: &mut Controls) {
+    pub fn clear_cache(&mut self, ctx: &mut Context) {
         self.last_sprites.clear();
         self.last_sprites_map.clear();
         let mut parents = vec![crate::ROOT_ID];
         while let Some(parent) = parents.pop() {
-            if let Some((rect, graphic)) = controls.get_rect_and_graphic(parent) {
+            if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
                 match graphic {
                     Graphic::Panel(x) => {
                         x.color_dirty = true;
@@ -51,19 +51,19 @@ impl<'a> GUISpriteRender {
                 }
                 rect.dirty_render_dirty_flags();
             } else {
-                controls.get_layouting(parent).dirty_render_dirty_flags();
+                ctx.get_layouting(parent).dirty_render_dirty_flags();
             }
-            parents.extend(controls.get_children(parent).iter().rev())
+            parents.extend(ctx.get_children(parent).iter().rev())
         }
     }
 
-    pub fn prepare_render(&mut self, controls: &mut Controls, renderer: &mut dyn SpriteRender) {
+    pub fn prepare_render(&mut self, ctx: &mut Context, renderer: &mut dyn SpriteRender) {
         use crate::ROOT_ID;
         let mut parents = vec![ROOT_ID];
         self.sprites.clear();
         self.sprites_map.clear();
         let mut masks: Vec<(usize, [f32; 4], bool)> = Vec::new();
-        let fonts = controls.get_fonts();
+        let fonts = ctx.get_fonts();
 
         fn intersection(a: &[f32; 4], b: &[f32; 4]) -> Option<[f32; 4]> {
             if a[0] > b[2] || a[2] < b[0] || a[1] > b[3] || a[3] < b[1] {
@@ -79,7 +79,7 @@ impl<'a> GUISpriteRender {
 
         'tree: while let Some(parent) = parents.pop() {
             let (mask, mask_changed) = {
-                let rect = controls.get_layouting(parent);
+                let rect = ctx.get_layouting(parent);
                 let mut mask = *rect.get_rect();
                 let mut mask_changed = rect
                     .get_render_dirty_flags()
@@ -105,7 +105,7 @@ impl<'a> GUISpriteRender {
                 (mask, mask_changed)
             };
             let mut compute_sprite = true;
-            if let Some((rect, graphic)) = controls.get_rect_and_graphic(parent) {
+            if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
                 let len = self.sprites.len();
                 if !rect
                     .get_render_dirty_flags()
@@ -231,8 +231,8 @@ impl<'a> GUISpriteRender {
                     self.sprites_map.push((parent, len..self.sprites.len()));
                 }
             }
-            controls.get_layouting(parent).clear_render_dirty_flags();
-            parents.extend(controls.get_children(parent).iter().rev())
+            ctx.get_layouting(parent).clear_render_dirty_flags();
+            parents.extend(ctx.get_children(parent).iter().rev())
         }
     }
 

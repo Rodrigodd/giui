@@ -761,8 +761,8 @@ fn main() {
                 _ => {}
             },
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                let (gui_render, mut controls) = gui.get_render_and_controls();
-                gui_render.prepare_render(&mut controls, &mut render);
+                let (gui_render, mut ctx) = gui.get_render_and_context();
+                gui_render.prepare_render(&mut ctx, &mut render);
                 let mut renderer = render.render();
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
                 gui.render().render(renderer.as_mut(), &mut screen_camera);

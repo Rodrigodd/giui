@@ -100,8 +100,23 @@ impl Hierarchy {
             .collect::<Vec<Id>>()
     }
 
+    fn is_child(&self, parent: Id, child: Id) -> bool {
+        Some(parent) == self.parents[child.index]
+    }
+
+    fn is_descendant(&self, ascendant: Id, descendant: Id) -> bool {
+        let mut curr = descendant;
+        while let Some(parent) = self.parents[curr.index] {
+            if parent == ascendant {
+                return true;
+            }
+            curr = parent;
+        }
+        false
+    }
+
     #[inline]
-    fn is_active(&mut self, id: Id) -> bool {
+    fn is_active(&self, id: Id) -> bool {
         self.active[id.index]
     }
 
@@ -263,9 +278,8 @@ impl Control {
         self.behaviour = Some(behaviour);
     }
 }
-
 // contains a reference to all the controls, except the behaviour of one control
-pub struct Controls<'a> {
+pub struct Context<'a> {
     modifiers: ModifiersState,
     controls: &'a mut [Control],
     hierarchy: &'a mut Hierarchy,
@@ -274,7 +288,7 @@ pub struct Controls<'a> {
     events_to: Vec<(Id, Box<dyn Any>)>,
     dirtys: Vec<Id>,
 }
-impl<'a> Controls<'a> {
+impl<'a> Context<'a> {
     pub fn new(
         controls: &'a mut [Control],
         hierarchy: &'a mut Hierarchy,
@@ -302,33 +316,6 @@ impl<'a> Controls<'a> {
         let this_one = unsafe {
             &mut *(controls[this.index].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
         };
-        Some((
-            this_one,
-            Self {
-                modifiers,
-                controls,
-                hierarchy,
-                events: Vec::new(),
-                events_to: Vec::new(),
-                fonts,
-                dirtys: Vec::new(),
-            },
-        ))
-    }
-
-    pub fn new_with_mut_layout(
-        this: Id,
-        controls: &'a mut [Control],
-        hierarchy: &'a mut Hierarchy,
-        fonts: &'a [FontArc],
-        modifiers: ModifiersState,
-    ) -> Option<(&'a mut dyn Behaviour, Self)> {
-        let this_one = unsafe {
-            &mut *(controls[this.index].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
-        };
-        if !this_one.layout_children() {
-            return None;
-        }
         Some((
             this_one,
             Self {
@@ -452,7 +439,7 @@ impl<'a> Controls<'a> {
         Some((&mut control.rect, control.graphic.as_mut()?))
     }
 
-    pub fn is_active(&mut self, id: Id) -> bool {
+    pub fn is_active(&self, id: Id) -> bool {
         self.hierarchy.is_active(id)
     }
 
@@ -470,6 +457,252 @@ impl<'a> Controls<'a> {
         self.hierarchy.move_to_front(id);
         self.dirty_layout(id);
         self.events.push(Box::new(event::Redraw));
+    }
+
+    pub fn get_parent(&mut self, id: Id) -> Option<Id> {
+        self.hierarchy.get_parent(id)
+    }
+
+    pub fn get_children(&mut self, id: Id) -> Vec<Id> {
+        self.hierarchy.get_children(id)
+    }
+}
+
+pub struct MinSizeContext<'a> {
+    this: Id,
+    controls: &'a mut [Control],
+    hierarchy: &'a Hierarchy,
+    fonts: &'a [FontArc],
+}
+impl<'a> MinSizeContext<'a> {
+    pub fn new(
+        this: Id,
+        controls: &'a mut [Control],
+        hierarchy: &'a Hierarchy,
+        fonts: &'a [FontArc],
+    ) -> (&'a mut dyn Behaviour, Self) {
+        let this_one = unsafe {
+            &mut *(controls[this.index]
+                .behaviour
+                .as_mut()
+                .map_or((&mut ()) as &mut dyn Behaviour, |x| x.as_mut())
+                as *mut dyn Behaviour)
+        };
+        (
+            this_one,
+            Self {
+                this,
+                controls,
+                hierarchy,
+                fonts,
+            },
+        )
+    }
+
+    pub fn get_fonts(&mut self) -> &'a [FontArc] {
+        self.fonts
+    }
+
+    pub fn get_layouting(&self, id: Id) -> &Rect {
+        &self.controls[id.index].rect
+    }
+
+    pub fn get_rect(&self, id: Id) -> &[f32; 4] {
+        &self.controls[id.index].rect.rect
+    }
+
+    pub fn get_size(&mut self, id: Id) -> [f32; 2] {
+        self.controls[id.index].rect.get_size()
+    }
+
+    pub fn get_margins(&self, id: Id) -> &[f32; 4] {
+        &self.controls[id.index].rect.margins
+    }
+
+    pub fn get_anchors(&self, id: Id) -> &[f32; 4] {
+        &self.controls[id.index].rect.anchors
+    }
+
+    pub fn get_min_size(&self, id: Id) -> [f32; 2] {
+        self.controls[id.index].rect.get_min_size()
+    }
+
+    pub fn set_this_min_size(&mut self, min_size: [f32; 2]) {
+        self.controls[self.this.index].rect.set_min_size(min_size);
+    }
+
+    pub fn get_graphic(&mut self, id: Id) -> Option<&mut Graphic> {
+        self.controls[id.index].graphic.as_mut()
+    }
+
+    pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
+        let control = &mut self.controls[id.index];
+        Some((&mut control.rect, control.graphic.as_mut()?))
+    }
+
+    pub fn is_active(&self, id: Id) -> bool {
+        self.hierarchy.is_active(id)
+    }
+
+    pub fn get_parent(&mut self, id: Id) -> Option<Id> {
+        self.hierarchy.get_parent(id)
+    }
+
+    pub fn get_children(&mut self, id: Id) -> Vec<Id> {
+        self.hierarchy.get_children(id)
+    }
+}
+
+pub struct LayoutContext<'a> {
+    this: Id,
+    controls: &'a mut [Control],
+    hierarchy: &'a mut Hierarchy,
+    dirtys: Vec<Id>,
+    events: Vec<Box<dyn Any>>,
+}
+impl<'a> LayoutContext<'a> {
+    pub fn new(
+        this: Id,
+        controls: &'a mut [Control],
+        hierarchy: &'a mut Hierarchy,
+    ) -> (&'a mut dyn Behaviour, Self) {
+        let this_one = unsafe {
+            &mut *(controls[this.index]
+                .behaviour
+                .as_mut()
+                .map_or((&mut ()) as &mut dyn Behaviour, |x| x.as_mut())
+                as *mut dyn Behaviour)
+        };
+        (
+            this_one,
+            Self {
+                this,
+                controls,
+                hierarchy,
+                dirtys: Vec::new(),
+                events: Vec::new(),
+            },
+        )
+    }
+
+    pub fn set_rect(&mut self, id: Id, rect: [f32; 4]) {
+        self.controls[id.index].rect.set_rect(rect);
+    }
+
+    pub fn set_designed_rect(&mut self, id: Id, rect: [f32; 4]) {
+        self.controls[id.index].rect.set_designed_rect(rect);
+    }
+
+    pub fn get_layouting(&self, id: Id) -> &Rect {
+        &self.controls[id.index].rect
+    }
+
+    pub fn dirty_layout(&mut self, id: Id) {
+        debug_assert!(
+            !self.hierarchy.is_child(self.this, id),
+            "It is only allowed to modify a child using set_rect, or set_designed_rect."
+        );
+        debug_assert!(
+            self.hierarchy.is_descendant(self.this, id),
+            "It is only allowed to modify descendant controls."
+        );
+        if !self.dirtys.iter().any(|x| *x == id) {
+            self.dirtys.push(id);
+        }
+    }
+
+    pub fn get_rect(&self, id: Id) -> &[f32; 4] {
+        &self.controls[id.index].rect.rect
+    }
+
+    pub fn get_size(&mut self, id: Id) -> [f32; 2] {
+        self.controls[id.index].rect.get_size()
+    }
+
+    pub fn get_margins(&self, id: Id) -> &[f32; 4] {
+        &self.controls[id.index].rect.margins
+    }
+
+    pub fn set_margins(&mut self, id: Id, margins: [f32; 4]) {
+        self.controls[id.index].rect.margins = margins;
+        self.dirty_layout(id);
+    }
+
+    pub fn get_anchors(&self, id: Id) -> &[f32; 4] {
+        &self.controls[id.index].rect.anchors
+    }
+
+    pub fn set_margin_left(&mut self, id: Id, margin: f32) {
+        self.controls[id.index].rect.margins[0] = margin;
+        self.dirty_layout(id);
+    }
+
+    pub fn set_margin_top(&mut self, id: Id, margin: f32) {
+        self.controls[id.index].rect.margins[1] = margin;
+        self.dirty_layout(id);
+    }
+
+    pub fn set_margin_right(&mut self, id: Id, margin: f32) {
+        self.controls[id.index].rect.margins[2] = margin;
+        self.dirty_layout(id);
+    }
+
+    pub fn set_margin_bottom(&mut self, id: Id, margin: f32) {
+        self.controls[id.index].rect.margins[3] = margin;
+        self.dirty_layout(id);
+    }
+
+    pub fn set_anchors(&mut self, id: Id, anchors: [f32; 4]) {
+        self.controls[id.index].rect.anchors = anchors;
+        self.dirty_layout(id);
+    }
+
+    pub fn set_anchor_left(&mut self, id: Id, anchor: f32) {
+        self.controls[id.index].rect.anchors[0] = anchor;
+        self.dirty_layout(id);
+    }
+
+    pub fn set_anchor_top(&mut self, id: Id, anchor: f32) {
+        self.controls[id.index].rect.anchors[1] = anchor;
+        self.dirty_layout(id);
+    }
+
+    pub fn set_anchor_right(&mut self, id: Id, anchor: f32) {
+        self.controls[id.index].rect.anchors[2] = anchor;
+        self.dirty_layout(id);
+    }
+
+    pub fn set_anchor_bottom(&mut self, id: Id, anchor: f32) {
+        self.controls[id.index].rect.anchors[3] = anchor;
+        self.dirty_layout(id);
+    }
+
+    pub fn get_min_size(&self, id: Id) -> [f32; 2] {
+        self.controls[id.index].rect.get_min_size()
+    }
+
+    pub fn set_min_size(&mut self, id: Id, min_size: [f32; 2]) {
+        self.controls[id.index].rect.set_min_size(min_size);
+        self.dirty_layout(id);
+    }
+
+    pub fn is_active(&self, id: Id) -> bool {
+        self.hierarchy.is_active(id)
+    }
+
+    /// This only took effect when Controls is dropped
+    pub fn active(&mut self, id: Id) {
+        self.events.push(Box::new(event::ActiveControl { id }));
+    }
+
+    /// This only took effect when Controls is dropped
+    pub fn deactive(&mut self, id: Id) {
+        self.events.push(Box::new(event::DeactiveControl { id }));
+    }
+
+    pub fn move_to_front(&mut self, id: Id) {
+        self.hierarchy.move_to_front(id);
+        self.dirty_layout(id);
     }
 
     pub fn get_parent(&mut self, id: Id) -> Option<Id> {
@@ -552,7 +785,7 @@ impl<R: GUIRender> GUI<R> {
         self.send_event(Box::new(event::Redraw));
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
-            self.call_event(id, |this, id, controls| this.on_active(id, controls));
+            self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
             if self.current_keyboard == Some(id) {
                 self.current_keyboard = None;
             }
@@ -573,7 +806,7 @@ impl<R: GUIRender> GUI<R> {
         let mut parents = vec![id];
         self.send_event(Box::new(event::Redraw));
         while let Some(id) = parents.pop() {
-            self.call_event(id, |this, id, controls| this.on_deactive(id, controls));
+            self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
             parents.extend(self.hierarchy.get_children(id).iter().rev());
         }
         // TODO: fix this error there
@@ -595,10 +828,10 @@ impl<R: GUIRender> GUI<R> {
     }
 
     #[inline]
-    pub fn get_render_and_controls(&mut self) -> (&mut R, Controls) {
+    pub fn get_render_and_context(&mut self) -> (&mut R, Context) {
         (
             &mut self.render,
-            Controls::new(
+            Context::new(
                 &mut self.controls,
                 &mut self.hierarchy,
                 &self.fonts,
@@ -646,20 +879,20 @@ impl<R: GUIRender> GUI<R> {
     }
 
     pub fn send_event_to(&mut self, id: Id, event: Box<dyn Any>) {
-        if let Some((this, mut controls)) = Controls::new_with_mut_behaviour(
+        if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(
             id,
             &mut self.controls,
             &mut self.hierarchy,
             &self.fonts,
             self.modifiers,
         ) {
-            this.on_event(event.as_ref(), id, &mut controls);
-            let Controls {
+            this.on_event(event.as_ref(), id, &mut ctx);
+            let Context {
                 events,
                 events_to,
                 dirtys,
                 ..
-            } = controls;
+            } = ctx;
             for event in events {
                 self.send_event(event);
             }
@@ -672,21 +905,21 @@ impl<R: GUIRender> GUI<R> {
         }
     }
 
-    pub fn call_event<F: Fn(&mut dyn Behaviour, Id, &mut Controls)>(&mut self, id: Id, event: F) {
-        if let Some((this, mut controls)) = Controls::new_with_mut_behaviour(
+    pub fn call_event<F: Fn(&mut dyn Behaviour, Id, &mut Context)>(&mut self, id: Id, event: F) {
+        if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(
             id,
             &mut self.controls,
             &mut self.hierarchy,
             &self.fonts,
             self.modifiers,
         ) {
-            event(this, id, &mut controls);
-            let Controls {
+            event(this, id, &mut ctx);
+            let Context {
                 events,
                 events_to,
                 dirtys,
                 ..
-            } = controls;
+            } = ctx;
             for event in events {
                 self.send_event(event);
             }
@@ -704,14 +937,14 @@ impl<R: GUIRender> GUI<R> {
         self.update_all_layouts();
         let mut parents = vec![ROOT_ID];
         while let Some(id) = parents.pop() {
-            self.call_event(id, |this, id, controls| this.on_start(id, controls));
+            self.call_event(id, |this, id, ctx| this.on_start(id, ctx));
             // when acessing childs directly, the inactive controls is also picked.
             parents.extend(self.hierarchy.childs[id.index].iter().rev());
         }
         parents.clear();
         parents.push(ROOT_ID);
         while let Some(id) = parents.pop() {
-            self.call_event(id, |this, id, controls| this.on_active(id, controls));
+            self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
             parents.extend(self.hierarchy.get_children(id));
         }
         fn print_tree(deep: usize, id: Id, hierarchy: &Hierarchy) {
@@ -761,9 +994,7 @@ impl<R: GUIRender> GUI<R> {
                                 [p.x as f32, p.y as f32]
                             }
                         };
-                        self.call_event(curr, |this, id, controls| {
-                            this.on_scroll_event(delta, id, controls)
-                        });
+                        self.call_event(curr, |this, id, ctx| this.on_scroll_event(delta, id, ctx));
                     }
                 }
                 WindowEvent::CursorLeft { .. } => {
@@ -779,8 +1010,8 @@ impl<R: GUIRender> GUI<R> {
                         if ch.is_control() {
                             return false;
                         }
-                        self.call_event(curr, move |this, id, controls| {
-                            this.on_keyboard_event(KeyboardEvent::Char(*ch), id, controls)
+                        self.call_event(curr, move |this, id, ctx| {
+                            this.on_keyboard_event(KeyboardEvent::Char(*ch), id, ctx)
                         });
                         return true;
                     }
@@ -796,8 +1027,8 @@ impl<R: GUIRender> GUI<R> {
                     ..
                 } => {
                     if let Some(curr) = self.current_keyboard {
-                        self.call_event(curr, |this, id, controls| {
-                            this.on_keyboard_event(KeyboardEvent::Pressed(*keycode), id, controls)
+                        self.call_event(curr, |this, id, ctx| {
+                            this.on_keyboard_event(KeyboardEvent::Pressed(*keycode), id, ctx)
                         });
                     }
                 }
@@ -812,14 +1043,14 @@ impl<R: GUIRender> GUI<R> {
             return;
         }
         if let Some(current_keyboard) = self.current_keyboard {
-            self.call_event(current_keyboard, |this, id, controls| {
-                this.on_keyboard_focus_change(false, id, controls)
+            self.call_event(current_keyboard, |this, id, ctx| {
+                this.on_keyboard_focus_change(false, id, ctx)
             });
         }
         self.current_keyboard = id;
         if let Some(current_keyboard) = self.current_keyboard {
-            self.call_event(current_keyboard, |this, id, controls| {
-                this.on_keyboard_focus_change(true, id, controls)
+            self.call_event(current_keyboard, |this, id, ctx| {
+                this.on_keyboard_focus_change(true, id, ctx)
             });
         }
     }
@@ -876,27 +1107,19 @@ impl<R: GUIRender> GUI<R> {
     }
 
     pub fn send_mouse_event_to(&mut self, id: Id, event: MouseEvent) {
-        self.call_event(id, |this, id, controls| {
-            this.on_mouse_event(event, id, controls)
-        });
+        self.call_event(id, |this, id, ctx| this.on_mouse_event(event, id, ctx));
     }
 
     pub fn update_layout(&mut self, mut id: Id) {
         // if min_size is dirty and parent has layout, update parent min_size, and recurse it
         // from the highter parent, update layout of its children. For each dirty chldren, update them, recursivily
 
-        println!("update layout of {}", id.get_index());
-        if let Some((layout, mut controls)) = Controls::new_with_mut_layout(
-            id,
-            &mut self.controls,
-            &mut self.hierarchy,
-            &self.fonts,
-            self.modifiers,
-        ) {
-            layout.compute_min_size(id, &mut controls);
+        {
+            let (layout, mut ctx) =
+                MinSizeContext::new(id, &mut self.controls, &self.hierarchy, &self.fonts);
+            layout.compute_min_size(id, &mut ctx);
         }
         while let Some(parent) = self.hierarchy.get_parent(id) {
-            println!("^ {}", parent.get_index());
             self.controls[id.index]
                 .rect
                 .layout_dirty_flags
@@ -906,14 +1129,14 @@ impl<R: GUIRender> GUI<R> {
                 .get_layout_dirty_flags()
                 .intersects(LayoutDirtyFlags::MIN_WIDTH | LayoutDirtyFlags::MIN_HEIGHT)
             {
-                if let Some((layout, mut controls)) = Controls::new_with_mut_layout(
-                    parent,
-                    &mut self.controls,
-                    &mut self.hierarchy,
-                    &self.fonts,
-                    self.modifiers,
-                ) {
-                    layout.compute_min_size(parent, &mut controls);
+                {
+                    let (layout, mut ctx) = MinSizeContext::new(
+                        parent,
+                        &mut self.controls,
+                        &self.hierarchy,
+                        &self.fonts,
+                    );
+                    layout.compute_min_size(parent, &mut ctx);
                 }
                 id = parent;
             } else {
@@ -925,21 +1148,17 @@ impl<R: GUIRender> GUI<R> {
         // inorder traversal
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
-            if let Some((layout, mut controls)) = Controls::new_with_mut_layout(
-                id,
-                &mut self.controls,
-                &mut self.hierarchy,
-                &self.fonts,
-                self.modifiers,
-            ) {
-                layout.update_layouts(id, &mut controls);
-                let Controls { events, dirtys, .. } = controls;
+            {
+                let (layout, mut ctx) =
+                    LayoutContext::new(id, &mut self.controls, &mut self.hierarchy);
+                layout.update_layouts(id, &mut ctx);
+                let LayoutContext { events, dirtys, .. } = ctx;
                 for event in events {
                     if let Some(event::DeactiveControl { id }) = event.downcast_ref() {
                         self.hierarchy.deactive(*id);
                     } else if let Some(event::ActiveControl { id }) = event.downcast_ref() {
                         self.hierarchy.active(*id);
-                    }
+                    } // else if let Some(event::)
                 }
                 for dirty in dirtys {
                     // if dirty == id {
@@ -952,26 +1171,6 @@ impl<R: GUIRender> GUI<R> {
                         assert!(dirty_parent != id, "A layout cannot dirty its own child!");
                         parents.push(dirty_parent);
                     }
-                }
-            } else {
-                for child in &self.hierarchy.get_children(id) {
-                    let size = self.controls[id.index].rect.get_size();
-                    let pos: [f32; 2] = [
-                        self.controls[id.index].rect.rect[0],
-                        self.controls[id.index].rect.rect[1],
-                    ];
-                    let rect = &mut self.controls[child.index].rect;
-                    let mut new_rect = [0.0; 4];
-                    for i in 0..4 {
-                        new_rect[i] = pos[i % 2] + size[i % 2] * rect.anchors[i] + rect.margins[i];
-                    }
-                    if new_rect[2] - new_rect[0] < rect.get_min_size()[0] {
-                        new_rect[2] = new_rect[0] + rect.get_min_size()[0];
-                    }
-                    if new_rect[3] - new_rect[1] < rect.get_min_size()[1] {
-                        new_rect[3] = new_rect[1] + rect.get_min_size()[1];
-                    }
-                    rect.set_designed_rect(new_rect);
                 }
             }
 
@@ -998,14 +1197,10 @@ impl<R: GUIRender> GUI<R> {
             i += 1;
         }
         while let Some(parent) = parents.pop() {
-            if let Some((layout, mut controls)) = Controls::new_with_mut_layout(
-                parent,
-                &mut self.controls,
-                &mut self.hierarchy,
-                &self.fonts,
-                self.modifiers,
-            ) {
-                layout.compute_min_size(parent, &mut controls);
+            {
+                let (layout, mut ctx) =
+                    MinSizeContext::new(parent, &mut self.controls, &self.hierarchy, &self.fonts);
+                layout.compute_min_size(parent, &mut ctx);
             }
         }
 
@@ -1014,39 +1209,15 @@ impl<R: GUIRender> GUI<R> {
         // inorder traversal
         parents.push(ROOT_ID);
         while let Some(parent) = parents.pop() {
-            if let Some((layout, mut controls)) = Controls::new_with_mut_layout(
-                parent,
-                &mut self.controls,
-                &mut self.hierarchy,
-                &self.fonts,
-                self.modifiers,
-            ) {
-                layout.update_layouts(parent, &mut controls);
-                for event in controls.events {
+            {
+                let (layout, mut ctx) =
+                    LayoutContext::new(parent, &mut self.controls, &mut self.hierarchy);
+                layout.update_layouts(parent, &mut ctx);
+                for event in ctx.events {
                     if let Some(event::DeactiveControl { id }) = event.downcast_ref() {
                         self.hierarchy.deactive(*id);
                     } else if let Some(event::ActiveControl { id }) = event.downcast_ref() {
                         self.hierarchy.active(*id);
-                    }
-                }
-            } else {
-                for child in &self.hierarchy.get_children(parent) {
-                    let size = self.controls[parent.index].rect.get_size();
-                    let pos: [f32; 2] = [
-                        self.controls[parent.index].rect.rect[0],
-                        self.controls[parent.index].rect.rect[1],
-                    ];
-                    let rect = &mut self.controls[child.index].rect;
-                    let mut new_rect = [0.0; 4];
-                    for i in 0..4 {
-                        new_rect[i] = pos[i % 2] + size[i % 2] * rect.anchors[i] + rect.margins[i];
-                    }
-                    rect.set_rect(new_rect);
-                    if rect.get_width() < rect.get_min_size()[0] {
-                        rect.set_width(rect.get_min_size()[0]);
-                    }
-                    if rect.get_height() < rect.get_min_size()[1] {
-                        rect.set_height(rect.get_min_size()[1]);
                     }
                 }
             }
@@ -1288,13 +1459,13 @@ impl Rect {
 
     /// Return true if this have the size_flag::EXPAND_X flag.
     #[inline]
-    pub fn is_expand_x(&mut self) -> bool {
+    pub fn is_expand_x(&self) -> bool {
         self.expand_x
     }
 
     /// Return true if this have the size_flag::EXPAND_Y flag.
     #[inline]
-    pub fn is_expand_y(&mut self) -> bool {
+    pub fn is_expand_y(&self) -> bool {
         self.expand_y
     }
 
@@ -1355,7 +1526,7 @@ impl Rect {
     }
 
     #[inline]
-    pub fn contains(&mut self, x: f32, y: f32) -> bool {
+    pub fn contains(&self, x: f32, y: f32) -> bool {
         self.rect[0] < x && x < self.rect[2] && self.rect[1] < y && y < self.rect[3]
     }
 }
@@ -1370,31 +1541,45 @@ bitflags! {
 
 #[allow(unused_variables)]
 pub trait Behaviour {
-    /// Tell if this widget control the layout of its children.
-    // If it is false, its children use anchor/margin for layout.
-    fn layout_children(&self) -> bool {
-        false
-    }
     /// Compute its own min size, based on the min size of its children.
-    fn compute_min_size(&mut self, this: Id, controls: &mut Controls) {}
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {}
     /// Update the position and size of its children.
-    fn update_layouts(&mut self, this: Id, controls: &mut Controls) {}
+    fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
+        let rect = ctx.get_rect(this);
+        let size = [rect[2] - rect[0], rect[3] - rect[1]];
+        let pos: [f32; 2] = [rect[0], rect[1]];
+        for child in ctx.get_children(this) {
+            let rect = &mut ctx.get_layouting(child);
+            let mut new_rect = [0.0; 4];
+            for i in 0..4 {
+                new_rect[i] = pos[i % 2] + size[i % 2] * rect.anchors[i] + rect.margins[i];
+            }
+            if new_rect[2] - new_rect[0] < rect.get_min_size()[0] {
+                new_rect[2] = new_rect[0] + rect.get_min_size()[0];
+            }
+            if new_rect[3] - new_rect[1] < rect.get_min_size()[1] {
+                new_rect[3] = new_rect[1] + rect.get_min_size()[1];
+            }
+            ctx.set_designed_rect(child, new_rect);
+        }
+    }
 
     fn input_flags(&self) -> InputFlags {
         InputFlags::empty()
     }
 
-    fn on_start(&mut self, this: Id, controls: &mut Controls) {}
-    fn on_active(&mut self, this: Id, controls: &mut Controls) {}
-    fn on_deactive(&mut self, this: Id, controls: &mut Controls) {}
+    fn on_start(&mut self, this: Id, ctx: &mut Context) {}
+    fn on_active(&mut self, this: Id, ctx: &mut Context) {}
+    fn on_deactive(&mut self, this: Id, ctx: &mut Context) {}
 
-    fn on_event(&mut self, event: &dyn Any, this: Id, controls: &mut Controls) {}
+    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {}
 
-    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, controls: &mut Controls) {}
+    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {}
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, controls: &mut Controls) {}
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {}
 
-    fn on_keyboard_focus_change(&mut self, focus: bool, this: Id, controls: &mut Controls) {}
+    fn on_keyboard_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {}
 
-    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, controls: &mut Controls) {}
+    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) {}
 }
+impl Behaviour for () {}
