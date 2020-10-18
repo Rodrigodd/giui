@@ -168,7 +168,6 @@ impl Hierarchy {
 
 pub struct ControlBuilder<'a, R: GUIRender> {
     gui: &'a mut GUI<R>,
-    input_flags: InputFlags,
     rect: Rect,
     graphic: Option<Graphic>,
     behaviour: Option<Box<dyn Behaviour>>,
@@ -178,7 +177,6 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
     fn new(gui: &'a mut GUI<R>) -> Self {
         Self {
             gui,
-            input_flags: InputFlags::empty(),
             rect: Rect::default(),
             graphic: None,
             behaviour: None,
@@ -214,7 +212,6 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
         self
     }
     pub fn with_behaviour(mut self, behaviour: Box<dyn Behaviour>) -> Self {
-        self.input_flags |= behaviour.input_flags();
         // TODO: remove this in production!!
         debug_assert!(self.behaviour.is_none());
         self.behaviour = Some(behaviour);
@@ -231,7 +228,6 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
     pub fn build(self) -> Id {
         let Self {
             gui,
-            input_flags,
             rect,
             graphic,
             behaviour,
@@ -239,7 +235,6 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
         } = self;
         gui.add_control(
             Control {
-                input_flags,
                 rect,
                 graphic,
                 behaviour,
@@ -250,7 +245,6 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
 }
 
 pub struct Control {
-    input_flags: InputFlags,
     rect: Rect,
     graphic: Option<Graphic>,
     behaviour: Option<Box<dyn Behaviour>>,
@@ -259,7 +253,6 @@ impl Control {
     /// create a control with no behaviour
     pub fn new(rect: Rect, graphic: Option<Graphic>) -> Self {
         Self {
-            input_flags: InputFlags::empty(),
             rect,
             graphic,
             behaviour: None,
@@ -267,14 +260,12 @@ impl Control {
     }
     /// add one more behaviour to the control
     pub fn with_behaviour(mut self, behaviour: Box<dyn Behaviour>) -> Self {
-        self.input_flags |= behaviour.input_flags();
         self.behaviour = Some(behaviour);
         self
     }
 
     /// add one more behaviour to the control
     pub fn set_behaviour(&mut self, behaviour: Box<dyn Behaviour>) {
-        self.input_flags |= behaviour.input_flags();
         self.behaviour = Some(behaviour);
     }
 }
@@ -726,7 +717,6 @@ pub struct GUI<R: GUIRender> {
     modifiers: ModifiersState,
     input: Input,
     current_over: Option<Id>,
-    current_scroll: Option<Id>,
     current_keyboard: Option<Id>,
     over_is_locked: bool,
     events: Vec<Box<dyn Any>>,
@@ -738,7 +728,6 @@ impl<R: GUIRender> GUI<R> {
         Self {
             modifiers: ModifiersState::empty(),
             controls: vec![Control {
-                input_flags: InputFlags::empty(),
                 rect: Rect {
                     anchors: [0.0; 4],
                     margins: [0.0; 4],
@@ -752,7 +741,6 @@ impl<R: GUIRender> GUI<R> {
             hierarchy: Hierarchy::default(),
             input: Input::default(),
             current_over: None,
-            current_scroll: None,
             current_keyboard: None,
             over_is_locked: false,
             events: Vec::new(),
@@ -786,15 +774,8 @@ impl<R: GUIRender> GUI<R> {
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
             self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
-            if self.current_keyboard == Some(id) {
-                self.current_keyboard = None;
-            }
-            if self.current_scroll == Some(id) {
-                self.current_scroll = None;
-            }
             parents.extend(self.hierarchy.get_children(id).iter().rev());
         }
-        // TODO: fix this error there
         self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
     }
 
@@ -809,7 +790,7 @@ impl<R: GUIRender> GUI<R> {
             self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
             parents.extend(self.hierarchy.get_children(id).iter().rev());
         }
-        // TODO: fix this error there
+        // TODO: maybe this need happen before the call above?
         self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
     }
 
@@ -933,6 +914,44 @@ impl<R: GUIRender> GUI<R> {
         }
     }
 
+    pub fn call_event_chain<F: Fn(&mut dyn Behaviour, Id, &mut Context) -> bool>(
+        &mut self,
+        id: Id,
+        event: F,
+    ) {
+        let mut handled = false;
+        if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(
+            id,
+            &mut self.controls,
+            &mut self.hierarchy,
+            &self.fonts,
+            self.modifiers,
+        ) {
+            handled = event(this, id, &mut ctx);
+            let Context {
+                events,
+                events_to,
+                dirtys,
+                ..
+            } = ctx;
+            for event in events {
+                self.send_event(event);
+            }
+            let mut event_queue = VecDeque::from(events_to);
+            while let Some((id, event)) = event_queue.pop_back() {
+                self.send_event_to(id, event);
+            }
+            for dirty in dirtys {
+                self.update_layout(dirty);
+            }
+        }
+        if !handled {
+            if let Some(parent) = self.hierarchy.get_parent(id) {
+                self.call_event_chain(parent, event);
+            }
+        }
+    }
+
     pub fn start(&mut self) {
         self.update_all_layouts();
         let mut parents = vec![ROOT_ID];
@@ -974,17 +993,24 @@ impl<R: GUIRender> GUI<R> {
                     return true;
                 }
                 WindowEvent::MouseInput { state, .. } => {
+                    if let ElementState::Pressed = state {
+                        println!("Change focus");
+                        self.set_keyboard_focus(self.current_over);
+                    }
                     if let Some(curr) = self.current_over {
-                        let event = match state {
-                            ElementState::Pressed => MouseEvent::Down,
-                            ElementState::Released => MouseEvent::Up,
+                        match state {
+                            ElementState::Pressed => {
+                                self.send_mouse_event_to(curr, MouseEvent::Down);
+                            }
+                            ElementState::Released => {
+                                self.send_mouse_event_to(curr, MouseEvent::Up);
+                            }
                         };
-                        self.send_mouse_event_to(curr, event);
                         return true;
                     }
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
-                    if let Some(curr) = self.current_scroll {
+                    if let Some(curr) = self.current_over {
                         //TODO: I should handle Line and Pixel Delta differences more wisely?
                         let delta = match delta {
                             winit::event::MouseScrollDelta::LineDelta(x, y) => {
@@ -994,12 +1020,14 @@ impl<R: GUIRender> GUI<R> {
                                 [p.x as f32, p.y as f32]
                             }
                         };
-                        self.call_event(curr, |this, id, ctx| this.on_scroll_event(delta, id, ctx));
+                        self.call_event_chain(curr, |this, id, ctx| {
+                            this.on_scroll_event(delta, id, ctx)
+                        });
                     }
                 }
                 WindowEvent::CursorLeft { .. } => {
                     if let Some(curr) = self.current_over.take() {
-                        if self.listen(curr, InputFlags::POINTER) && !self.over_is_locked {
+                        if !self.over_is_locked {
                             self.send_mouse_event_to(curr, MouseEvent::Exit);
                             return true;
                         }
@@ -1010,7 +1038,7 @@ impl<R: GUIRender> GUI<R> {
                         if ch.is_control() {
                             return false;
                         }
-                        self.call_event(curr, move |this, id, ctx| {
+                        self.call_event_chain(curr, move |this, id, ctx| {
                             this.on_keyboard_event(KeyboardEvent::Char(*ch), id, ctx)
                         });
                         return true;
@@ -1027,7 +1055,7 @@ impl<R: GUIRender> GUI<R> {
                     ..
                 } => {
                     if let Some(curr) = self.current_keyboard {
-                        self.call_event(curr, |this, id, ctx| {
+                        self.call_event_chain(curr, |this, id, ctx| {
                             this.on_keyboard_event(KeyboardEvent::Pressed(*keycode), id, ctx)
                         });
                     }
@@ -1056,30 +1084,22 @@ impl<R: GUIRender> GUI<R> {
     }
 
     pub fn mouse_moved(&mut self, mouse_x: f32, mouse_y: f32) {
-        if let Some(curr) = self.current_over {
-            if self.over_is_locked || self.controls[curr.index].rect.contains(mouse_x, mouse_y) {
-                self.send_mouse_event_to(
-                    curr,
-                    MouseEvent::Moved {
-                        x: mouse_x,
-                        y: mouse_y,
-                    },
-                );
-                return;
+        let mut curr = ROOT_ID;
+
+        if let Some(current_over) = self.current_over {
+            if self.over_is_locked
+                || self.controls[current_over.index]
+                    .rect
+                    .contains(mouse_x, mouse_y)
+            {
+                curr = current_over;
             } else {
-                self.send_mouse_event_to(curr, MouseEvent::Exit);
+                self.send_mouse_event_to(current_over, MouseEvent::Exit);
                 self.current_over = None;
             }
         }
 
-        let mut curr = ROOT_ID;
         'l: loop {
-            if self.listen(curr, InputFlags::POINTER) {
-                self.current_over = Some(curr);
-            }
-            if self.listen(curr, InputFlags::SCROLL) {
-                self.current_scroll = Some(curr);
-            }
             // the interator is reversed because the last childs block the previous ones
             for child in self.hierarchy.get_children(curr).iter().rev() {
                 if self.controls[child.index].rect.contains(mouse_x, mouse_y) {
@@ -1090,7 +1110,21 @@ impl<R: GUIRender> GUI<R> {
             break;
         }
 
-        if let Some(curr) = self.current_over {
+        println!("curr is {}", curr.get_index());
+
+        if Some(curr) == self.current_over {
+            self.send_mouse_event_to(
+                curr,
+                MouseEvent::Moved {
+                    x: mouse_x,
+                    y: mouse_y,
+                },
+            );
+        } else {
+            if let Some(current_over) = self.current_over {
+                self.send_mouse_event_to(current_over, MouseEvent::Exit);
+            }
+            self.current_over = Some(curr);
             self.send_mouse_event_to(curr, MouseEvent::Enter);
             self.send_mouse_event_to(
                 curr,
@@ -1102,12 +1136,10 @@ impl<R: GUIRender> GUI<R> {
         }
     }
 
-    fn listen(&self, id: Id, flag: InputFlags) -> bool {
-        self.controls[id.index].input_flags.contains(flag)
-    }
-
     pub fn send_mouse_event_to(&mut self, id: Id, event: MouseEvent) {
-        self.call_event(id, |this, id, ctx| this.on_mouse_event(event, id, ctx));
+        // TODO: This need more thought, because call_event_chain implys that a widget
+        // can receive MouseMoved withou receving MouseEnter!
+        self.call_event_chain(id, |this, id, ctx| this.on_mouse_event(event, id, ctx));
     }
 
     pub fn update_layout(&mut self, mut id: Id) {
@@ -1531,14 +1563,6 @@ impl Rect {
     }
 }
 
-bitflags! {
-    pub struct InputFlags: u32 {
-        const POINTER = 0x01;
-        const SCROLL = 0x02;
-        const KEYBOARD = 0x04;
-    }
-}
-
 #[allow(unused_variables)]
 pub trait Behaviour {
     /// Compute its own min size, based on the min size of its children.
@@ -1564,22 +1588,24 @@ pub trait Behaviour {
         }
     }
 
-    fn input_flags(&self) -> InputFlags {
-        InputFlags::empty()
-    }
-
     fn on_start(&mut self, this: Id, ctx: &mut Context) {}
     fn on_active(&mut self, this: Id, ctx: &mut Context) {}
     fn on_deactive(&mut self, this: Id, ctx: &mut Context) {}
 
     fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {}
 
-    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {}
+    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) -> bool {
+        false
+    }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {}
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+        false
+    }
 
     fn on_keyboard_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {}
 
-    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) {}
+    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
+        false
+    }
 }
 impl Behaviour for () {}

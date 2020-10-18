@@ -1,6 +1,6 @@
 use crate::{
-    event, render::Graphic, text::TextInfo, Behaviour, Context, Id, InputFlags, KeyboardEvent,
-    LayoutContext, MinSizeContext, MouseEvent,
+    event, render::Graphic, text::TextInfo, Behaviour, Context, Id, KeyboardEvent, LayoutContext,
+    MinSizeContext, MouseEvent,
 };
 use copypasta::{ClipboardContext, ClipboardProvider};
 use std::any::Any;
@@ -16,17 +16,13 @@ impl Button {
     }
 }
 impl Behaviour for Button {
-    fn input_flags(&self) -> InputFlags {
-        InputFlags::POINTER
-    }
-
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         let graphic = ctx.get_graphic(this).unwrap();
         graphic.set_color([200, 200, 200, 255]);
         ctx.send_event(event::Redraw);
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
         match event {
             MouseEvent::Enter => {
                 let graphic = ctx.get_graphic(this).unwrap();
@@ -55,6 +51,7 @@ impl Behaviour for Button {
             }
             MouseEvent::Moved { .. } => {}
         }
+        true
     }
 }
 
@@ -110,17 +107,13 @@ impl Slider {
     }
 }
 impl Behaviour for Slider {
-    fn input_flags(&self) -> InputFlags {
-        InputFlags::POINTER
-    }
-
     fn on_active(&mut self, this: Id, ctx: &mut Context) {
         self.set_handle_pos(this, ctx);
         let value = self.value;
         ctx.send_event(event::ValueSet { id: this, value });
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {}
@@ -149,6 +142,7 @@ impl Behaviour for Slider {
                 }
             }
         }
+        true
     }
 }
 
@@ -169,10 +163,6 @@ impl Toggle {
     }
 }
 impl Behaviour for Toggle {
-    fn input_flags(&self) -> InputFlags {
-        InputFlags::POINTER
-    }
-
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         ctx.send_event(event::ToggleChanged {
             id: this,
@@ -184,7 +174,7 @@ impl Behaviour for Toggle {
             ctx.get_graphic(self.marker).unwrap().set_alpha(0)
         }
     }
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
         match event {
             MouseEvent::Enter => {
                 let graphic = ctx.get_graphic(self.background).unwrap();
@@ -222,6 +212,7 @@ impl Behaviour for Toggle {
             }
             MouseEvent::Moved { .. } => {}
         }
+        true
     }
 }
 
@@ -281,10 +272,6 @@ impl TabButton {
     }
 }
 impl Behaviour for TabButton {
-    fn input_flags(&self) -> InputFlags {
-        InputFlags::POINTER
-    }
-
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         if self.selected {
             self.select(this, ctx);
@@ -301,7 +288,7 @@ impl Behaviour for TabButton {
         }
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
         match event {
             MouseEvent::Enter => {
                 if !self.selected {
@@ -340,6 +327,7 @@ impl Behaviour for TabButton {
             }
             MouseEvent::Moved { .. } => {}
         }
+        true
     }
 }
 
@@ -360,15 +348,11 @@ impl Hoverable {
     }
 }
 impl Behaviour for Hoverable {
-    fn input_flags(&self) -> InputFlags {
-        InputFlags::POINTER
-    }
-
     fn on_start(&mut self, _this: Id, ctx: &mut Context) {
         ctx.deactive(self.hover);
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) -> bool {
         match event {
             MouseEvent::Enter => {
                 ctx.active(self.hover);
@@ -395,6 +379,7 @@ impl Behaviour for Hoverable {
                 }
             }
         }
+        true
     }
 }
 
@@ -426,11 +411,7 @@ impl ScrollBar {
     }
 }
 impl Behaviour for ScrollBar {
-    fn input_flags(&self) -> InputFlags {
-        InputFlags::POINTER
-    }
-
-    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) -> bool {
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {
@@ -541,6 +522,7 @@ impl Behaviour for ScrollBar {
                 }
             }
         }
+        true
     }
 }
 
@@ -719,10 +701,6 @@ impl Behaviour for ScrollView {
         ctx.set_designed_rect(content, content_rect);
     }
 
-    fn input_flags(&self) -> InputFlags {
-        InputFlags::SCROLL
-    }
-
     fn on_start(&mut self, _this: Id, ctx: &mut Context) {
         ctx.move_to_front(self.v_scroll_bar);
         ctx.move_to_front(self.h_scroll_bar);
@@ -749,14 +727,6 @@ impl Behaviour for ScrollView {
         );
     }
 
-    fn on_scroll_event(&mut self, delta: [f32; 2], _: Id, ctx: &mut Context) {
-        self.delta_x += delta[0];
-        self.delta_y -= delta[1];
-
-        ctx.dirty_layout(self.view);
-        ctx.send_event(event::Redraw);
-    }
-
     fn on_event(&mut self, event: &dyn Any, _: Id, ctx: &mut Context) {
         if let Some(event) = event.downcast_ref::<SetScrollPosition>() {
             if !event.vertical {
@@ -768,6 +738,74 @@ impl Behaviour for ScrollView {
             }
             ctx.dirty_layout(self.view);
             ctx.send_event(event::Redraw);
+        }
+    }
+
+    fn on_scroll_event(&mut self, delta: [f32; 2], _: Id, ctx: &mut Context) -> bool {
+        self.delta_x += delta[0];
+        self.delta_y -= delta[1];
+
+        ctx.dirty_layout(self.view);
+        ctx.send_event(event::Redraw);
+        true
+    }
+
+    fn on_keyboard_event(&mut self, event: KeyboardEvent, _this: Id, ctx: &mut Context) -> bool {
+        match event {
+            KeyboardEvent::Pressed(key) => match key {
+                VirtualKeyCode::Up => {
+                    self.delta_y -= 30.0;
+                    ctx.dirty_layout(self.view);
+                    ctx.send_event(event::Redraw);
+                    true
+                }
+                VirtualKeyCode::Down => {
+                    self.delta_y += 30.0;
+                    ctx.dirty_layout(self.view);
+                    ctx.send_event(event::Redraw);
+                    true
+                }
+                VirtualKeyCode::Right => {
+                    self.delta_x += 30.0;
+                    ctx.dirty_layout(self.view);
+                    ctx.send_event(event::Redraw);
+                    true
+                }
+                VirtualKeyCode::Left => {
+                    self.delta_x -= 30.0;
+                    ctx.dirty_layout(self.view);
+                    ctx.send_event(event::Redraw);
+                    true
+                }
+                VirtualKeyCode::Home => {
+                    self.delta_y = 0.0;
+                    ctx.dirty_layout(self.view);
+                    ctx.send_event(event::Redraw);
+                    true
+                }
+                VirtualKeyCode::End => {
+                    self.delta_y = f32::INFINITY;
+                    ctx.dirty_layout(self.view);
+                    ctx.send_event(event::Redraw);
+                    true
+                }
+                VirtualKeyCode::PageUp => {
+                    let height = ctx.get_size(self.view)[1] - 40.0;
+                    self.delta_y -= height;
+                    ctx.dirty_layout(self.view);
+                    ctx.send_event(event::Redraw);
+                    true
+                }
+                VirtualKeyCode::PageDown => {
+                    let height = ctx.get_size(self.view)[1] - 40.0;
+                    self.delta_y += height;
+                    ctx.dirty_layout(self.view);
+                    ctx.send_event(event::Redraw);
+                    true
+                }
+                _ => false,
+            },
+            _ => false,
         }
     }
 }
@@ -930,10 +968,6 @@ impl TextField {
     }
 }
 impl Behaviour for TextField {
-    fn input_flags(&self) -> InputFlags {
-        InputFlags::KEYBOARD | InputFlags::POINTER | InputFlags::SCROLL
-    }
-
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         self.update_text(this, ctx);
         ctx.move_to_front(self.label);
@@ -948,7 +982,7 @@ impl Behaviour for TextField {
         }
     }
 
-    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {
+    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) -> bool {
         let delta = if delta[0].abs() > delta[1].abs() {
             delta[0]
         } else {
@@ -956,9 +990,11 @@ impl Behaviour for TextField {
         };
         self.x_scroll -= delta;
         self.update_carret(this, ctx, false);
+
+        true
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {}
@@ -985,7 +1021,7 @@ impl Behaviour for TextField {
                     let x = self.mouse_x - left;
                     let caret_index = self.text_info.get_caret_index_at_pos(0, x);
                     if caret_index == self.caret_index {
-                        return;
+                        return true;
                     }
                     if let Some(selection_index) = self.selection_index {
                         if caret_index == selection_index {
@@ -999,6 +1035,7 @@ impl Behaviour for TextField {
                 }
             }
         }
+        true
     }
 
     fn on_keyboard_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
@@ -1007,14 +1044,13 @@ impl Behaviour for TextField {
         ctx.send_event(event::Redraw);
     }
 
-    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) {
+    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
         match event {
             KeyboardEvent::Char(ch) => {
                 if self.selection_index.is_some() {
                     self.delete_selection(this, ctx);
                 }
                 self.insert_char(ch, this, ctx);
-                println!("receive char {:?}", ch);
             }
             KeyboardEvent::Pressed(key_code) => match key_code {
                 VirtualKeyCode::C | VirtualKeyCode::X => {
@@ -1079,7 +1115,7 @@ impl Behaviour for TextField {
                 }
                 VirtualKeyCode::Back => {
                     if self.caret_index == 0 {
-                        return;
+                        return true;
                     }
                     self.caret_index -= 1;
                     self.text
@@ -1167,5 +1203,6 @@ impl Behaviour for TextField {
                 _ => {}
             },
         }
+        true
     }
 }

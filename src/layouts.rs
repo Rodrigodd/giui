@@ -319,8 +319,6 @@ impl Behaviour for GridLayout {
             self.rows = 1 + (len as u32 - 1) / self.columns;
             let columns = self.columns.min(children.len() as u32) as usize;
             let len = columns + self.rows as usize;
-            dbg!(columns);
-            dbg!(len);
             self.min_sizes.resize(len, 0.0);
             self.expand.clear();
             self.expand.resize(len, false);
