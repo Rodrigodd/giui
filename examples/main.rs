@@ -82,7 +82,7 @@ fn main() {
 
         (hover, label)
     };
-    let (page_1, top_text, bottom_text, my_button, my_slider, my_toggle) = {
+    let (page_1, top_text, bottom_text, my_slider, my_toggle) = {
         let page_1 = gui.create_control().with_parent(page_area).build();
         let menu = {
             let graphic = painel.clone();
@@ -143,12 +143,12 @@ fn main() {
             text_box
         };
 
-        let my_button = {
+        let _my_button = {
             let button = gui
                 .create_control()
                 .with_min_size([0.0, 30.0])
                 .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
-                .with_behaviour(Box::new(Button::new()))
+                .with_behaviour(Box::new(Button::new(|_, _| println!("clicked my button!"))))
                 .with_parent(menu)
                 .build();
             let graphic =
@@ -226,14 +226,7 @@ fn main() {
 
             toggle
         };
-        (
-            page_1,
-            top_text,
-            bottom_text,
-            my_button,
-            my_slider,
-            my_toggle,
-        )
+        (page_1, top_text, bottom_text, my_slider, my_toggle)
     };
     let page_2 = {
         let page_2 = gui
@@ -576,26 +569,7 @@ fn main() {
                 v_scroll_bar_handle,
             )),
         );
-        let create_item = |gui: &mut GUI<GUISpriteRender>, text: String, color: [u8; 4]| -> Id {
-            let item = gui
-                .create_control()
-                .with_min_size([100.0, 35.0])
-                .with_graphic(painel.clone().with_border(0.0).with_color(color))
-                .with_parent(list)
-                .with_behaviour(Box::new(MarginLayout::new([5.0, 0.0, 5.0, 0.0])))
-                .build();
-            //TODO: there must be a better way to increase the min_size height
-            gui.create_control()
-                .with_min_size([0.0, 35.0])
-                .with_parent(item)
-                .build();
-            gui.create_control()
-                .with_parent(item)
-                .with_graphic(Text::new([0, 0, 0, 255], text, 16.0, (-1, 0)).into())
-                .with_behaviour(Box::new(FitText))
-                .build();
-            item
-        };
+
         let mut seed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -603,7 +577,7 @@ fn main() {
         seed = seed ^ (seed << 64);
         for i in 0..5 {
             let color = (seed.rotate_left(i * 3)) as u32 | 0xff;
-            create_item(&mut gui, format!("This is the item number {} with the color which hexadecimal representation is #{:0x}", i + 1, color), color.to_be_bytes());
+            create_item(&mut gui, list, texture, format!("This is the item number {} with the color which hexadecimal representation is #{:0x}", i + 1, color), color.to_be_bytes());
         }
         (page_3, input_box, list)
     };
@@ -694,10 +668,6 @@ fn main() {
         for event in gui.get_events().collect::<Vec<_>>() {
             if event.is::<ui_event::Redraw>() {
                 window.request_redraw();
-            } else if let Some(ui_event::ButtonClicked { id }) = event.downcast_ref() {
-                if *id == my_button {
-                    println!("Button clicked!!")
-                }
             } else if let Some(ui_event::ValueChanged { id, value }) = event.downcast_ref() {
                 if *id == my_slider {
                     if let Some(Graphic::Text(text)) = gui.get_graphic(top_text) {
@@ -726,28 +696,7 @@ fn main() {
                 if id == input_box {
                     println!("Submited {}!", text);
                     gui.send_event_to(id, Box::new(ui_event::ClearText));
-                    let item = gui
-                        .create_control()
-                        .with_min_size([100.0, 35.0])
-                        .with_graphic(
-                            painel
-                                .clone()
-                                .with_border(0.0)
-                                .with_color([200, 230, 255, 255]),
-                        )
-                        .with_parent(list)
-                        .with_behaviour(Box::new(MarginLayout::new([5.0, 0.0, 5.0, 0.0])))
-                        .build();
-                    //TODO: there must be a better way to increase the min_size height
-                    gui.create_control()
-                        .with_min_size([0.0, 35.0])
-                        .with_parent(item)
-                        .build();
-                    gui.create_control()
-                        .with_parent(item)
-                        .with_graphic(Text::new([0, 0, 0, 255], text, 16.0, (-1, 0)).into())
-                        .with_behaviour(Box::new(FitText))
-                        .build();
+                    create_item(&mut gui, list, texture, text, [130, 150, 255, 255]);
                 }
             }
         }
@@ -771,4 +720,44 @@ fn main() {
             _ => {}
         }
     })
+}
+
+fn create_item<R: GUIRender>(
+    gui: &mut GUI<R>,
+    list: Id,
+    texture: u32,
+    text: String,
+    color: [u8; 4],
+) {
+    let painel: Graphic =
+        Texture::new(texture, [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0]).into();
+    let item = gui
+        .create_control()
+        .with_min_size([100.0, 35.0])
+        .with_graphic(painel.clone().with_color(color))
+        .with_parent(list)
+        .with_behaviour(Box::new(HBoxLayout::new(0.0, [5.0, 0.0, 5.0, 0.0], 0)))
+        .build();
+    // TODO: there must be a better way of set the minsize of the control above,
+    // instead of relying in a child.
+    gui.create_control()
+        .with_min_height(35.0)
+        .with_parent(item)
+        .build();
+    let _text = gui
+        .create_control()
+        .with_parent(item)
+        .with_graphic(Text::new([0, 0, 0, 255], text, 16.0, (-1, 0)).into())
+        .with_behaviour(Box::new(FitText))
+        .with_expand_x(true)
+        .build();
+    let _button = gui
+        .create_control()
+        .with_parent(item)
+        .with_graphic(painel)
+        .with_behaviour(Box::new(Button::new(move |_, ctx| ctx.remove(item))))
+        .with_min_size([15.0, 15.0])
+        .with_fill_x(RectFill::ShrinkCenter)
+        .with_fill_y(RectFill::ShrinkCenter)
+        .build();
 }

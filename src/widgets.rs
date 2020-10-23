@@ -7,16 +7,20 @@ use std::any::Any;
 use winit::event::VirtualKeyCode;
 
 #[derive(Default)]
-pub struct Button {
+pub struct Button<F: Fn(Id, &mut Context)> {
     pub click: bool,
+    pub on_click: F,
 }
-impl Button {
-    pub fn new() -> Self {
-        Self { click: false }
+impl<F: Fn(Id, &mut Context)> Button<F> {
+    pub fn new(on_click: F) -> Self {
+        Self {
+            click: false,
+            on_click,
+        }
     }
 }
-impl Behaviour for Button {
-    fn on_start(&mut self, this: Id, ctx: &mut Context) {
+impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
+    fn on_active(&mut self, this: Id, ctx: &mut Context) {
         let graphic = ctx.get_graphic(this).unwrap();
         graphic.set_color([200, 200, 200, 255]);
         ctx.send_event(event::Redraw);
@@ -46,7 +50,7 @@ impl Behaviour for Button {
                 graphic.set_color([180, 180, 180, 255]);
                 ctx.send_event(event::Redraw);
                 if self.click {
-                    ctx.send_event(event::ButtonClicked { id: this });
+                    (self.on_click)(this, ctx);
                 }
             }
             MouseEvent::Moved { .. } => {}
