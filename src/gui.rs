@@ -863,7 +863,9 @@ impl<R: GUIRender> GUI<R> {
         if !self.get_control_mut(id).active() {
             return;
         }
-        self.update_layout(id);
+        if let Some(parent) = self.get_parent(id) {
+            self.update_layout(parent);
+        }
         self.send_event(Box::new(event::Redraw));
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
@@ -877,7 +879,9 @@ impl<R: GUIRender> GUI<R> {
         if !self.get_control_mut(id).deactive() {
             return;
         }
-        self.update_layout(id);
+        if let Some(parent) = self.get_parent(id) {
+            self.update_layout(parent);
+        }
         self.send_event(Box::new(event::Redraw));
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
@@ -894,7 +898,9 @@ impl<R: GUIRender> GUI<R> {
     /// Remove a control and all of its children
     pub fn remove_control(&mut self, id: Id) {
         if self.controls[id.get_index()].deactive() {
-            self.update_layout(id);
+            if let Some(parent) = self.get_parent(id) {
+                self.update_layout(parent);
+            }
             self.send_event(Box::new(event::Redraw));
         }
         if let Some(parent) = self.controls[id.get_index()].parent {
