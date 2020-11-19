@@ -6,56 +6,94 @@ use copypasta::{ClipboardContext, ClipboardProvider};
 use std::any::Any;
 use winit::event::VirtualKeyCode;
 
-#[derive(Default)]
+#[derive(Clone)]
+pub struct OnFocusStyle {
+    pub normal: Graphic,
+    pub focus: Graphic,
+}
+
+#[derive(Clone)]
+pub struct ButtonStyle {
+    pub normal: Graphic,
+    pub hover: Graphic,
+    pub pressed: Graphic,
+    pub focus: Graphic,
+}
+
+#[derive(Clone)]
+pub struct TabStyle {
+    pub unselected: Graphic,
+    pub hover: Graphic,
+    pub pressed: Graphic,
+    pub selected: Graphic,
+}
+
 pub struct Button<F: Fn(Id, &mut Context)> {
-    pub click: bool,
-    pub on_click: F,
+    state: u8, // 0 - normal, 1 - hover, 2 - pressed
+    focus: bool,
+    on_click: F,
+    style: ButtonStyle,
 }
 impl<F: Fn(Id, &mut Context)> Button<F> {
-    pub fn new(on_click: F) -> Self {
+    pub fn new(style: ButtonStyle, on_click: F) -> Self {
         Self {
-            click: false,
+            state: 0,
+            focus: false,
             on_click,
+            style,
         }
     }
 }
 impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
     fn on_active(&mut self, this: Id, ctx: &mut Context) {
-        let graphic = ctx.get_graphic(this).unwrap();
-        graphic.set_color([200, 200, 200, 255]);
+        ctx.set_graphic(this, self.style.normal.clone());
         ctx.send_event(event::Redraw);
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
         match event {
             MouseEvent::Enter => {
-                let graphic = ctx.get_graphic(this).unwrap();
-                graphic.set_color([180, 180, 180, 255]);
+                self.state = 1;
+                ctx.set_graphic(this, self.style.hover.clone());
                 ctx.send_event(event::Redraw);
             }
             MouseEvent::Exit => {
-                self.click = false;
-                let graphic = ctx.get_graphic(this).unwrap();
-                graphic.set_color([200, 200, 200, 255]);
+                self.state = 0;
+                if self.focus {
+                    ctx.set_graphic(this, self.style.focus.clone());
+                } else {
+                    ctx.set_graphic(this, self.style.normal.clone());
+                }
                 ctx.send_event(event::Redraw);
             }
             MouseEvent::Down => {
-                self.click = true;
-                let graphic = ctx.get_graphic(this).unwrap();
-                graphic.set_color([128, 128, 128, 255]);
+                self.state = 2;
+                ctx.set_graphic(this, self.style.pressed.clone());
                 ctx.send_event(event::Redraw);
             }
             MouseEvent::Up => {
-                let graphic = ctx.get_graphic(this).unwrap();
-                graphic.set_color([180, 180, 180, 255]);
-                ctx.send_event(event::Redraw);
-                if self.click {
+                if self.state == 2 {
                     (self.on_click)(this, ctx);
                 }
+                self.state = 1;
+                ctx.set_graphic(this, self.style.hover.clone());
+                ctx.send_event(event::Redraw);
             }
             MouseEvent::Moved { .. } => {}
         }
         true
+    }
+
+    fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
+        self.focus = focus;
+        if self.state == 0 {
+            if focus {
+                ctx.set_graphic(this, self.style.focus.clone());
+            } else {
+                ctx.set_graphic(this, self.style.normal.clone());
+            }
+            ctx.send_event(event::Redraw);
+        }
     }
 }
 
@@ -67,6 +105,7 @@ pub struct Slider {
     min_value: f32,
     max_value: f32,
     value: f32,
+    style: OnFocusStyle,
 }
 impl Slider {
     pub fn new(
@@ -75,6 +114,7 @@ impl Slider {
         min_value: f32,
         max_value: f32,
         start_value: f32,
+        style: OnFocusStyle,
     ) -> Self {
         Self {
             handle,
@@ -84,6 +124,7 @@ impl Slider {
             max_value,
             min_value,
             value: start_value,
+            style,
         }
     }
 
@@ -115,6 +156,17 @@ impl Behaviour for Slider {
         self.set_handle_pos(this, ctx);
         let value = self.value;
         ctx.send_event(event::ValueSet { id: this, value });
+        ctx.set_graphic(this, self.style.normal.clone());
+        ctx.send_event(event::Redraw);
+    }
+
+    fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
+        if focus {
+            ctx.set_graphic(this, self.style.focus.clone());
+        } else {
+            ctx.set_graphic(this, self.style.normal.clone());
+        }
+        ctx.send_event(event::Redraw);
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
@@ -153,16 +205,25 @@ impl Behaviour for Slider {
 pub struct Toggle {
     click: bool,
     enable: bool,
-    background: Id,
+    button: Id,
     marker: Id,
+    button_style: ButtonStyle,
+    background_style: OnFocusStyle,
 }
 impl Toggle {
-    pub fn new(background: Id, marker: Id) -> Self {
+    pub fn new(
+        button: Id,
+        marker: Id,
+        button_style: ButtonStyle,
+        background_style: OnFocusStyle,
+    ) -> Self {
         Self {
             click: false,
             enable: false,
-            background,
+            button,
             marker,
+            button_style,
+            background_style,
         }
     }
 }
@@ -172,33 +233,45 @@ impl Behaviour for Toggle {
             id: this,
             value: self.enable,
         });
+        ctx.set_graphic(this, self.background_style.normal.clone());
+        ctx.set_graphic(self.button, self.button_style.normal.clone());
         if self.enable {
-            ctx.get_graphic(self.marker).unwrap().set_alpha(255)
+            ctx.get_graphic(self.marker).set_alpha(255)
         } else {
-            ctx.get_graphic(self.marker).unwrap().set_alpha(0)
+            ctx.get_graphic(self.marker).set_alpha(0)
         }
     }
+
+    fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
+        if focus {
+            ctx.set_graphic(this, self.background_style.focus.clone());
+        } else {
+            ctx.set_graphic(this, self.background_style.normal.clone());
+        }
+        ctx.send_event(event::Redraw);
+    }
+
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
         match event {
             MouseEvent::Enter => {
-                let graphic = ctx.get_graphic(self.background).unwrap();
+                let graphic = ctx.get_graphic(self.button);
                 graphic.set_color([190, 190, 190, 255]);
                 ctx.send_event(event::Redraw);
             }
             MouseEvent::Exit => {
                 self.click = false;
-                let graphic = ctx.get_graphic(self.background).unwrap();
+                let graphic = ctx.get_graphic(self.button);
                 graphic.set_color([200, 200, 200, 255]);
                 ctx.send_event(event::Redraw);
             }
             MouseEvent::Down => {
                 self.click = true;
-                let graphic = ctx.get_graphic(self.background).unwrap();
+                let graphic = ctx.get_graphic(self.button);
                 graphic.set_color([170, 170, 170, 255]);
                 ctx.send_event(event::Redraw);
             }
             MouseEvent::Up => {
-                let graphic = ctx.get_graphic(self.background).unwrap();
+                let graphic = ctx.get_graphic(self.button);
                 graphic.set_color([190, 190, 190, 255]);
                 ctx.send_event(event::Redraw);
                 if self.click {
@@ -208,9 +281,9 @@ impl Behaviour for Toggle {
                         value: self.enable,
                     });
                     if self.enable {
-                        ctx.get_graphic(self.marker).unwrap().set_alpha(255)
+                        ctx.get_graphic(self.marker).set_alpha(255)
                     } else {
-                        ctx.get_graphic(self.marker).unwrap().set_alpha(0)
+                        ctx.get_graphic(self.marker).set_alpha(0)
                     }
                 }
             }
@@ -244,14 +317,16 @@ pub struct TabButton {
     page: Id,
     selected: bool,
     click: bool,
+    style: TabStyle,
 }
 impl TabButton {
-    pub fn new(tab_group: ButtonGroup, page: Id, selected: bool) -> Self {
+    pub fn new(tab_group: ButtonGroup, page: Id, selected: bool, style: TabStyle) -> Self {
         Self {
             tab_group,
             page,
             selected,
             click: false,
+            style,
         }
     }
 
@@ -262,16 +337,14 @@ impl TabButton {
         ctx.active(self.page);
         self.selected = true;
         self.tab_group.set_selected(Some(this));
-        let graphic = ctx.get_graphic(this).unwrap();
-        graphic.set_color([255, 255, 255, 255]);
+        ctx.set_graphic(this, self.style.selected.clone());
         ctx.send_event(event::Redraw);
     }
 
     pub fn unselect(&mut self, this: Id, ctx: &mut Context) {
         ctx.deactive(self.page);
         self.selected = false;
-        let graphic = ctx.get_graphic(this).unwrap();
-        graphic.set_color([200, 200, 200, 255]);
+        ctx.set_graphic(this, self.style.unselected.clone());
         ctx.send_event(event::Redraw);
     }
 }
@@ -296,37 +369,32 @@ impl Behaviour for TabButton {
         match event {
             MouseEvent::Enter => {
                 if !self.selected {
-                    let graphic = ctx.get_graphic(this).unwrap();
-                    graphic.set_color([180, 180, 180, 255]);
+                    ctx.set_graphic(this, self.style.hover.clone());
                     ctx.send_event(event::Redraw);
                 }
             }
             MouseEvent::Exit => {
                 if !self.selected {
                     self.click = false;
-                    let graphic = ctx.get_graphic(this).unwrap();
-                    graphic.set_color([200, 200, 200, 255]);
+                    ctx.set_graphic(this, self.style.unselected.clone());
                     ctx.send_event(event::Redraw);
                 }
             }
             MouseEvent::Down => {
                 if !self.selected {
                     self.click = true;
-                    let graphic = ctx.get_graphic(this).unwrap();
-                    graphic.set_color([128, 128, 128, 255]);
+                    ctx.set_graphic(this, self.style.pressed.clone());
                     ctx.send_event(event::Redraw);
                 }
             }
             MouseEvent::Up => {
                 if !self.selected {
-                    let graphic = ctx.get_graphic(this).unwrap();
-
                     if self.click {
                         self.select(this, ctx);
                     } else {
-                        graphic.set_color([180, 180, 180, 255]);
+                        ctx.set_graphic(this, self.style.unselected.clone());
+                        ctx.send_event(event::Redraw);
                     }
-                    ctx.send_event(event::Redraw);
                 }
             }
             MouseEvent::Moved { .. } => {}
@@ -360,7 +428,7 @@ impl Behaviour for Hoverable {
         match event {
             MouseEvent::Enter => {
                 ctx.active(self.hover);
-                ctx.get_graphic(self.label).unwrap().set_text(&self.text);
+                ctx.get_graphic(self.label).set_text(&self.text);
                 ctx.dirty_layout(self.label);
                 ctx.move_to_front(self.hover);
                 self.is_over = true;
@@ -419,17 +487,13 @@ impl Behaviour for ScrollBar {
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {
-                if let Some(handle) = ctx.get_graphic(self.handle) {
-                    handle.set_color([220, 220, 220, 255]);
-                    ctx.send_event(event::Redraw);
-                }
+                ctx.get_graphic(self.handle).set_color([220, 220, 220, 255]);
+                ctx.send_event(event::Redraw);
             }
             MouseEvent::Down => {
                 self.dragging = true;
-                if let Some(handle) = ctx.get_graphic(self.handle) {
-                    handle.set_color([180, 180, 180, 255]);
-                    ctx.send_event(event::Redraw);
-                }
+                ctx.get_graphic(self.handle).set_color([180, 180, 180, 255]);
+                ctx.send_event(event::Redraw);
                 ctx.send_event(event::LockOver);
                 let handle_rect = *ctx.get_rect(self.handle);
                 let area = ctx
@@ -475,10 +539,8 @@ impl Behaviour for ScrollBar {
                 if self.dragging {
                     self.dragging = false;
                     ctx.send_event(event::UnlockOver);
-                    if let Some(graphic) = ctx.get_graphic(self.handle) {
-                        graphic.set_color([200, 200, 200, 255]);
-                        ctx.send_event(event::Redraw);
-                    }
+                    ctx.get_graphic(self.handle).set_color([200, 200, 200, 255]);
+                    ctx.send_event(event::Redraw);
                 }
             }
             MouseEvent::Moved { x, y } => {
@@ -514,9 +576,9 @@ impl Behaviour for ScrollBar {
                             value,
                         },
                     )
-                } else if ctx.get_graphic(self.handle).is_some() {
+                } else {
                     let handle_rect = *ctx.get_rect(self.handle);
-                    let graphic = ctx.get_graphic(self.handle).unwrap();
+                    let graphic = ctx.get_graphic(self.handle);
                     if self.mouse_pos < handle_rect[1] || self.mouse_pos > handle_rect[3] {
                         graphic.set_color([220, 220, 220, 255]);
                     } else {
@@ -826,9 +888,10 @@ pub struct TextField {
     on_focus: bool,
     mouse_x: f32,
     mouse_down: bool,
+    style: OnFocusStyle,
 }
 impl TextField {
-    pub fn new(caret: Id, label: Id) -> Self {
+    pub fn new(caret: Id, label: Id, style: OnFocusStyle) -> Self {
         Self {
             caret,
             label,
@@ -841,6 +904,7 @@ impl TextField {
             on_focus: false,
             mouse_x: 0.0,
             mouse_down: false,
+            style,
         }
     }
 }
@@ -889,9 +953,7 @@ impl TextField {
         caret_pos[0] -= self.x_scroll;
 
         if let Some(selection_index) = self.selection_index {
-            ctx.get_graphic(self.caret)
-                .unwrap()
-                .set_color([51, 153, 255, 255]);
+            ctx.get_graphic(self.caret).set_color([51, 153, 255, 255]);
             let mut selection_pos = self.text_info.get_caret_pos(selection_index);
             selection_pos[0] -= self.x_scroll;
             let mut margins = [
@@ -908,9 +970,7 @@ impl TextField {
             }
             ctx.set_margins(self.caret, margins);
         } else {
-            ctx.get_graphic(self.caret)
-                .unwrap()
-                .set_color([0, 0, 0, 255]);
+            ctx.get_graphic(self.caret).set_color([0, 0, 0, 255]);
             if self.on_focus {
                 ctx.set_margins(
                     self.caret,
@@ -975,6 +1035,8 @@ impl Behaviour for TextField {
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         self.update_text(this, ctx);
         ctx.move_to_front(self.label);
+        ctx.set_graphic(this, self.style.normal.clone());
+        ctx.send_event(event::Redraw);
     }
 
     fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
@@ -1042,8 +1104,13 @@ impl Behaviour for TextField {
         true
     }
 
-    fn on_keyboard_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
+    fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
         self.on_focus = focus;
+        if focus {
+            ctx.set_graphic(this, self.style.focus.clone());
+        } else {
+            ctx.set_graphic(this, self.style.normal.clone());
+        }
         self.update_carret(this, ctx, true);
         ctx.send_event(event::Redraw);
     }

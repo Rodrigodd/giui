@@ -133,10 +133,44 @@ fn get_children(controls: &[Control], id: Id) -> Vec<Id> {
         .collect::<Vec<Id>>()
 }
 
+fn get_control_stack(controls: &[Control], id: Id) -> Vec<Id> {
+    debug_assert!(
+        controls[id.get_index()].generation == id.generation,
+        "The Control with this Id is not alive anymore"
+    );
+    let mut curr = id;
+    let mut stack = vec![curr];
+    while let Some(parent) = controls[curr.get_index()].parent {
+        curr = parent;
+        stack.push(curr);
+    }
+    stack
+}
+
+fn lowest_common_ancestor(controls: &[Control], a: Id, b: Id) -> Option<Id> {
+    debug_assert!(
+        controls[a.get_index()].generation == a.generation,
+        "The Control with this Id is not alive anymore"
+    );
+    debug_assert!(
+        controls[b.get_index()].generation == b.generation,
+        "The Control with this Id is not alive anymore"
+    );
+    let a_stack = get_control_stack(controls, a);
+    let b_stack = get_control_stack(controls, b);
+    // lowest common anscertor
+    a_stack
+        .iter()
+        .zip(b_stack.iter())
+        .take_while(|(a, b)| *a == *b)
+        .last()
+        .map(|(a, _)| *a)
+}
+
 pub struct ControlBuilder<'a, R: GUIRender> {
     gui: &'a mut GUI<R>,
     rect: Rect,
-    graphic: Option<Graphic>,
+    graphic: Graphic,
     behaviour: Option<Box<dyn Behaviour>>,
     parent: Option<Id>,
 }
@@ -145,7 +179,7 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
         Self {
             gui,
             rect: Rect::default(),
-            graphic: None,
+            graphic: Graphic::None,
             behaviour: None,
             parent: None,
         }
@@ -193,7 +227,7 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
         self
     }
     pub fn with_graphic(mut self, graphic: Graphic) -> Self {
-        self.graphic = Some(graphic);
+        self.graphic = graphic;
         self
     }
     pub fn with_parent(mut self, parent: Id) -> Self {
@@ -224,7 +258,7 @@ impl<'a, R: GUIRender> ControlBuilder<'a, R> {
 pub struct Control {
     generation: u32,
     rect: Rect,
-    graphic: Option<Graphic>,
+    graphic: Graphic,
     behaviour: Option<Box<dyn Behaviour>>,
     parent: Option<Id>,
     children: Vec<Id>,
@@ -434,13 +468,23 @@ impl<'a> Context<'a> {
         self.dirty_layout(id);
     }
 
-    pub fn get_graphic(&mut self, id: Id) -> Option<&mut Graphic> {
-        self.get_control_mut(id).graphic.as_mut()
+    pub fn get_graphic(&mut self, id: Id) -> &mut Graphic {
+        &mut self.get_control_mut(id).graphic
+    }
+
+    pub fn set_graphic(&mut self, id: Id, graphic: Graphic) {
+        let control = self.get_control_mut(id);
+        control.graphic = graphic;
+        control.rect.dirty_render_dirty_flags();
     }
 
     pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
         let control = self.get_control_mut(id);
-        Some((&mut control.rect, control.graphic.as_mut()?))
+        if let Graphic::None = control.graphic {
+            None
+        } else {
+            Some((&mut control.rect, &mut control.graphic))
+        }
     }
 
     pub fn is_active(&self, id: Id) -> bool {
@@ -553,13 +597,17 @@ impl<'a> MinSizeContext<'a> {
         self.get_control_mut(self.this).rect.set_min_size(min_size);
     }
 
-    pub fn get_graphic(&mut self, id: Id) -> Option<&mut Graphic> {
-        self.get_control_mut(id).graphic.as_mut()
+    pub fn get_graphic(&mut self, id: Id) -> &mut Graphic {
+        &mut self.get_control_mut(id).graphic
     }
 
     pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
         let control = self.get_control_mut(id);
-        Some((&mut control.rect, control.graphic.as_mut()?))
+        if let Graphic::None = control.graphic {
+            None
+        } else {
+            Some((&mut control.rect, &mut control.graphic))
+        }
     }
 
     pub fn is_active(&self, id: Id) -> bool {
@@ -778,7 +826,7 @@ impl<R: GUIRender> GUI<R> {
                     rect: [0.0, 0.0, width, height],
                     ..Default::default()
                 },
-                graphic: None,
+                graphic: Graphic::None,
                 behaviour: None,
                 parent: None,
                 children: Vec::new(),
@@ -949,9 +997,10 @@ impl<R: GUIRender> GUI<R> {
         self.get_control_mut(id).set_behaviour(behaviour);
     }
 
-    pub fn get_graphic(&mut self, id: Id) -> Option<&mut Graphic> {
-        self.get_control_mut(id).graphic.as_mut()
+    pub fn get_graphic(&mut self, id: Id) -> &mut Graphic {
+        &mut self.get_control_mut(id).graphic
     }
+    
     pub fn get_rect(&self, id: Id) -> &Rect {
         &self.get_control(id).rect
     }
@@ -1183,15 +1232,39 @@ impl<R: GUIRender> GUI<R> {
         if id == self.current_keyboard {
             return;
         }
-        if let Some(current_keyboard) = self.current_keyboard {
-            self.call_event(current_keyboard, |this, id, ctx| {
-                this.on_keyboard_focus_change(false, id, ctx)
+
+        if let (Some(prev), Some(next)) = (self.current_keyboard, id) {
+            let lca = lowest_common_ancestor(&self.controls, prev, next);
+
+            let mut curr = Some(prev);
+            while let Some(id) = curr {
+                self.call_event(id, |this, id, ctx| this.on_focus_change(false, id, ctx));
+                curr = self.get_parent(id);
+                if curr == lca {
+                    break;
+                }
+            }
+
+            self.current_keyboard = Some(next);
+
+            let mut curr = Some(next);
+            while let Some(id) = curr {
+                self.call_event(id, |this, id, ctx| this.on_focus_change(true, id, ctx));
+                curr = self.get_parent(id);
+                if curr == lca {
+                    break;
+                }
+            }
+        } else if let Some(current_keyboard) = self.current_keyboard {
+            self.call_event_chain(current_keyboard, |this, id, ctx| {
+                this.on_focus_change(false, id, ctx);
+                true
             });
-        }
-        self.current_keyboard = id;
-        if let Some(current_keyboard) = self.current_keyboard {
-            self.call_event(current_keyboard, |this, id, ctx| {
-                this.on_keyboard_focus_change(true, id, ctx)
+        } else if let Some(current_keyboard) = id {
+            self.current_keyboard = Some(current_keyboard);
+            self.call_event_chain(current_keyboard, |this, id, ctx| {
+                this.on_focus_change(true, id, ctx);
+                true
             });
         }
     }
@@ -1715,7 +1788,7 @@ pub trait Behaviour {
         false
     }
 
-    fn on_keyboard_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {}
+    fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {}
 
     fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
         false

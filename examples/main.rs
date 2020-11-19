@@ -1,16 +1,10 @@
 #![allow(clippy::useless_vec)]
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteRender};
-use ui_engine::{
-    event as ui_event,
-    layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    render::{GUISpriteRender, Graphic, Panel, Text, Texture},
-    widgets::{
+use ui_engine::{GUI, GUIRender, Id, RectFill, widgets::TabStyle, event as ui_event, layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout}, render::{GUISpriteRender, Graphic, Panel, Text, Texture}, widgets::ButtonStyle, widgets::OnFocusStyle, widgets::{
         Button, ButtonGroup, Hoverable, NoneLayout, ScrollBar, ScrollView, Slider, TabButton,
         TextField, Toggle,
-    },
-    GUIRender, Id, RectFill, GUI,
-};
+    }};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -36,9 +30,14 @@ fn main() {
         gui_render,
     );
     let texture = {
-        let data = image::load_from_memory(include_bytes!("panel.png")).unwrap();
-        let data = data.as_rgba8().unwrap();
-        render.new_texture(data.width(), data.height(), data, true)
+        let data = image::open("D:/repos/rust/ui_engine/examples/panel.png").unwrap();
+        let data = data.to_rgba();
+        render.new_texture(data.width(), data.height(), data.as_ref(), true)
+    };
+    let tab_texture = {
+        let data = image::open("D:/repos/rust/ui_engine/examples/tab.png").unwrap();
+        let data = data.to_rgba();
+        render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
     let mut screen_camera = sprite_render::Camera::new(
         window_size.width,
@@ -49,7 +48,25 @@ fn main() {
         window_size.width as f32 / 2.0,
         window_size.height as f32 / 2.0,
     );
-    let painel: Graphic = Panel::new(texture, [0.0, 0.0, 1.0, 1.0], 5.0).into();
+    let painel: Graphic = Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0).into();
+
+    let button_style = ButtonStyle {
+        normal: Graphic::from(Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0)),
+        hover: Graphic::from(Panel::new(texture, [0.5, 0.0, 0.5, 0.5], 10.0)),
+        pressed: Graphic::from(Panel::new(texture, [0.0, 0.5, 0.5, 0.5], 10.0)),
+        focus: Graphic::from(Panel::new(texture, [0.5, 0.5, 0.5, 0.5], 10.0)),
+    };
+    let tab_style = TabStyle {
+        hover: Graphic::from(Panel::new(tab_texture, [0.5, 0.0, 0.5, 0.5], 10.0)),
+        pressed: Graphic::from(Panel::new(tab_texture, [0.0, 0.5, 0.5, 0.5], 10.0)),
+        unselected: Graphic::from(Panel::new(tab_texture, [0.0, 0.0, 0.5, 0.5], 10.0)),
+        selected: Graphic::from(Panel::new(tab_texture, [0.5, 0.5, 0.5, 0.5], 10.0)),
+    };
+    let focus_style = OnFocusStyle {
+        normal: Graphic::None,
+        focus: button_style.focus.clone(),
+    };
+
     let page_area = gui
         .create_control()
         .with_margins([0.0, 45.0, 0.0, 0.0])
@@ -148,7 +165,9 @@ fn main() {
                 .create_control()
                 .with_min_size([0.0, 30.0])
                 .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
-                .with_behaviour(Box::new(Button::new(|_, _| println!("clicked my button!"))))
+                .with_behaviour(Box::new(Button::new(button_style.clone(), |_, _| {
+                    println!("clicked my button!")
+                })))
                 .with_parent(menu)
                 .build();
             let graphic =
@@ -183,7 +202,7 @@ fn main() {
                 .build();
             gui.add_behaviour(
                 slider,
-                Box::new(Slider::new(handle, slide_area, 10.0, 30.0, 25.0)),
+                Box::new(Slider::new(handle, slide_area, 10.0, 30.0, 25.0, focus_style.clone())),
             );
             slider
         };
@@ -213,7 +232,7 @@ fn main() {
                 .with_graphic(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0))
                 .with_parent(background)
                 .build();
-            gui.add_behaviour(toggle, Box::new(Toggle::new(background, marker)));
+            gui.add_behaviour(toggle, Box::new(Toggle::new(background, marker, button_style.clone(), focus_style)));
 
             let graphic =
                 Text::new([40, 40, 100, 255], "Bottom Text".to_owned(), 16.0, (-1, 0)).into();
@@ -468,7 +487,6 @@ fn main() {
             let input_box = gui
                 .create_control()
                 .with_min_size([0.0, 24.0])
-                .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
                 .with_parent(hbox)
                 .with_expand_x(true)
                 .build();
@@ -483,7 +501,17 @@ fn main() {
                 .with_graphic(Text::new([0, 0, 0, 255], String::new(), 16.0, (-1, 0)).into())
                 .with_parent(input_box)
                 .build();
-            gui.add_behaviour(input_box, Box::new(TextField::new(caret, input_text)));
+            gui.add_behaviour(
+                input_box,
+                Box::new(TextField::new(
+                    caret,
+                    input_text,
+                    OnFocusStyle {
+                        normal: painel.clone().with_color([200, 200, 200, 255]),
+                        focus: button_style.focus.clone().with_color([200, 200, 200, 255]),
+                    },
+                )),
+            );
             input_box
         };
         let scroll_view = gui
@@ -499,7 +527,7 @@ fn main() {
             .build();
         let view = gui
             .create_control()
-            .with_graphic(Graphic::Mask)
+            .with_graphic(Graphic::None)
             .with_parent(scroll_view)
             .with_behaviour(Box::new(NoneLayout))
             .build();
@@ -577,7 +605,7 @@ fn main() {
         seed = seed ^ (seed << 64);
         for i in 0..5 {
             let color = (seed.rotate_left(i * 3)) as u32 | 0xff;
-            create_item(&mut gui, list, texture, format!("This is the item number {} with the color which hexadecimal representation is #{:0x}", i + 1, color), color.to_be_bytes());
+            create_item(&mut gui, list, texture, format!("This is the item number {} with the color which hexadecimal representation is #{:0x}", i + 1, color), color.to_be_bytes(),button_style.clone());
         }
         (page_3, input_box, list)
     };
@@ -625,7 +653,7 @@ fn main() {
                     .with_graphic(painel.clone())
                     .with_parent(header)
                     .with_expand_x(true)
-                    .with_behaviour(Box::new(TabButton::new(tab_group.clone(), page, selected)))
+                    .with_behaviour(Box::new(TabButton::new(tab_group.clone(), page, selected, tab_style.clone())))
                     .build();
                 let graphic = Text::new([40, 40, 100, 255], label, 16.0, (0, 0)).into();
                 gui.create_control()
@@ -670,13 +698,13 @@ fn main() {
                 window.request_redraw();
             } else if let Some(ui_event::ValueChanged { id, value }) = event.downcast_ref() {
                 if *id == my_slider {
-                    if let Some(Graphic::Text(text)) = gui.get_graphic(top_text) {
+                    if let Graphic::Text(text) = gui.get_graphic(top_text) {
                         text.set_font_size(*value);
                     }
                 }
             } else if let Some(ui_event::ValueSet { id, value }) = event.downcast_ref() {
                 if *id == my_slider {
-                    if let Some(Graphic::Text(text)) = gui.get_graphic(top_text) {
+                    if let Graphic::Text(text) = gui.get_graphic(top_text) {
                         text.set_font_size(*value);
                     }
                     println!("Slide value set!! {}", value);
@@ -696,7 +724,14 @@ fn main() {
                 if id == input_box {
                     println!("Submited {}!", text);
                     gui.send_event_to(id, Box::new(ui_event::ClearText));
-                    create_item(&mut gui, list, texture, text, [130, 150, 255, 255]);
+                    create_item(
+                        &mut gui,
+                        list,
+                        texture,
+                        text,
+                        [130, 150, 255, 255],
+                        button_style.clone(),
+                    );
                 }
             }
         }
@@ -728,9 +763,10 @@ fn create_item<R: GUIRender>(
     texture: u32,
     text: String,
     color: [u8; 4],
+    button_style: ButtonStyle,
 ) {
     let painel: Graphic =
-        Texture::new(texture, [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0]).into();
+        Panel::new(texture, [0.0 / 2.0, 0.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0], 10.0).into();
     let item = gui
         .create_control()
         .with_min_size([100.0, 35.0])
@@ -755,7 +791,9 @@ fn create_item<R: GUIRender>(
         .create_control()
         .with_parent(item)
         .with_graphic(painel)
-        .with_behaviour(Box::new(Button::new(move |_, ctx| ctx.remove(item))))
+        .with_behaviour(Box::new(Button::new(button_style, move |_, ctx| {
+            ctx.remove(item);
+        })))
         .with_min_size([15.0, 15.0])
         .with_fill_x(RectFill::ShrinkCenter)
         .with_fill_y(RectFill::ShrinkCenter)

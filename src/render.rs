@@ -47,7 +47,7 @@ impl<'a> GUISpriteRender {
                         x.color_dirty = true;
                     }
                     Graphic::Text(x) => x.dirty(),
-                    Graphic::Mask => {}
+                    Graphic::None => {}
                 }
                 rect.dirty_render_dirty_flags();
             } else {
@@ -223,7 +223,7 @@ impl<'a> GUISpriteRender {
                                 }
                             }
                         }
-                        Graphic::Mask => {}
+                        Graphic::None => {}
                     }
                 }
                 graphic.clear_dirty();
@@ -433,7 +433,12 @@ pub enum Graphic {
     Panel(Panel),
     Texture(Texture),
     Text(Text),
-    Mask,
+    None,
+}
+impl Default for Graphic {
+    fn default() -> Self {
+        Self::None
+    }
 }
 impl From<Panel> for Graphic {
     fn from(panel: Panel) -> Self {
@@ -461,7 +466,7 @@ impl Graphic {
             Graphic::Panel(Panel { color, .. }) => *color,
             Graphic::Texture(Texture { color, .. }) => *color,
             Graphic::Text(Text { color, .. }) => *color,
-            Graphic::Mask => [255, 255, 255, 255],
+            Graphic::None => [255, 255, 255, 255],
         }
     }
 
@@ -479,7 +484,7 @@ impl Graphic {
                 *color = new_color;
                 *color_dirty = true;
             }
-            Graphic::Mask => {}
+            Graphic::None => {}
         }
     }
     pub fn set_alpha(&mut self, new_alpha: u8) {
@@ -496,7 +501,7 @@ impl Graphic {
                 color[3] = new_alpha;
                 *color_dirty = true;
             }
-            Graphic::Mask => {}
+            Graphic::None => {}
         }
     }
 
@@ -505,7 +510,7 @@ impl Graphic {
             Graphic::Panel(_) => false,
             Graphic::Texture(_) => false,
             Graphic::Text(Text { text_dirty, .. }) => *text_dirty,
-            Graphic::Mask => false,
+            Graphic::None => false,
         }
     }
 
@@ -514,7 +519,7 @@ impl Graphic {
             Graphic::Panel(Panel { color_dirty, .. }) => *color_dirty,
             Graphic::Texture(Texture { color_dirty, .. }) => *color_dirty,
             Graphic::Text(Text { color_dirty, .. }) => *color_dirty,
-            Graphic::Mask => false,
+            Graphic::None => false,
         }
     }
 
@@ -530,7 +535,7 @@ impl Graphic {
                 *color_dirty = false;
                 *text_dirty = false;
             }
-            Graphic::Mask => {}
+            Graphic::None => {}
         }
     }
 
@@ -569,7 +574,7 @@ impl Painel {
     pub fn new(texture: u32, uv_rect: [f32; 4], border: f32) -> Self {
         let w = uv_rect[2] / 3.0;
         let h = uv_rect[3] / 3.0;
-        let sprite = SpriteInstance::new(0.0, 0.0, 1.0, 1.0, texture, [0.0, 0.0, 1.0, 1.0]);
+        let sprite = SpriteInstance::new(0.0, 0.0, 1.0, 1.0, texture, [0.0, 0.0, 0.0, 0.0]);
         let mut sprites: [SpriteInstance; 9] = unsafe { std::mem::zeroed() };
         for i in 0..9 {
             sprites[i] = sprite.clone().with_uv_rect([
