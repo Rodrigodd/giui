@@ -1,4 +1,4 @@
-use crate::{render::Graphic, util::cmp_float, GUIRender};
+use crate::{render::Graphic, util::cmp_float};
 use ab_glyph::FontArc;
 use std::any::Any;
 use std::collections::VecDeque;
@@ -11,7 +11,7 @@ pub mod event {
     pub struct Redraw;
     pub struct LockOver;
     pub struct UnlockOver;
-    pub struct RequestKeyboardFocus {
+    pub struct RequestFocus {
         pub id: Id,
     }
     pub struct ActiveControl {
@@ -55,6 +55,10 @@ pub struct Id {
     generation: u32,
 }
 impl Id {
+    const INVALID: Id = Id {
+        generation: u32::max_value(),
+        index: u32::max_value(),
+    };
     /// Get the index of the control in the controls vector inside GUI<R>
     pub fn get_index(&self) -> usize {
         self.index as usize
@@ -76,7 +80,7 @@ pub enum KeyboardEvent {
     Pressed(VirtualKeyCode),
 }
 
-fn move_to_front(controls: &mut [Control], id: Id) {
+fn move_to_front(controls: &mut Controls, id: Id) {
     debug_assert!(
         controls[id.get_index()].generation == id.generation,
         "The Control with this Id is not alive anymore"
@@ -89,7 +93,7 @@ fn move_to_front(controls: &mut [Control], id: Id) {
     }
 }
 
-fn is_child(controls: &mut [Control], parent: Id, child: Id) -> bool {
+fn is_child(controls: &mut Controls, parent: Id, child: Id) -> bool {
     debug_assert!(
         controls[child.get_index()].generation == child.generation,
         "The Control with this Id is not alive anymore"
@@ -101,7 +105,7 @@ fn is_child(controls: &mut [Control], parent: Id, child: Id) -> bool {
     Some(parent) == controls[child.get_index()].parent
 }
 
-fn is_descendant(controls: &mut [Control], ascendant: Id, descendant: Id) -> bool {
+fn is_descendant(controls: &mut Controls, ascendant: Id, descendant: Id) -> bool {
     debug_assert!(
         controls[ascendant.get_index()].generation == ascendant.generation,
         "The Control with this Id is not alive anymore"
@@ -120,7 +124,7 @@ fn is_descendant(controls: &mut [Control], ascendant: Id, descendant: Id) -> boo
     false
 }
 
-fn get_children(controls: &[Control], id: Id) -> Vec<Id> {
+fn get_children(controls: &Controls, id: Id) -> Vec<Id> {
     debug_assert!(
         controls[id.get_index()].generation == id.generation,
         "The Control with this Id is not alive anymore"
@@ -133,7 +137,7 @@ fn get_children(controls: &[Control], id: Id) -> Vec<Id> {
         .collect::<Vec<Id>>()
 }
 
-fn get_control_stack(controls: &[Control], id: Id) -> Vec<Id> {
+fn get_control_stack(controls: &Controls, id: Id) -> Vec<Id> {
     debug_assert!(
         controls[id.get_index()].generation == id.generation,
         "The Control with this Id is not alive anymore"
@@ -147,7 +151,7 @@ fn get_control_stack(controls: &[Control], id: Id) -> Vec<Id> {
     stack
 }
 
-fn lowest_common_ancestor(controls: &[Control], a: Id, b: Id) -> Option<Id> {
+fn lowest_common_ancestor(controls: &Controls, a: Id, b: Id) -> Option<Id> {
     debug_assert!(
         controls[a.get_index()].generation == a.generation,
         "The Control with this Id is not alive anymore"
@@ -161,96 +165,81 @@ fn lowest_common_ancestor(controls: &[Control], a: Id, b: Id) -> Option<Id> {
     // lowest common anscertor
     a_stack
         .iter()
-        .zip(b_stack.iter())
+        .rev()
+        .zip(b_stack.iter().rev())
         .take_while(|(a, b)| *a == *b)
         .last()
         .map(|(a, _)| *a)
 }
 
-pub struct ControlBuilder<'a, R: GUIRender> {
-    gui: &'a mut GUI<R>,
-    rect: Rect,
-    graphic: Graphic,
-    behaviour: Option<Box<dyn Behaviour>>,
-    parent: Option<Id>,
+pub struct ControlBuilder<'a> {
+    builder: Box<dyn FnOnce(ControlBuild) -> Id + 'a>,
+    build: ControlBuild,
 }
-impl<'a, R: GUIRender> ControlBuilder<'a, R> {
-    fn new(gui: &'a mut GUI<R>) -> Self {
+impl<'a> ControlBuilder<'a> {
+    fn new(builder: Box<dyn FnOnce(ControlBuild) -> Id + 'a>) -> Self {
         Self {
-            gui,
-            rect: Rect::default(),
-            graphic: Graphic::None,
-            behaviour: None,
-            parent: None,
+            builder,
+            build: ControlBuild::default(),
         }
     }
     pub fn with_anchors(mut self, anchors: [f32; 4]) -> Self {
-        self.rect.anchors = anchors;
+        self.build.rect.anchors = anchors;
         self
     }
     pub fn with_margins(mut self, margins: [f32; 4]) -> Self {
-        self.rect.margins = margins;
+        self.build.rect.margins = margins;
         self
     }
     pub fn with_min_size(mut self, min_size: [f32; 2]) -> Self {
-        self.rect.min_size = min_size;
+        self.build.rect.min_size = min_size;
         self
     }
     pub fn with_min_width(mut self, min_width: f32) -> Self {
-        self.rect.min_size[0] = min_width;
+        self.build.rect.min_size[0] = min_width;
         self
     }
     pub fn with_min_height(mut self, min_height: f32) -> Self {
-        self.rect.min_size[1] = min_height;
+        self.build.rect.min_size[1] = min_height;
         self
     }
     pub fn with_fill_x(mut self, fill: RectFill) -> Self {
-        self.rect.set_fill_x(fill);
+        self.build.rect.set_fill_x(fill);
         self
     }
     pub fn with_fill_y(mut self, fill: RectFill) -> Self {
-        self.rect.set_fill_y(fill);
+        self.build.rect.set_fill_y(fill);
         self
     }
     pub fn with_expand_x(mut self, expand: bool) -> Self {
-        self.rect.expand_x = expand;
+        self.build.rect.expand_x = expand;
         self
     }
     pub fn with_expand_y(mut self, expand: bool) -> Self {
-        self.rect.expand_y = expand;
+        self.build.rect.expand_y = expand;
         self
     }
     pub fn with_behaviour(mut self, behaviour: Box<dyn Behaviour>) -> Self {
         // TODO: remove this in production!!
-        debug_assert!(self.behaviour.is_none());
-        self.behaviour = Some(behaviour);
+        debug_assert!(self.build.behaviour.is_none());
+        self.build.behaviour = Some(behaviour);
         self
     }
     pub fn with_graphic(mut self, graphic: Graphic) -> Self {
-        self.graphic = graphic;
+        self.build.graphic = graphic;
         self
     }
     pub fn with_parent(mut self, parent: Id) -> Self {
-        self.parent = Some(parent);
+        self.build.parent = Some(parent);
+        self
+    }
+    pub fn with_active(mut self, active: bool) -> Self {
+        self.build.active = active;
         self
     }
     pub fn build(self) -> Id {
-        let Self {
-            gui,
-            rect,
-            graphic,
-            behaviour,
-            parent,
-        } = self;
-        gui.add_control(Control {
-            generation: u32::max_value(),
-            rect,
-            graphic,
-            behaviour,
-            parent,
-            children: Vec::new(),
-            active: true,
-        })
+        let Self { build, builder } = self;
+        (builder)(build)
     }
 }
 
@@ -305,21 +294,37 @@ impl Control {
         }
     }
 }
+
+pub struct ControlBuild {
+    rect: Rect,
+    graphic: Graphic,
+    behaviour: Option<Box<dyn Behaviour>>,
+    parent: Option<Id>,
+    active: bool,
+}
+impl Default for ControlBuild {
+    fn default() -> Self {
+        Self {
+            rect: Rect::default(),
+            graphic: Graphic::None,
+            behaviour: None,
+            parent: None,
+            active: true,
+        }
+    }
+}
+
 // contains a reference to all the controls, except the behaviour of one control
 pub struct Context<'a> {
     modifiers: ModifiersState,
-    controls: &'a mut [Control],
+    controls: &'a mut Controls,
     fonts: &'a [FontArc],
     events: Vec<Box<dyn Any>>,
     events_to: Vec<(Id, Box<dyn Any>)>,
     dirtys: Vec<Id>,
 }
 impl<'a> Context<'a> {
-    pub fn new(
-        controls: &'a mut [Control],
-        fonts: &'a [FontArc],
-        modifiers: ModifiersState,
-    ) -> Self {
+    fn new(controls: &'a mut Controls, fonts: &'a [FontArc], modifiers: ModifiersState) -> Self {
         Self {
             modifiers,
             controls,
@@ -330,9 +335,9 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn new_with_mut_behaviour(
+    fn new_with_mut_behaviour(
         this: Id,
-        controls: &'a mut [Control],
+        controls: &'a mut Controls,
         fonts: &'a [FontArc],
         modifiers: ModifiersState,
     ) -> Option<(&'a mut dyn Behaviour, Self)> {
@@ -350,6 +355,14 @@ impl<'a> Context<'a> {
                 dirtys: Vec::new(),
             },
         ))
+    }
+
+    pub fn create_control(&mut self) -> ControlBuilder {
+        let id = self.controls.reserve();
+        ControlBuilder::new(Box::new(move |build| {
+            self.send_event((id, build));
+            id
+        }))
     }
 
     fn get_control(&self, id: Id) -> &Control {
@@ -501,6 +514,7 @@ impl<'a> Context<'a> {
         self.events.push(Box::new(event::DeactiveControl { id }));
     }
 
+    /// Destroy the control, drop it, invalidating all of its referencing Id's
     /// This only took effect when Controls is dropped
     pub fn remove(&mut self, id: Id) {
         self.events.push(Box::new(event::RemoveControl { id }));
@@ -517,19 +531,19 @@ impl<'a> Context<'a> {
     }
 
     pub fn get_children(&self, id: Id) -> Vec<Id> {
-        get_children(self.controls, id)
+        get_children(&self.controls, id)
     }
 }
 
 pub struct MinSizeContext<'a> {
     this: Id,
-    controls: &'a mut [Control],
+    controls: &'a mut Controls,
     fonts: &'a [FontArc],
 }
 impl<'a> MinSizeContext<'a> {
-    pub fn new(
+    fn new(
         this: Id,
-        controls: &'a mut [Control],
+        controls: &'a mut Controls,
         fonts: &'a [FontArc],
     ) -> (&'a mut dyn Behaviour, Self) {
         let this_one = unsafe {
@@ -619,18 +633,18 @@ impl<'a> MinSizeContext<'a> {
     }
 
     pub fn get_children(&self, id: Id) -> Vec<Id> {
-        get_children(self.controls, id)
+        get_children(&self.controls, id)
     }
 }
 
 pub struct LayoutContext<'a> {
     this: Id,
-    controls: &'a mut [Control],
+    controls: &'a mut Controls,
     dirtys: Vec<Id>,
     events: Vec<Box<dyn Any>>,
 }
 impl<'a> LayoutContext<'a> {
-    pub fn new(this: Id, controls: &'a mut [Control]) -> (&'a mut dyn Behaviour, Self) {
+    fn new(this: Id, controls: &'a mut Controls) -> (&'a mut dyn Behaviour, Self) {
         let this_one = unsafe {
             &mut *(controls[this.get_index()]
                 .behaviour
@@ -790,7 +804,7 @@ impl<'a> LayoutContext<'a> {
     }
 
     pub fn get_children(&self, id: Id) -> Vec<Id> {
-        get_children(self.controls, id)
+        get_children(&self.controls, id)
     }
 }
 
@@ -800,22 +814,59 @@ struct Input {
     mouse_y: f32,
 }
 
-pub struct GUI<R: GUIRender> {
+struct Controls {
     dead_controls: Vec<u32>,
     controls: Vec<Control>,
+}
+impl Controls {
+    fn reserve(&mut self) -> Id {
+        if let Some(index) = self.dead_controls.pop() {
+            Id {
+                generation: self.controls[index as usize].generation + 1,
+                index,
+            }
+        } else {
+            self.controls.push(Control::default());
+            Id {
+                generation: 0,
+                index: self.controls.len() as u32 - 1,
+            }
+        }
+    }
+}
+impl std::ops::Index<usize> for Controls {
+    type Output = Control;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.controls[index]
+    }
+}
+impl std::ops::IndexMut<usize> for Controls {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.controls[index]
+    }
+}
+impl From<Vec<Control>> for Controls {
+    fn from(controls: Vec<Control>) -> Self {
+        Self {
+            dead_controls: Vec::new(),
+            controls,
+        }
+    }
+}
+
+pub struct GUI {
+    controls: Controls,
     modifiers: ModifiersState,
     input: Input,
     current_over: Option<Id>,
-    current_keyboard: Option<Id>,
+    current_focus: Option<Id>,
     over_is_locked: bool,
     events: Vec<Box<dyn Any>>,
     fonts: Vec<FontArc>,
-    render: R,
 }
-impl<R: GUIRender> GUI<R> {
-    pub fn new(width: f32, height: f32, fonts: Vec<FontArc>, render: R) -> Self {
+impl GUI {
+    pub fn new(width: f32, height: f32, fonts: Vec<FontArc>) -> Self {
         Self {
-            dead_controls: Vec::new(),
             modifiers: ModifiersState::empty(),
             controls: vec![Control {
                 generation: 0,
@@ -831,14 +882,14 @@ impl<R: GUIRender> GUI<R> {
                 parent: None,
                 children: Vec::new(),
                 active: true,
-            }],
+            }]
+            .into(),
             input: Input::default(),
             current_over: None,
-            current_keyboard: None,
+            current_focus: None,
             over_is_locked: false,
             events: Vec::new(),
             fonts,
-            render,
         }
     }
 
@@ -866,13 +917,37 @@ impl<R: GUIRender> GUI<R> {
         get_children(&self.controls, id)
     }
 
-    pub fn create_control(&mut self) -> ControlBuilder<R> {
-        ControlBuilder::new(self)
+    pub fn create_control(&mut self) -> ControlBuilder {
+        ControlBuilder::new(Box::new(move |build| self.add_control(build)))
     }
 
-    pub fn add_control(&mut self, control: Control) -> Id {
+    pub fn add_control(&mut self, build: ControlBuild) -> Id {
+        self.add_control_reserved(build, Id::INVALID)
+    }
+
+    pub fn add_control_reserved(&mut self, build: ControlBuild, reserve: Id) -> Id {
+        let ControlBuild {
+            rect,
+            graphic,
+            behaviour,
+            parent,
+            active,
+        } = build;
+        let control = Control {
+            generation: u32::max_value(),
+            rect,
+            graphic,
+            behaviour,
+            parent,
+            children: Vec::new(),
+            active,
+        };
         let new;
-        if let Some(next_id) = self.dead_controls.pop() {
+        if reserve != Id::INVALID {
+            new = reserve;
+            self.controls[new.get_index() as usize] = control;
+            self.controls[new.get_index() as usize].generation = new.generation;
+        } else if let Some(next_id) = self.controls.dead_controls.pop() {
             new = Id {
                 index: next_id,
                 generation: self.controls[next_id as usize].generation + 1,
@@ -880,9 +955,9 @@ impl<R: GUIRender> GUI<R> {
             self.controls[next_id as usize] = control;
             self.controls[next_id as usize].generation = new.generation;
         } else {
-            self.controls.push(control);
+            self.controls.controls.push(control);
             new = Id {
-                index: self.controls.len() as u32 - 1,
+                index: self.controls.controls.len() as u32 - 1,
                 generation: 0,
             };
             self.controls[new.get_index()].generation = 0;
@@ -897,10 +972,12 @@ impl<R: GUIRender> GUI<R> {
             self.get_control_mut(ROOT_ID).add_children(new);
         }
 
-        let mut parents = vec![new];
-        while let Some(id) = parents.pop() {
-            self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
-            parents.extend(self.get_children(id).iter().rev());
+        if active {
+            let mut parents = vec![new];
+            while let Some(id) = parents.pop() {
+                self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
+                parents.extend(self.get_children(id).iter().rev());
+            }
         }
 
         self.update_layout(new);
@@ -917,10 +994,11 @@ impl<R: GUIRender> GUI<R> {
         self.send_event(Box::new(event::Redraw));
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
-            self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
             parents.extend(self.get_children(id).iter().rev());
+            self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
         }
-        self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
+        // uncommenting the line below allow infinity recursion to happen
+        // self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
     }
 
     pub fn deactive_control(&mut self, id: Id) {
@@ -933,14 +1011,15 @@ impl<R: GUIRender> GUI<R> {
         self.send_event(Box::new(event::Redraw));
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
+            parents.extend(self.get_children(id).iter().rev());
             if Some(id) == self.current_over {
                 self.send_mouse_event_to(id, MouseEvent::Exit);
+                self.current_over = None;
             }
             self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
-            parents.extend(self.get_children(id).iter().rev());
         }
-        self.current_over = None;
-        self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
+        // uncommenting the line below allow infinity recursion to happen
+        // self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
     }
 
     /// Remove a control and all of its children
@@ -957,10 +1036,14 @@ impl<R: GUIRender> GUI<R> {
                 children.remove(pos);
             }
         }
+
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
+            parents.extend(self.get_children(id).iter().rev());
+
             if Some(id) == self.current_over {
                 self.send_mouse_event_to(id, MouseEvent::Exit);
+                self.current_over = None;
             }
             self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
 
@@ -968,12 +1051,10 @@ impl<R: GUIRender> GUI<R> {
                 generation: self.controls[id.get_index()].generation,
                 ..Control::default()
             };
-            self.dead_controls.push(id.index);
-
-            parents.extend(self.get_children(id).iter().rev());
+            self.controls.dead_controls.push(id.index);
         }
-        self.current_over = None;
-        self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
+        // uncommenting the line below allow infinity recursion to happen
+        // self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
     }
 
     pub fn get_fonts(&mut self) -> Vec<FontArc> {
@@ -981,26 +1062,18 @@ impl<R: GUIRender> GUI<R> {
     }
 
     #[inline]
-    pub fn render(&mut self) -> &mut R {
-        &mut self.render
+    pub fn get_context(&mut self) -> Context {
+        Context::new(&mut self.controls, &self.fonts, self.modifiers)
     }
 
-    #[inline]
-    pub fn get_render_and_context(&mut self) -> (&mut R, Context) {
-        (
-            &mut self.render,
-            Context::new(&mut self.controls, &self.fonts, self.modifiers),
-        )
-    }
-
-    pub fn add_behaviour(&mut self, id: Id, behaviour: Box<dyn Behaviour>) {
+    pub fn set_behaviour(&mut self, id: Id, behaviour: Box<dyn Behaviour>) {
         self.get_control_mut(id).set_behaviour(behaviour);
     }
 
     pub fn get_graphic(&mut self, id: Id) -> &mut Graphic {
         &mut self.get_control_mut(id).graphic
     }
-    
+
     pub fn get_rect(&self, id: Id) -> &Rect {
         &self.get_control(id).rect
     }
@@ -1027,8 +1100,11 @@ impl<R: GUIRender> GUI<R> {
             self.over_is_locked = true;
         } else if event.is::<event::UnlockOver>() {
             self.over_is_locked = false;
-        } else if let Some(event::RequestKeyboardFocus { id }) = event.downcast_ref() {
-            self.set_keyboard_focus(Some(*id));
+        } else if let Some(event::RequestFocus { id }) = event.downcast_ref() {
+            self.set_focus(Some(*id));
+        } else if event.is::<(Id, ControlBuild)>() {
+            let (id, build) = *event.downcast::<(Id, ControlBuild)>().unwrap();
+            self.add_control_reserved(build, id);
         } else {
             self.events.push(event);
         }
@@ -1100,8 +1176,7 @@ impl<R: GUIRender> GUI<R> {
             for event in events {
                 self.send_event(event);
             }
-            let mut event_queue = VecDeque::from(events_to);
-            while let Some((id, event)) = event_queue.pop_back() {
+            for (id, event) in events_to {
                 self.send_event_to(id, event);
             }
             for dirty in dirtys {
@@ -1129,7 +1204,7 @@ impl<R: GUIRender> GUI<R> {
             self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
             parents.extend(self.get_children(id));
         }
-        fn print_tree<R: GUIRender>(deep: usize, id: Id, gui: &mut GUI<R>) {
+        fn print_tree(deep: usize, id: Id, gui: &mut GUI) {
             let childs = gui.get_control(id).children.clone();
             let len = childs.len();
             for (i, child) in childs.iter().enumerate() {
@@ -1146,18 +1221,17 @@ impl<R: GUIRender> GUI<R> {
         print_tree(0, ROOT_ID, self);
     }
 
-    pub fn handle_event<T>(&mut self, event: &Event<T>) -> bool {
+    pub fn handle_event<T>(&mut self, event: &Event<T>) {
         if let Event::WindowEvent { event, .. } = event {
             match event {
                 WindowEvent::CursorMoved { position, .. } => {
                     self.input.mouse_x = position.x as f32;
                     self.input.mouse_y = position.y as f32;
                     self.mouse_moved(position.x as f32, position.y as f32);
-                    return true;
                 }
                 WindowEvent::MouseInput { state, .. } => {
                     if let ElementState::Pressed = state {
-                        self.set_keyboard_focus(self.current_over);
+                        self.set_focus(self.current_over);
                     }
                     if let Some(curr) = self.current_over {
                         match state {
@@ -1168,7 +1242,6 @@ impl<R: GUIRender> GUI<R> {
                                 self.send_mouse_event_to(curr, MouseEvent::Up);
                             }
                         };
-                        return true;
                     }
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
@@ -1191,19 +1264,17 @@ impl<R: GUIRender> GUI<R> {
                     if let Some(curr) = self.current_over.take() {
                         if !self.over_is_locked {
                             self.send_mouse_event_to(curr, MouseEvent::Exit);
-                            return true;
                         }
                     }
                 }
                 WindowEvent::ReceivedCharacter(ch) => {
-                    if let Some(curr) = self.current_keyboard {
+                    if let Some(curr) = self.current_focus {
                         if ch.is_control() {
-                            return false;
+                            return;
                         }
                         self.call_event_chain(curr, move |this, id, ctx| {
                             this.on_keyboard_event(KeyboardEvent::Char(*ch), id, ctx)
                         });
-                        return true;
                     }
                 }
                 WindowEvent::ModifiersChanged(modifiers) => self.modifiers = *modifiers,
@@ -1216,7 +1287,7 @@ impl<R: GUIRender> GUI<R> {
                         },
                     ..
                 } => {
-                    if let Some(curr) = self.current_keyboard {
+                    if let Some(curr) = self.current_focus {
                         self.call_event_chain(curr, |this, id, ctx| {
                             this.on_keyboard_event(KeyboardEvent::Pressed(*keycode), id, ctx)
                         });
@@ -1225,43 +1296,47 @@ impl<R: GUIRender> GUI<R> {
                 _ => {}
             }
         }
-        false
     }
 
-    pub fn set_keyboard_focus(&mut self, id: Option<Id>) {
-        if id == self.current_keyboard {
+    pub fn set_focus(&mut self, id: Option<Id>) {
+        if id == self.current_focus {
             return;
         }
 
-        if let (Some(prev), Some(next)) = (self.current_keyboard, id) {
+        if let (Some(prev), Some(next)) = (self.current_focus, id) {
             let lca = lowest_common_ancestor(&self.controls, prev, next);
 
             let mut curr = Some(prev);
-            while let Some(id) = curr {
-                self.call_event(id, |this, id, ctx| this.on_focus_change(false, id, ctx));
-                curr = self.get_parent(id);
-                if curr == lca {
-                    break;
+            if curr != lca {
+                while let Some(id) = curr {
+                    self.call_event(id, |this, id, ctx| this.on_focus_change(false, id, ctx));
+                    curr = self.get_parent(id);
+                    if curr == lca {
+                        break;
+                    }
                 }
             }
 
-            self.current_keyboard = Some(next);
+            self.current_focus = Some(next);
 
             let mut curr = Some(next);
-            while let Some(id) = curr {
-                self.call_event(id, |this, id, ctx| this.on_focus_change(true, id, ctx));
-                curr = self.get_parent(id);
-                if curr == lca {
-                    break;
+            if curr != lca {
+                while let Some(id) = curr {
+                    self.call_event(id, |this, id, ctx| this.on_focus_change(true, id, ctx));
+                    curr = self.get_parent(id);
+                    if curr == lca {
+                        break;
+                    }
                 }
             }
-        } else if let Some(current_keyboard) = self.current_keyboard {
+        } else if let Some(current_keyboard) = self.current_focus {
+            self.current_focus = None;
             self.call_event_chain(current_keyboard, |this, id, ctx| {
                 this.on_focus_change(false, id, ctx);
                 true
             });
         } else if let Some(current_keyboard) = id {
-            self.current_keyboard = Some(current_keyboard);
+            self.current_focus = Some(current_keyboard);
             self.call_event_chain(current_keyboard, |this, id, ctx| {
                 this.on_focus_change(true, id, ctx);
                 true
@@ -1270,24 +1345,20 @@ impl<R: GUIRender> GUI<R> {
     }
 
     pub fn mouse_moved(&mut self, mouse_x: f32, mouse_y: f32) {
-        let mut curr = ROOT_ID;
-
-        if let Some(current_over) = self.current_over {
-            if self.over_is_locked
-                || self
-                    .get_control_mut(current_over)
-                    .rect
-                    .contains(mouse_x, mouse_y)
-            {
-                curr = current_over;
-            } else {
-                self.send_mouse_event_to(current_over, MouseEvent::Exit);
-                self.current_over = None;
-            }
+        if self.current_over.is_some() && self.over_is_locked {
+            self.send_mouse_event_to(
+                self.current_over.unwrap(),
+                MouseEvent::Moved {
+                    x: mouse_x,
+                    y: mouse_y,
+                },
+            );
+            return;
         }
 
+        let mut curr = ROOT_ID;
         'l: loop {
-            // the interator is reversed because the last childs block the previous ones
+            // the interator is reversed because the last child block the previous ones
             for child in self.get_children(curr).iter().rev() {
                 if self.get_control_mut(*child).rect.contains(mouse_x, mouse_y) {
                     curr = *child;

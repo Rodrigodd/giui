@@ -10,11 +10,10 @@
   - ~~Button~~
   - ~~Slider~~
   - ~~Toggle~~
-  - Dropbox
+  - ~~Dropdown~~
   - ~~Hover~~
   - Fold
   - Text Field
   - ~~Scrollbar~~
 - Add some richtext support?
-- Make ever rect masks its content?
 - Replace each 'aling: i8' with a enum

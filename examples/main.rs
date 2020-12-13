@@ -1,10 +1,16 @@
 #![allow(clippy::useless_vec)]
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteRender};
-use ui_engine::{GUI, GUIRender, Id, RectFill, widgets::TabStyle, event as ui_event, layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout}, render::{GUISpriteRender, Graphic, Panel, Text, Texture}, widgets::ButtonStyle, widgets::OnFocusStyle, widgets::{
-        Button, ButtonGroup, Hoverable, NoneLayout, ScrollBar, ScrollView, Slider, TabButton,
-        TextField, Toggle,
-    }};
+use ui_engine::{
+    event as ui_event,
+    layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
+    render::{GUISpriteRender, Graphic, Panel, Text, Texture},
+    widgets::{
+        Blocker, Button, ButtonGroup, ButtonStyle, Dropdown, Hoverable, Menu, MenuItem, NoneLayout,
+        OnFocusStyle, ScrollBar, ScrollView, Slider, TabButton, TabStyle, TextField, Toggle,
+    },
+    Id, RectFill, GUI,
+};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -18,17 +24,12 @@ fn main() {
     let (window, mut render) = GLSpriteRender::new(wb, &event_loop, true);
     let window_size = window.inner_size();
     let font_texture = render.new_texture(1024, 1024, &vec![0; 1024 * 1024 * 4], true);
-    let gui_render = GUISpriteRender::new(font_texture);
+    let mut gui_render = GUISpriteRender::new(font_texture);
     let fonts: Vec<FontArc> = [include_bytes!("../examples/NotoSans-Regular.ttf")]
         .iter()
         .map(|&font| FontArc::try_from_slice(font).unwrap())
         .collect();
-    let mut gui = GUI::new(
-        window_size.width as f32,
-        window_size.height as f32,
-        fonts,
-        gui_render,
-    );
+    let mut gui = GUI::new(window_size.width as f32, window_size.height as f32, fonts);
     let texture = {
         let data = image::open("D:/repos/rust/ui_engine/examples/panel.png").unwrap();
         let data = data.to_rgba();
@@ -55,6 +56,12 @@ fn main() {
         hover: Graphic::from(Panel::new(texture, [0.5, 0.0, 0.5, 0.5], 10.0)),
         pressed: Graphic::from(Panel::new(texture, [0.0, 0.5, 0.5, 0.5], 10.0)),
         focus: Graphic::from(Panel::new(texture, [0.5, 0.5, 0.5, 0.5], 10.0)),
+    };
+    let menu_button_style = ButtonStyle {
+        normal: Graphic::from(Texture::new(texture, [0.1, 0.1, 0.3, 0.3])),
+        hover: Graphic::from(Texture::new(texture, [0.6, 0.1, 0.3, 0.3])),
+        pressed: Graphic::from(Texture::new(texture, [0.1, 0.6, 0.3, 0.3])),
+        focus: Graphic::from(Texture::new(texture, [0.5, 0.5, 0.001, 0.001])),
     };
     let tab_style = TabStyle {
         hover: Graphic::from(Panel::new(tab_texture, [0.5, 0.0, 0.5, 0.5], 10.0)),
@@ -200,9 +207,16 @@ fn main() {
                 .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
                 .with_parent(slider)
                 .build();
-            gui.add_behaviour(
+            gui.set_behaviour(
                 slider,
-                Box::new(Slider::new(handle, slide_area, 10.0, 30.0, 25.0, focus_style.clone())),
+                Box::new(Slider::new(
+                    handle,
+                    slide_area,
+                    10.0,
+                    30.0,
+                    25.0,
+                    focus_style.clone(),
+                )),
             );
             slider
         };
@@ -232,7 +246,15 @@ fn main() {
                 .with_graphic(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0))
                 .with_parent(background)
                 .build();
-            gui.add_behaviour(toggle, Box::new(Toggle::new(background, marker, button_style.clone(), focus_style)));
+            gui.set_behaviour(
+                toggle,
+                Box::new(Toggle::new(
+                    background,
+                    marker,
+                    button_style.clone(),
+                    focus_style,
+                )),
+            );
 
             let graphic =
                 Text::new([40, 40, 100, 255], "Bottom Text".to_owned(), 16.0, (-1, 0)).into();
@@ -244,6 +266,72 @@ fn main() {
                 .build();
 
             toggle
+        };
+        let _my_dropdown = {
+            let blocker = gui.create_control().with_active(false).build();
+            let dropmenu = gui
+                .create_control()
+                .with_active(false)
+                .with_graphic(button_style.normal.clone())
+                .with_behaviour(Box::new(Menu::<&'static str, _>::new(blocker, {
+                    // let menu_button_style = menu_button_style.clone();
+                    move |data, this, ctx| {
+                        let id = ctx
+                            .create_control()
+                            .with_behaviour(Box::new(MenuItem::new(
+                                this,
+                                menu_button_style.clone(),
+                            )))
+                            .with_parent(this)
+                            .with_min_size([10.0, 25.0])
+                            .build();
+                        let _text = ctx
+                            .create_control()
+                            .with_margins([10.0, 0.0, -10.0, 0.0])
+                            .with_graphic(
+                                Text::new([40, 40, 100, 255], data.to_string(), 16.0, (-1, 0))
+                                    .into(),
+                            )
+                            .with_parent(id)
+                            .build();
+                        id
+                    }
+                })))
+                .with_min_size([0.0, 80.0])
+                .build();
+            gui.set_behaviour(blocker, Box::new(Blocker { menu: dropmenu }));
+            let my_dropdown = gui
+                .create_control()
+                .with_min_size([0.0, 25.0])
+                .with_parent(menu)
+                .build();
+            let text = gui
+                .create_control()
+                .with_margins([10.0, 0.0, -10.0, 0.0])
+                .with_graphic(
+                    Text::new(
+                        [40, 40, 100, 255],
+                        "Select one, please".to_owned(),
+                        16.0,
+                        (-1, 0),
+                    )
+                    .into(),
+                )
+                .with_parent(my_dropdown)
+                .build();
+            gui.set_behaviour(
+                my_dropdown,
+                Box::new(Dropdown::new(
+                    vec!["Item A", "Item B", "Item C", "Item D", "Item E"],
+                    dropmenu,
+                    move |selected, _this, ctx| {
+                        ctx.get_graphic(text).set_text(selected);
+                    },
+                    button_style.clone(),
+                )),
+            );
+
+            my_dropdown
         };
         (page_1, top_text, bottom_text, my_slider, my_toggle)
     };
@@ -260,7 +348,7 @@ fn main() {
             )))
             .build();
 
-        let create_vbox = |gui: &mut GUI<GUISpriteRender>, expand: [bool; 2], align: i8| {
+        let create_vbox = |gui: &mut GUI, expand: [bool; 2], align: i8| {
             gui.create_control()
                 .with_parent(page_2)
                 .with_expand_x(expand[0])
@@ -270,7 +358,7 @@ fn main() {
                 .build()
         };
 
-        let create_rect = |gui: &mut GUI<GUISpriteRender>,
+        let create_rect = |gui: &mut GUI,
                            min_size: [f32; 2],
                            expand: [bool; 2],
                            fill: [RectFill; 2],
@@ -501,7 +589,7 @@ fn main() {
                 .with_graphic(Text::new([0, 0, 0, 255], String::new(), 16.0, (-1, 0)).into())
                 .with_parent(input_box)
                 .build();
-            gui.add_behaviour(
+            gui.set_behaviour(
                 input_box,
                 Box::new(TextField::new(
                     caret,
@@ -552,7 +640,7 @@ fn main() {
             )
             .with_parent(h_scroll_bar)
             .build();
-        gui.add_behaviour(
+        gui.set_behaviour(
             h_scroll_bar,
             Box::new(ScrollBar::new(h_scroll_bar_handle, scroll_view, false)),
         );
@@ -577,7 +665,7 @@ fn main() {
             )
             .with_parent(v_scroll_bar)
             .build();
-        gui.add_behaviour(
+        gui.set_behaviour(
             v_scroll_bar,
             Box::new(ScrollBar::new(v_scroll_bar_handle, scroll_view, true)),
         );
@@ -586,7 +674,7 @@ fn main() {
             .with_behaviour(Box::new(VBoxLayout::new(3.0, [5.0, 5.0, 5.0, 5.0], -1)))
             .with_parent(view)
             .build();
-        gui.add_behaviour(
+        gui.set_behaviour(
             scroll_view,
             Box::new(ScrollView::new(
                 view,
@@ -646,23 +734,27 @@ fn main() {
             .build();
 
         let tab_group = ButtonGroup::new();
-        let create_button =
-            |gui: &mut GUI<GUISpriteRender>, page: Id, selected: bool, label: String| {
-                let button = gui
-                    .create_control()
-                    .with_graphic(painel.clone())
-                    .with_parent(header)
-                    .with_expand_x(true)
-                    .with_behaviour(Box::new(TabButton::new(tab_group.clone(), page, selected, tab_style.clone())))
-                    .build();
-                let graphic = Text::new([40, 40, 100, 255], label, 16.0, (0, 0)).into();
-                gui.create_control()
-                    .with_graphic(graphic)
-                    .with_parent(button)
-                    .with_behaviour(Box::new(FitText))
-                    .build();
-                button
-            };
+        let create_button = |gui: &mut GUI, page: Id, selected: bool, label: String| {
+            let button = gui
+                .create_control()
+                .with_graphic(painel.clone())
+                .with_parent(header)
+                .with_expand_x(true)
+                .with_behaviour(Box::new(TabButton::new(
+                    tab_group.clone(),
+                    page,
+                    selected,
+                    tab_style.clone(),
+                )))
+                .build();
+            let graphic = Text::new([40, 40, 100, 255], label, 16.0, (0, 0)).into();
+            gui.create_control()
+                .with_graphic(graphic)
+                .with_parent(button)
+                .with_behaviour(Box::new(FitText))
+                .build();
+            button
+        };
         create_button(&mut gui, page_1, true, "Random Controls".to_owned());
         create_button(&mut gui, page_2, false, "Grid Layout".to_owned());
         create_button(&mut gui, page_3, false, "ScrollView".to_owned());
@@ -674,9 +766,9 @@ fn main() {
     gui.start();
     println!("Started");
 
-    fn resize<R: GUIRender>(
+    fn resize(
         size: PhysicalSize<u32>,
-        ui: &mut GUI<R>,
+        ui: &mut GUI,
         render: &mut GLSpriteRender,
         screen_camera: &mut Camera,
     ) {
@@ -745,11 +837,11 @@ fn main() {
                 _ => {}
             },
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                let (gui_render, mut ctx) = gui.get_render_and_context();
+                let mut ctx = gui.get_context();
                 gui_render.prepare_render(&mut ctx, &mut render);
                 let mut renderer = render.render();
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
-                gui.render().render(renderer.as_mut(), &mut screen_camera);
+                gui_render.render(renderer.as_mut(), &mut screen_camera);
                 renderer.finish();
             }
             _ => {}
@@ -757,8 +849,8 @@ fn main() {
     })
 }
 
-fn create_item<R: GUIRender>(
-    gui: &mut GUI<R>,
+fn create_item(
+    gui: &mut GUI,
     list: Id,
     texture: u32,
     text: String,
