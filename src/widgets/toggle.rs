@@ -38,9 +38,9 @@ impl Behaviour for Toggle {
         ctx.set_graphic(this, self.background_style.normal.clone());
         ctx.set_graphic(self.button, self.button_style.normal.clone());
         if self.enable {
-            ctx.get_graphic(self.marker).set_alpha(255)
+            ctx.get_graphic_mut(self.marker).set_alpha(255)
         } else {
-            ctx.get_graphic(self.marker).set_alpha(0)
+            ctx.get_graphic_mut(self.marker).set_alpha(0)
         }
     }
 
@@ -50,32 +50,27 @@ impl Behaviour for Toggle {
         } else {
             ctx.set_graphic(this, self.background_style.normal.clone());
         }
-        ctx.send_event(event::Redraw);
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
         match event {
             MouseEvent::Enter => {
-                let graphic = ctx.get_graphic(self.button);
+                let graphic = ctx.get_graphic_mut(self.button);
                 graphic.set_color([190, 190, 190, 255]);
-                ctx.send_event(event::Redraw);
             }
             MouseEvent::Exit => {
                 self.click = false;
-                let graphic = ctx.get_graphic(self.button);
+                let graphic = ctx.get_graphic_mut(self.button);
                 graphic.set_color([200, 200, 200, 255]);
-                ctx.send_event(event::Redraw);
             }
             MouseEvent::Down => {
                 self.click = true;
-                let graphic = ctx.get_graphic(self.button);
+                let graphic = ctx.get_graphic_mut(self.button);
                 graphic.set_color([170, 170, 170, 255]);
-                ctx.send_event(event::Redraw);
             }
             MouseEvent::Up => {
-                let graphic = ctx.get_graphic(self.button);
+                let graphic = ctx.get_graphic_mut(self.button);
                 graphic.set_color([190, 190, 190, 255]);
-                ctx.send_event(event::Redraw);
                 if self.click {
                     self.enable = !self.enable;
                     ctx.send_event(event::ToggleChanged {
@@ -83,9 +78,9 @@ impl Behaviour for Toggle {
                         value: self.enable,
                     });
                     if self.enable {
-                        ctx.get_graphic(self.marker).set_alpha(255)
+                        ctx.get_graphic_mut(self.marker).set_alpha(255)
                     } else {
-                        ctx.get_graphic(self.marker).set_alpha(0)
+                        ctx.get_graphic_mut(self.marker).set_alpha(0)
                     }
                 }
             }

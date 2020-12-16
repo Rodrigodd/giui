@@ -83,7 +83,7 @@ impl TextField {
         caret_pos[0] -= self.x_scroll;
 
         if let Some(selection_index) = self.selection_index {
-            ctx.get_graphic(self.caret).set_color([51, 153, 255, 255]);
+            ctx.get_graphic_mut(self.caret).set_color([51, 153, 255, 255]);
             let mut selection_pos = self.text_info.get_caret_pos(selection_index);
             selection_pos[0] -= self.x_scroll;
             let mut margins = [
@@ -100,7 +100,7 @@ impl TextField {
             }
             ctx.set_margins(self.caret, margins);
         } else {
-            ctx.get_graphic(self.caret).set_color([0, 0, 0, 255]);
+            ctx.get_graphic_mut(self.caret).set_color([0, 0, 0, 255]);
             if self.on_focus {
                 ctx.set_margins(
                     self.caret,
@@ -115,7 +115,6 @@ impl TextField {
                 ctx.set_margins(self.caret, [0.0, 0.0, 0.0, 0.0]);
             }
         }
-        ctx.send_event(event::Redraw);
     }
 
     fn move_caret(&mut self, caret: usize, ctx: &mut Context) {
@@ -166,7 +165,6 @@ impl Behaviour for TextField {
         self.update_text(this, ctx);
         ctx.move_to_front(self.label);
         ctx.set_graphic(this, self.style.normal.clone());
-        ctx.send_event(event::Redraw);
     }
 
     fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
@@ -239,7 +237,6 @@ impl Behaviour for TextField {
             ctx.set_graphic(this, self.style.normal.clone());
         }
         self.update_carret(this, ctx, true);
-        ctx.send_event(event::Redraw);
     }
 
     fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {

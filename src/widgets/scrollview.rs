@@ -1,5 +1,5 @@
 use crate::{
-    event, Behaviour, Context, Id, KeyboardEvent, LayoutContext, MinSizeContext, MouseEvent,
+    event, Behaviour, Context, Id, KeyboardEvent, Layout, LayoutContext, MinSizeContext, MouseEvent,
 };
 
 use std::any::Any;
@@ -37,13 +37,13 @@ impl Behaviour for ScrollBar {
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {
-                ctx.get_graphic(self.handle).set_color([220, 220, 220, 255]);
-                ctx.send_event(event::Redraw);
+                ctx.get_graphic_mut(self.handle)
+                    .set_color([220, 220, 220, 255]);
             }
             MouseEvent::Down => {
                 self.dragging = true;
-                ctx.get_graphic(self.handle).set_color([180, 180, 180, 255]);
-                ctx.send_event(event::Redraw);
+                ctx.get_graphic_mut(self.handle)
+                    .set_color([180, 180, 180, 255]);
                 ctx.send_event(event::LockOver);
                 let handle_rect = *ctx.get_rect(self.handle);
                 let area = ctx
@@ -89,8 +89,8 @@ impl Behaviour for ScrollBar {
                 if self.dragging {
                     self.dragging = false;
                     ctx.send_event(event::UnlockOver);
-                    ctx.get_graphic(self.handle).set_color([200, 200, 200, 255]);
-                    ctx.send_event(event::Redraw);
+                    ctx.get_graphic_mut(self.handle)
+                        .set_color([200, 200, 200, 255]);
                 }
             }
             MouseEvent::Moved { x, y } => {
@@ -128,13 +128,12 @@ impl Behaviour for ScrollBar {
                     )
                 } else {
                     let handle_rect = *ctx.get_rect(self.handle);
-                    let graphic = ctx.get_graphic(self.handle);
+                    let graphic = ctx.get_graphic_mut(self.handle);
                     if self.mouse_pos < handle_rect[1] || self.mouse_pos > handle_rect[3] {
                         graphic.set_color([220, 220, 220, 255]);
                     } else {
                         graphic.set_color([200, 200, 200, 255]);
                     }
-                    ctx.send_event(event::Redraw);
                 }
             }
         }
@@ -143,7 +142,7 @@ impl Behaviour for ScrollBar {
 }
 
 pub struct NoneLayout;
-impl Behaviour for NoneLayout {
+impl Layout for NoneLayout {
     fn update_layouts(&mut self, _: Id, _: &mut LayoutContext) {}
 }
 
@@ -180,6 +179,149 @@ impl ScrollView {
     }
 }
 impl Behaviour for ScrollView {
+    fn on_start(&mut self, _this: Id, ctx: &mut Context) {
+        ctx.move_to_front(self.v_scroll_bar);
+        ctx.move_to_front(self.h_scroll_bar);
+    }
+
+    fn on_active(&mut self, _: Id, ctx: &mut Context) {
+        let content_size = ctx.get_min_size(self.content);
+
+        let view_rect = ctx.get_rect(self.view);
+
+        let view_width = view_rect[2] - view_rect[0];
+        let view_height = view_rect[3] - view_rect[1];
+
+        ctx.set_anchor_left(self.h_scroll_bar_handle, self.delta_x / content_size[0]);
+        ctx.set_anchor_right(
+            self.h_scroll_bar_handle,
+            ((self.delta_x + view_width) / content_size[0]).min(1.0),
+        );
+
+        ctx.set_anchor_top(self.v_scroll_bar_handle, self.delta_y / content_size[1]);
+        ctx.set_anchor_bottom(
+            self.v_scroll_bar_handle,
+            ((self.delta_y + view_height) / content_size[1]).min(1.0),
+        );
+    }
+
+    fn on_event(&mut self, event: &dyn Any, _: Id, ctx: &mut Context) {
+        if let Some(event) = event.downcast_ref::<SetScrollPosition>() {
+            if !event.vertical {
+                let total_size = ctx.get_size(self.content)[0] - ctx.get_size(self.view)[0];
+                self.delta_x = event.value * total_size;
+            } else {
+                let total_size = ctx.get_size(self.content)[1] - ctx.get_size(self.view)[1];
+                self.delta_y = event.value * total_size;
+            }
+            ctx.dirty_layout(self.view);
+        }
+    }
+
+    fn on_scroll_event(&mut self, delta: [f32; 2], _: Id, ctx: &mut Context) -> bool {
+        self.delta_x += delta[0];
+        self.delta_y -= delta[1];
+
+        ctx.dirty_layout(self.view);
+        true
+    }
+
+    fn on_keyboard_event(&mut self, event: KeyboardEvent, _this: Id, ctx: &mut Context) -> bool {
+        match event {
+            KeyboardEvent::Pressed(key) => match key {
+                VirtualKeyCode::Up => {
+                    self.delta_y -= 30.0;
+                    ctx.dirty_layout(self.view);
+                    true
+                }
+                VirtualKeyCode::Down => {
+                    self.delta_y += 30.0;
+                    ctx.dirty_layout(self.view);
+                    true
+                }
+                VirtualKeyCode::Right => {
+                    self.delta_x += 30.0;
+                    ctx.dirty_layout(self.view);
+                    true
+                }
+                VirtualKeyCode::Left => {
+                    self.delta_x -= 30.0;
+                    ctx.dirty_layout(self.view);
+                    true
+                }
+                VirtualKeyCode::Home => {
+                    self.delta_y = 0.0;
+                    ctx.dirty_layout(self.view);
+                    true
+                }
+                VirtualKeyCode::End => {
+                    self.delta_y = f32::INFINITY;
+                    ctx.dirty_layout(self.view);
+                    true
+                }
+                VirtualKeyCode::PageUp => {
+                    let height = ctx.get_size(self.view)[1] - 40.0;
+                    self.delta_y -= height;
+                    ctx.dirty_layout(self.view);
+                    true
+                }
+                VirtualKeyCode::PageDown => {
+                    let height = ctx.get_size(self.view)[1] - 40.0;
+                    self.delta_y += height;
+                    ctx.dirty_layout(self.view);
+                    true
+                }
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+}
+
+impl<T: Layout> Layout for std::rc::Rc<std::cell::RefCell<T>> {
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
+        self.as_ref().borrow_mut().compute_min_size(this, ctx)
+    }
+
+    fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
+        self.as_ref().borrow_mut().update_layouts(this, ctx)
+    }
+}
+impl<T: Behaviour> Behaviour for std::rc::Rc<std::cell::RefCell<T>> {
+    fn on_start(&mut self, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_start(this, ctx)
+    }
+
+    fn on_active(&mut self, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_active(this, ctx)
+    }
+
+    fn on_deactive(&mut self, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_deactive(this, ctx)
+    }
+
+    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_event(event, this, ctx)
+    }
+
+    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) -> bool {
+        self.as_ref().borrow_mut().on_scroll_event(delta, this, ctx)
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+        self.as_ref().borrow_mut().on_mouse_event(event, this, ctx)
+    }
+
+    fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_focus_change(focus, this, ctx)
+    }
+
+    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
+        self.as_ref().borrow_mut().on_keyboard_event(event, this, ctx)
+    }
+}
+
+impl Layout for ScrollView {
     fn compute_min_size(&mut self, _this: Id, ctx: &mut MinSizeContext) {
         let mut min_size = ctx.get_min_size(self.view);
 
@@ -315,113 +457,5 @@ impl Behaviour for ScrollView {
         );
 
         ctx.set_designed_rect(content, content_rect);
-    }
-
-    fn on_start(&mut self, _this: Id, ctx: &mut Context) {
-        ctx.move_to_front(self.v_scroll_bar);
-        ctx.move_to_front(self.h_scroll_bar);
-    }
-
-    fn on_active(&mut self, _: Id, ctx: &mut Context) {
-        let content_size = ctx.get_min_size(self.content);
-
-        let view_rect = ctx.get_rect(self.view);
-
-        let view_width = view_rect[2] - view_rect[0];
-        let view_height = view_rect[3] - view_rect[1];
-
-        ctx.set_anchor_left(self.h_scroll_bar_handle, self.delta_x / content_size[0]);
-        ctx.set_anchor_right(
-            self.h_scroll_bar_handle,
-            ((self.delta_x + view_width) / content_size[0]).min(1.0),
-        );
-
-        ctx.set_anchor_top(self.v_scroll_bar_handle, self.delta_y / content_size[1]);
-        ctx.set_anchor_bottom(
-            self.v_scroll_bar_handle,
-            ((self.delta_y + view_height) / content_size[1]).min(1.0),
-        );
-    }
-
-    fn on_event(&mut self, event: &dyn Any, _: Id, ctx: &mut Context) {
-        if let Some(event) = event.downcast_ref::<SetScrollPosition>() {
-            if !event.vertical {
-                let total_size = ctx.get_size(self.content)[0] - ctx.get_size(self.view)[0];
-                self.delta_x = event.value * total_size;
-            } else {
-                let total_size = ctx.get_size(self.content)[1] - ctx.get_size(self.view)[1];
-                self.delta_y = event.value * total_size;
-            }
-            ctx.dirty_layout(self.view);
-            ctx.send_event(event::Redraw);
-        }
-    }
-
-    fn on_scroll_event(&mut self, delta: [f32; 2], _: Id, ctx: &mut Context) -> bool {
-        self.delta_x += delta[0];
-        self.delta_y -= delta[1];
-
-        ctx.dirty_layout(self.view);
-        ctx.send_event(event::Redraw);
-        true
-    }
-
-    fn on_keyboard_event(&mut self, event: KeyboardEvent, _this: Id, ctx: &mut Context) -> bool {
-        match event {
-            KeyboardEvent::Pressed(key) => match key {
-                VirtualKeyCode::Up => {
-                    self.delta_y -= 30.0;
-                    ctx.dirty_layout(self.view);
-                    ctx.send_event(event::Redraw);
-                    true
-                }
-                VirtualKeyCode::Down => {
-                    self.delta_y += 30.0;
-                    ctx.dirty_layout(self.view);
-                    ctx.send_event(event::Redraw);
-                    true
-                }
-                VirtualKeyCode::Right => {
-                    self.delta_x += 30.0;
-                    ctx.dirty_layout(self.view);
-                    ctx.send_event(event::Redraw);
-                    true
-                }
-                VirtualKeyCode::Left => {
-                    self.delta_x -= 30.0;
-                    ctx.dirty_layout(self.view);
-                    ctx.send_event(event::Redraw);
-                    true
-                }
-                VirtualKeyCode::Home => {
-                    self.delta_y = 0.0;
-                    ctx.dirty_layout(self.view);
-                    ctx.send_event(event::Redraw);
-                    true
-                }
-                VirtualKeyCode::End => {
-                    self.delta_y = f32::INFINITY;
-                    ctx.dirty_layout(self.view);
-                    ctx.send_event(event::Redraw);
-                    true
-                }
-                VirtualKeyCode::PageUp => {
-                    let height = ctx.get_size(self.view)[1] - 40.0;
-                    self.delta_y -= height;
-                    ctx.dirty_layout(self.view);
-                    ctx.send_event(event::Redraw);
-                    true
-                }
-                VirtualKeyCode::PageDown => {
-                    let height = ctx.get_size(self.view)[1] - 40.0;
-                    self.delta_y += height;
-                    ctx.dirty_layout(self.view);
-                    ctx.send_event(event::Redraw);
-                    true
-                }
-                _ => false,
-            },
-            _ => false,
-        }
     }
 }

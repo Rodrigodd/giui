@@ -1,4 +1,4 @@
-use crate::{event, Behaviour, Context, Id, MouseEvent};
+use crate::{Behaviour, Context, Id, MouseEvent};
 
 pub struct Hoverable {
     is_over: bool,
@@ -25,16 +25,14 @@ impl Behaviour for Hoverable {
         match event {
             MouseEvent::Enter => {
                 ctx.active(self.hover);
-                ctx.get_graphic(self.label).set_text(&self.text);
+                ctx.get_graphic_mut(self.label).set_text(&self.text);
                 ctx.dirty_layout(self.label);
                 ctx.move_to_front(self.hover);
                 self.is_over = true;
-                ctx.send_event(event::Redraw);
             }
             MouseEvent::Exit => {
                 ctx.deactive(self.hover);
                 self.is_over = false;
-                ctx.send_event(event::Redraw);
             }
             MouseEvent::Down => {}
             MouseEvent::Up => {}
@@ -44,7 +42,6 @@ impl Behaviour for Hoverable {
                     let x = x / width;
                     let y = y / heigth;
                     ctx.set_anchors(self.hover, [x, y, x, y]);
-                    ctx.send_event(event::Redraw);
                 }
             }
         }

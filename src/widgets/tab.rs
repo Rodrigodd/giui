@@ -1,4 +1,4 @@
-use crate::{event, widgets::TabStyle, Behaviour, Context, Id, MouseEvent};
+use crate::{widgets::TabStyle, Behaviour, Context, Id, MouseEvent};
 
 use std::any::Any;
 
@@ -46,14 +46,12 @@ impl TabButton {
         self.selected = true;
         self.tab_group.set_selected(Some(this));
         ctx.set_graphic(this, self.style.selected.clone());
-        ctx.send_event(event::Redraw);
     }
 
     pub fn unselect(&mut self, this: Id, ctx: &mut Context) {
         ctx.deactive(self.page);
         self.selected = false;
         ctx.set_graphic(this, self.style.unselected.clone());
-        ctx.send_event(event::Redraw);
     }
 }
 impl Behaviour for TabButton {
@@ -78,21 +76,18 @@ impl Behaviour for TabButton {
             MouseEvent::Enter => {
                 if !self.selected {
                     ctx.set_graphic(this, self.style.hover.clone());
-                    ctx.send_event(event::Redraw);
                 }
             }
             MouseEvent::Exit => {
                 if !self.selected {
                     self.click = false;
                     ctx.set_graphic(this, self.style.unselected.clone());
-                    ctx.send_event(event::Redraw);
                 }
             }
             MouseEvent::Down => {
                 if !self.selected {
                     self.click = true;
                     ctx.set_graphic(this, self.style.pressed.clone());
-                    ctx.send_event(event::Redraw);
                 }
             }
             MouseEvent::Up => {
@@ -101,7 +96,6 @@ impl Behaviour for TabButton {
                         self.select(this, ctx);
                     } else {
                         ctx.set_graphic(this, self.style.unselected.clone());
-                        ctx.send_event(event::Redraw);
                     }
                 }
             }

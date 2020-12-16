@@ -8,7 +8,6 @@ use winit::event::{
 
 pub mod event {
     use super::Id;
-    pub struct Redraw;
     pub struct LockOver;
     pub struct UnlockOver;
     pub struct RequestFocus {
@@ -55,10 +54,6 @@ pub struct Id {
     generation: u32,
 }
 impl Id {
-    const INVALID: Id = Id {
-        generation: u32::max_value(),
-        index: u32::max_value(),
-    };
     /// Get the index of the control in the controls vector inside GUI<R>
     pub fn get_index(&self) -> usize {
         self.index as usize
@@ -225,6 +220,10 @@ impl<'a> ControlBuilder<'a> {
         self.build.behaviour = Some(behaviour);
         self
     }
+    pub fn with_layout(mut self, layout: Box<dyn Layout>) -> Self {
+        self.build.layout = layout;
+        self
+    }
     pub fn with_graphic(mut self, graphic: Graphic) -> Self {
         self.build.graphic = graphic;
         self
@@ -249,6 +248,7 @@ pub struct Control {
     rect: Rect,
     graphic: Graphic,
     behaviour: Option<Box<dyn Behaviour>>,
+    layout: Box<dyn Layout>,
     parent: Option<Id>,
     children: Vec<Id>,
     active: bool,
@@ -263,6 +263,10 @@ impl Control {
     /// add one more behaviour to the control
     pub fn set_behaviour(&mut self, behaviour: Box<dyn Behaviour>) {
         self.behaviour = Some(behaviour);
+    }
+
+    pub fn set_layout(&mut self, layout: Box<dyn Layout>) {
+        self.layout = layout;
     }
 
     fn add_children(&mut self, child: Id) {
@@ -299,6 +303,7 @@ pub struct ControlBuild {
     rect: Rect,
     graphic: Graphic,
     behaviour: Option<Box<dyn Behaviour>>,
+    layout: Box<dyn Layout>,
     parent: Option<Id>,
     active: bool,
 }
@@ -307,6 +312,7 @@ impl Default for ControlBuild {
         Self {
             rect: Rect::default(),
             graphic: Graphic::None,
+            layout: Default::default(),
             behaviour: None,
             parent: None,
             active: true,
@@ -322,6 +328,7 @@ pub struct Context<'a> {
     events: Vec<Box<dyn Any>>,
     events_to: Vec<(Id, Box<dyn Any>)>,
     dirtys: Vec<Id>,
+    render_dirty: bool,
 }
 impl<'a> Context<'a> {
     fn new(controls: &'a mut Controls, fonts: &'a [FontArc], modifiers: ModifiersState) -> Self {
@@ -332,6 +339,7 @@ impl<'a> Context<'a> {
             events_to: Vec::new(),
             fonts,
             dirtys: Vec::new(),
+            render_dirty: false,
         }
     }
 
@@ -353,6 +361,7 @@ impl<'a> Context<'a> {
                 events_to: Vec::new(),
                 fonts,
                 dirtys: Vec::new(),
+                render_dirty: false,
             },
         ))
     }
@@ -481,7 +490,8 @@ impl<'a> Context<'a> {
         self.dirty_layout(id);
     }
 
-    pub fn get_graphic(&mut self, id: Id) -> &mut Graphic {
+    pub fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
+        self.render_dirty = true;
         &mut self.get_control_mut(id).graphic
     }
 
@@ -489,6 +499,7 @@ impl<'a> Context<'a> {
         let control = self.get_control_mut(id);
         control.graphic = graphic;
         control.rect.dirty_render_dirty_flags();
+        self.render_dirty = true;
     }
 
     pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
@@ -523,7 +534,6 @@ impl<'a> Context<'a> {
     pub fn move_to_front(&mut self, id: Id) {
         move_to_front(self.controls, id);
         self.dirty_layout(id);
-        self.events.push(Box::new(event::Redraw));
     }
 
     pub fn get_parent(&self, id: Id) -> Option<Id> {
@@ -545,14 +555,9 @@ impl<'a> MinSizeContext<'a> {
         this: Id,
         controls: &'a mut Controls,
         fonts: &'a [FontArc],
-    ) -> (&'a mut dyn Behaviour, Self) {
-        let this_one = unsafe {
-            &mut *(controls[this.get_index()]
-                .behaviour
-                .as_mut()
-                .map_or((&mut ()) as &mut dyn Behaviour, |x| x.as_mut())
-                as *mut dyn Behaviour)
-        };
+    ) -> (&'a mut dyn Layout, Self) {
+        let this_one =
+            unsafe { &mut *(controls[this.get_index()].layout.as_mut() as *mut dyn Layout) };
         (
             this_one,
             Self {
@@ -644,14 +649,9 @@ pub struct LayoutContext<'a> {
     events: Vec<Box<dyn Any>>,
 }
 impl<'a> LayoutContext<'a> {
-    fn new(this: Id, controls: &'a mut Controls) -> (&'a mut dyn Behaviour, Self) {
-        let this_one = unsafe {
-            &mut *(controls[this.get_index()]
-                .behaviour
-                .as_mut()
-                .map_or((&mut ()) as &mut dyn Behaviour, |x| x.as_mut())
-                as *mut dyn Behaviour)
-        };
+    fn new(this: Id, controls: &'a mut Controls) -> (&'a mut dyn Layout, Self) {
+        let this_one =
+            unsafe { &mut *(controls[this.get_index()].layout.as_mut() as *mut dyn Layout) };
         (
             this_one,
             Self {
@@ -822,11 +822,15 @@ impl Controls {
     fn reserve(&mut self) -> Id {
         if let Some(index) = self.dead_controls.pop() {
             Id {
-                generation: self.controls[index as usize].generation + 1,
+                generation: self.controls[index as usize].generation,
                 index,
             }
         } else {
-            self.controls.push(Control::default());
+            let control = Control {
+                generation: 0,
+                ..Control::default()
+            };
+            self.controls.push(control);
             Id {
                 generation: 0,
                 index: self.controls.len() as u32 - 1,
@@ -856,13 +860,14 @@ impl From<Vec<Control>> for Controls {
 
 pub struct GUI {
     controls: Controls,
+    events: Vec<Box<dyn Any>>,
+    redraw: bool,
+    fonts: Vec<FontArc>,
     modifiers: ModifiersState,
     input: Input,
     current_over: Option<Id>,
     current_focus: Option<Id>,
     over_is_locked: bool,
-    events: Vec<Box<dyn Any>>,
-    fonts: Vec<FontArc>,
 }
 impl GUI {
     pub fn new(width: f32, height: f32, fonts: Vec<FontArc>) -> Self {
@@ -879,6 +884,7 @@ impl GUI {
                 },
                 graphic: Graphic::None,
                 behaviour: None,
+                layout: Default::default(),
                 parent: None,
                 children: Vec::new(),
                 active: true,
@@ -890,6 +896,7 @@ impl GUI {
             over_is_locked: false,
             events: Vec::new(),
             fonts,
+            redraw: true,
         }
     }
 
@@ -917,12 +924,24 @@ impl GUI {
         get_children(&self.controls, id)
     }
 
+    pub fn reserve_id(&mut self) -> Id {
+        self.controls.reserve()
+    }
+
     pub fn create_control(&mut self) -> ControlBuilder {
         ControlBuilder::new(Box::new(move |build| self.add_control(build)))
     }
 
+    /// Create a control with a predetermined id, id that can be obtained by the method reserve_id().
+    pub fn create_control_reserved(&mut self, reserved_id: Id) -> ControlBuilder {
+        ControlBuilder::new(Box::new(move |build| {
+            self.add_control_reserved(build, reserved_id)
+        }))
+    }
+
     pub fn add_control(&mut self, build: ControlBuild) -> Id {
-        self.add_control_reserved(build, Id::INVALID)
+        let reserve = self.controls.reserve();
+        self.add_control_reserved(build, reserve)
     }
 
     pub fn add_control_reserved(&mut self, build: ControlBuild, reserve: Id) -> Id {
@@ -930,38 +949,22 @@ impl GUI {
             rect,
             graphic,
             behaviour,
+            layout,
             parent,
             active,
         } = build;
-        let control = Control {
-            generation: u32::max_value(),
-            rect,
-            graphic,
-            behaviour,
-            parent,
-            children: Vec::new(),
-            active,
-        };
-        let new;
-        if reserve != Id::INVALID {
-            new = reserve;
-            self.controls[new.get_index() as usize] = control;
-            self.controls[new.get_index() as usize].generation = new.generation;
-        } else if let Some(next_id) = self.controls.dead_controls.pop() {
-            new = Id {
-                index: next_id,
-                generation: self.controls[next_id as usize].generation + 1,
-            };
-            self.controls[next_id as usize] = control;
-            self.controls[next_id as usize].generation = new.generation;
-        } else {
-            self.controls.controls.push(control);
-            new = Id {
-                index: self.controls.controls.len() as u32 - 1,
-                generation: 0,
-            };
-            self.controls[new.get_index()].generation = 0;
-        }
+        let new = reserve;
+        
+        let mut control = &mut self.controls[new.get_index() as usize];
+        control.rect = rect;
+        control.graphic = graphic;
+        control.behaviour = behaviour;
+        control.layout = layout;
+        control.parent = parent;
+        control.active = active;
+
+        assert_eq!(self.controls[new.get_index() as usize].generation, new.generation);
+        // self.controls[new.get_index() as usize].generation = new.generation;
 
         let control = self.get_control_mut(new);
 
@@ -991,7 +994,6 @@ impl GUI {
         if let Some(parent) = self.get_parent(id) {
             self.update_layout(parent);
         }
-        self.send_event(Box::new(event::Redraw));
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
             parents.extend(self.get_children(id).iter().rev());
@@ -1008,7 +1010,6 @@ impl GUI {
         if let Some(parent) = self.get_parent(id) {
             self.update_layout(parent);
         }
-        self.send_event(Box::new(event::Redraw));
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
             parents.extend(self.get_children(id).iter().rev());
@@ -1028,7 +1029,6 @@ impl GUI {
             if let Some(parent) = self.get_parent(id) {
                 self.update_layout(parent);
             }
-            self.send_event(Box::new(event::Redraw));
         }
         if let Some(parent) = self.controls[id.get_index()].parent {
             let children = &mut self.get_control_mut(parent).children;
@@ -1048,7 +1048,7 @@ impl GUI {
             self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
 
             self.controls[id.get_index()] = Control {
-                generation: self.controls[id.get_index()].generation,
+                generation: self.controls[id.get_index()].generation + 1,
                 ..Control::default()
             };
             self.controls.dead_controls.push(id.index);
@@ -1061,13 +1061,23 @@ impl GUI {
         self.fonts.clone()
     }
 
+    pub fn render_is_dirty(&self) -> bool {
+        self.redraw
+    }
+
     #[inline]
-    pub fn get_context(&mut self) -> Context {
+    pub fn get_render_context(&mut self) -> Context {
+        //TODO: Context -> RenderContext
+        self.redraw = false;
         Context::new(&mut self.controls, &self.fonts, self.modifiers)
     }
 
     pub fn set_behaviour(&mut self, id: Id, behaviour: Box<dyn Behaviour>) {
         self.get_control_mut(id).set_behaviour(behaviour);
+    }
+
+    pub fn set_layout(&mut self, id: Id, layout: Box<dyn Layout>) {
+        self.get_control_mut(id).set_layout(layout);
     }
 
     pub fn get_graphic(&mut self, id: Id) -> &mut Graphic {
@@ -1119,8 +1129,12 @@ impl GUI {
                 events,
                 events_to,
                 dirtys,
+                render_dirty,
                 ..
             } = ctx;
+            if render_dirty {
+                self.redraw = true;
+            }
             for event in events {
                 self.send_event(event);
             }
@@ -1142,8 +1156,12 @@ impl GUI {
                 events,
                 events_to,
                 dirtys,
+                render_dirty,
                 ..
             } = ctx;
+            if render_dirty {
+                self.redraw = true;
+            }
             for event in events {
                 self.send_event(event);
             }
@@ -1171,8 +1189,12 @@ impl GUI {
                 events,
                 events_to,
                 dirtys,
+                render_dirty,
                 ..
             } = ctx;
+            if render_dirty {
+                self.redraw = true;
+            }
             for event in events {
                 self.send_event(event);
             }
@@ -1399,6 +1421,7 @@ impl GUI {
     }
 
     pub fn update_layout(&mut self, mut id: Id) {
+        self.redraw = true;
         // if min_size is dirty and parent has layout, update parent min_size, and recurse it
         // from the highter parent, update layout of its children. For each dirty chldren, update them, recursivily
 
@@ -1475,6 +1498,7 @@ impl GUI {
     }
 
     pub fn update_all_layouts(&mut self) {
+        self.redraw = true;
         let mut parents = vec![ROOT_ID];
 
         // post order traversal
@@ -1822,6 +1846,30 @@ impl Rect {
 
 #[allow(unused_variables)]
 pub trait Behaviour {
+    fn on_start(&mut self, this: Id, ctx: &mut Context) {}
+    fn on_active(&mut self, this: Id, ctx: &mut Context) {}
+    fn on_deactive(&mut self, this: Id, ctx: &mut Context) {}
+
+    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {}
+
+    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) -> bool {
+        false
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+        false
+    }
+
+    fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {}
+
+    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
+        false
+    }
+}
+impl Behaviour for () {}
+
+#[allow(unused_variables)]
+pub trait Layout {
     /// Compute its own min size, based on the min size of its children.
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {}
     /// Update the position and size of its children.
@@ -1844,25 +1892,10 @@ pub trait Behaviour {
             ctx.set_designed_rect(child, new_rect);
         }
     }
-
-    fn on_start(&mut self, this: Id, ctx: &mut Context) {}
-    fn on_active(&mut self, this: Id, ctx: &mut Context) {}
-    fn on_deactive(&mut self, this: Id, ctx: &mut Context) {}
-
-    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {}
-
-    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) -> bool {
-        false
-    }
-
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
-        false
-    }
-
-    fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {}
-
-    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
-        false
+}
+impl Layout for () {}
+impl Default for Box<dyn Layout> {
+    fn default() -> Self {
+        Box::new(())
     }
 }
-impl Behaviour for () {}

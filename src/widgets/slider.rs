@@ -51,7 +51,6 @@ impl Slider {
 
         ctx.set_anchor_left(self.handle, x);
         ctx.set_anchor_right(self.handle, x);
-        ctx.send_event(event::Redraw);
     }
 }
 impl Behaviour for Slider {
@@ -60,7 +59,6 @@ impl Behaviour for Slider {
         let value = self.value;
         ctx.send_event(event::ValueSet { id: this, value });
         ctx.set_graphic(this, self.style.normal.clone());
-        ctx.send_event(event::Redraw);
     }
 
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
@@ -69,7 +67,6 @@ impl Behaviour for Slider {
         } else {
             ctx.set_graphic(this, self.style.normal.clone());
         }
-        ctx.send_event(event::Redraw);
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {

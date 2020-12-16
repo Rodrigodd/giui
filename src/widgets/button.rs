@@ -1,4 +1,4 @@
-use crate::{event, widgets::ButtonStyle, Behaviour, Context, Id, MouseEvent};
+use crate::{widgets::ButtonStyle, Behaviour, Context, Id, MouseEvent};
 
 pub struct Button<F: Fn(Id, &mut Context)> {
     state: u8, // 0 - normal, 1 - hover, 2 - pressed
@@ -19,7 +19,6 @@ impl<F: Fn(Id, &mut Context)> Button<F> {
 impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
     fn on_active(&mut self, this: Id, ctx: &mut Context) {
         ctx.set_graphic(this, self.style.normal.clone());
-        ctx.send_event(event::Redraw);
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
@@ -27,7 +26,6 @@ impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
             MouseEvent::Enter => {
                 self.state = 1;
                 ctx.set_graphic(this, self.style.hover.clone());
-                ctx.send_event(event::Redraw);
             }
             MouseEvent::Exit => {
                 self.state = 0;
@@ -36,12 +34,10 @@ impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
                 } else {
                     ctx.set_graphic(this, self.style.normal.clone());
                 }
-                ctx.send_event(event::Redraw);
             }
             MouseEvent::Down => {
                 self.state = 2;
                 ctx.set_graphic(this, self.style.pressed.clone());
-                ctx.send_event(event::Redraw);
             }
             MouseEvent::Up => {
                 if self.state == 2 {
@@ -49,7 +45,6 @@ impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
                 }
                 self.state = 1;
                 ctx.set_graphic(this, self.style.hover.clone());
-                ctx.send_event(event::Redraw);
             }
             MouseEvent::Moved { .. } => {}
         }
@@ -64,7 +59,6 @@ impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
             } else {
                 ctx.set_graphic(this, self.style.normal.clone());
             }
-            ctx.send_event(event::Redraw);
         }
     }
 }

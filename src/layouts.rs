@@ -1,7 +1,7 @@
-use crate::{Behaviour, Id, LayoutContext, MinSizeContext};
+use crate::{Layout, Id, LayoutContext, MinSizeContext};
 
 pub struct FitText;
-impl Behaviour for FitText {
+impl Layout for FitText {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
         let fonts = ctx.get_fonts();
         let min_size = ctx.get_graphic(this).compute_min_size(fonts).unwrap_or([0.0, 0.0]);
@@ -18,7 +18,7 @@ impl MarginLayout {
         Self { margins }
     }
 }
-impl Behaviour for MarginLayout {
+impl Layout for MarginLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
         let mut min_size = [0.0f32, 0.0];
         for child in ctx.get_children(this) {
@@ -54,7 +54,7 @@ impl RatioLayout {
         Self { ratio, align }
     }
 }
-impl Behaviour for RatioLayout {
+impl Layout for RatioLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
         let mut min_size = [0.0f32, 0.0];
         for child in ctx.get_children(this) {
@@ -120,7 +120,7 @@ impl HBoxLayout {
         }
     }
 }
-impl Behaviour for HBoxLayout {
+impl Layout for HBoxLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
         let children = ctx.get_children(this);
         if children.is_empty() {
@@ -206,7 +206,7 @@ impl VBoxLayout {
         }
     }
 }
-impl Behaviour for VBoxLayout {
+impl Layout for VBoxLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
         let children = ctx.get_children(this);
         if children.is_empty() {
@@ -300,7 +300,7 @@ impl GridLayout {
         }
     }
 }
-impl Behaviour for GridLayout {
+impl Layout for GridLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
         let children = ctx.get_children(this);
         if children.is_empty() {
