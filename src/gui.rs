@@ -214,14 +214,14 @@ impl<'a> ControlBuilder<'a> {
         self.build.rect.expand_y = expand;
         self
     }
-    pub fn with_behaviour(mut self, behaviour: Box<dyn Behaviour>) -> Self {
+    pub fn with_behaviour<T: Behaviour + 'static>(mut self, behaviour: T) -> Self {
         // TODO: remove this in production!!
         debug_assert!(self.build.behaviour.is_none());
-        self.build.behaviour = Some(behaviour);
+        self.build.behaviour = Some(Box::new(behaviour));
         self
     }
-    pub fn with_layout(mut self, layout: Box<dyn Layout>) -> Self {
-        self.build.layout = layout;
+    pub fn with_layout<T: Layout + 'static>(mut self, layout: T) -> Self {
+        self.build.layout = Box::new(layout);
         self
     }
     pub fn with_graphic(mut self, graphic: Graphic) -> Self {
@@ -1072,12 +1072,12 @@ impl GUI {
         Context::new(&mut self.controls, &self.fonts, self.modifiers)
     }
 
-    pub fn set_behaviour(&mut self, id: Id, behaviour: Box<dyn Behaviour>) {
-        self.get_control_mut(id).set_behaviour(behaviour);
+    pub fn set_behaviour<T: Behaviour + 'static>(&mut self, id: Id, behaviour: T) {
+        self.get_control_mut(id).set_behaviour(Box::new(behaviour));
     }
 
-    pub fn set_layout(&mut self, id: Id, layout: Box<dyn Layout>) {
-        self.get_control_mut(id).set_layout(layout);
+    pub fn set_layout<T: Layout + 'static>(&mut self, id: Id, layout: T) {
+        self.get_control_mut(id).set_layout(Box::new(layout));
     }
 
     pub fn get_graphic(&mut self, id: Id) -> &mut Graphic {
