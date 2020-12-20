@@ -34,8 +34,8 @@ impl Behaviour for Hoverable {
                 ctx.deactive(self.hover);
                 self.is_over = false;
             }
-            MouseEvent::Down => {}
-            MouseEvent::Up => {}
+            MouseEvent::Down(_) => {}
+            MouseEvent::Up(_) => {}
             MouseEvent::Moved { x, y } => {
                 if self.is_over {
                     let [width, heigth] = ctx.get_size(crate::ROOT_ID);

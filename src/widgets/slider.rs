@@ -1,4 +1,4 @@
-use crate::{event, widgets::OnFocusStyle, Behaviour, Context, Id, MouseEvent};
+use crate::{event, style::OnFocusStyle, Behaviour, Context, Id, MouseEvent, MouseButton};
 
 pub struct Slider {
     handle: Id,
@@ -70,10 +70,11 @@ impl Behaviour for Slider {
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+        use MouseButton::*;
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {}
-            MouseEvent::Down => {
+            MouseEvent::Down(Left) => {
                 self.dragging = true;
                 ctx.send_event(event::LockOver);
                 self.update_value(ctx);
@@ -81,7 +82,7 @@ impl Behaviour for Slider {
                 let value = self.value;
                 ctx.send_event(event::ValueChanged { id: this, value });
             }
-            MouseEvent::Up => {
+            MouseEvent::Up(Left) => {
                 self.dragging = false;
                 self.set_handle_pos(this, ctx);
                 let value = self.value;
@@ -97,6 +98,8 @@ impl Behaviour for Slider {
                     ctx.send_event(event::ValueChanged { id: this, value });
                 }
             }
+            MouseEvent::Up(_) => {}
+            MouseEvent::Down(_) => {}
         }
         true
     }

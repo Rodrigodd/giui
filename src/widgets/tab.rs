@@ -1,4 +1,4 @@
-use crate::{widgets::TabStyle, Behaviour, Context, Id, MouseEvent};
+use crate::{style::TabStyle, Behaviour, Context, Id, MouseEvent, MouseButton};
 
 use std::any::Any;
 
@@ -72,6 +72,7 @@ impl Behaviour for TabButton {
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+        use MouseButton::*;
         match event {
             MouseEvent::Enter => {
                 if !self.selected {
@@ -84,13 +85,13 @@ impl Behaviour for TabButton {
                     ctx.set_graphic(this, self.style.unselected.clone());
                 }
             }
-            MouseEvent::Down => {
+            MouseEvent::Down(Left) => {
                 if !self.selected {
                     self.click = true;
                     ctx.set_graphic(this, self.style.pressed.clone());
                 }
             }
-            MouseEvent::Up => {
+            MouseEvent::Up(Left) => {
                 if !self.selected {
                     if self.click {
                         self.select(this, ctx);
@@ -99,6 +100,8 @@ impl Behaviour for TabButton {
                     }
                 }
             }
+            MouseEvent::Up(_) => {}
+            MouseEvent::Down(_) => {}
             MouseEvent::Moved { .. } => {}
         }
         true

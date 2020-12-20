@@ -1,4 +1,4 @@
-use crate::{widgets::ButtonStyle, Behaviour, Context, Id, MouseEvent};
+use crate::{style::ButtonStyle, Behaviour, Context, Id, MouseEvent, MouseButton};
 
 pub struct Button<F: Fn(Id, &mut Context)> {
     state: u8, // 0 - normal, 1 - hover, 2 - pressed
@@ -22,6 +22,7 @@ impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+        use MouseButton::*;
         match event {
             MouseEvent::Enter => {
                 self.state = 1;
@@ -35,18 +36,18 @@ impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
                     ctx.set_graphic(this, self.style.normal.clone());
                 }
             }
-            MouseEvent::Down => {
+            MouseEvent::Down(Left) => {
                 self.state = 2;
                 ctx.set_graphic(this, self.style.pressed.clone());
             }
-            MouseEvent::Up => {
+            MouseEvent::Up(Left) => {
                 if self.state == 2 {
                     (self.on_click)(this, ctx);
                 }
                 self.state = 1;
                 ctx.set_graphic(this, self.style.hover.clone());
             }
-            MouseEvent::Moved { .. } => {}
+            _ => {}
         }
         true
     }

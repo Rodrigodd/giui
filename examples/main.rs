@@ -5,10 +5,10 @@ use ui_engine::{
     event as ui_event,
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
     render::{GUISpriteRender, Graphic, Panel, Text, Texture},
+    style::{ButtonStyle, OnFocusStyle, TabStyle},
     widgets::{
-        self, Blocker, Button, ButtonGroup, ButtonStyle, CloseMenu, Dropdown, Hoverable, Menu,
-        MenuItem, NoneLayout, OnFocusStyle, ScrollBar, ScrollView, Slider, TabButton, TabStyle,
-        TextField, Toggle,
+        self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, Dropdown, Hoverable, Menu,
+        MenuItem, NoneLayout, ScrollBar, ScrollView, Slider, TabButton, TextField, Toggle,
     },
     Context, ControlBuilder, Id, RectFill, GUI,
 };
@@ -106,6 +106,43 @@ fn main() {
             .build();
 
         (hover, label)
+    };
+    let float_menu = {
+        let blocker = gui.create_control().with_active(false).build();
+        let menu = gui
+            .create_control()
+            .with_active(false)
+            .with_graphic(button_style.normal.clone())
+            .with_behaviour(Menu::<String, _>::new(blocker, {
+                // let menu_button_style = menu_button_style.clone();
+                move |data, this, ctx| {
+                    let id = ctx
+                        .create_control()
+                        .with_behaviour(MenuItem::new(this, menu_button_style.clone()))
+                        .with_layout(MarginLayout::new([4.0, 4.0, 4.0, 4.0]))
+                        .with_parent(this)
+                        // .with_min_size([10.0, 25.0])
+                        .build();
+                    let _text = ctx
+                        .create_control()
+                        .with_margins([10.0, 0.0, -10.0, 0.0])
+                        .with_graphic(
+                            Text::new([40, 40, 100, 255], data.to_string(), 16.0, (-1, 0)).into(),
+                        )
+                        .with_layout(FitText)
+                        .with_parent(id)
+                        .build();
+                    id
+                }
+            }))
+            .with_layout(VBoxLayout::new(0.0, [1.0, 1.0, 1.0, 1.0], -1))
+            .with_min_size([0.0, 80.0])
+            .build();
+        gui.set_behaviour(
+            blocker,
+            Blocker::new(move |_, ctx| ctx.send_event_to(menu, CloseMenu)),
+        );
+        menu
     };
     let (page_1, top_text, bottom_text, my_slider, my_toggle) = {
         let page_1 = gui.create_control().with_parent(page_area).build();
@@ -216,14 +253,10 @@ fn main() {
                 .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
                 .with_parent(slider)
                 .build();
-            gui.set_behaviour(slider, Slider::new(
-                    handle,
-                    slide_area,
-                    10.0,
-                    30.0,
-                    25.0,
-                    focus_style.clone(),
-                ));
+            gui.set_behaviour(
+                slider,
+                Slider::new(handle, slide_area, 10.0, 30.0, 25.0, focus_style.clone()),
+            );
             slider
         };
         let my_toggle = {
@@ -252,12 +285,10 @@ fn main() {
                 .with_graphic(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0))
                 .with_parent(background)
                 .build();
-            gui.set_behaviour(toggle, Toggle::new(
-                    background,
-                    marker,
-                    button_style.clone(),
-                    focus_style,
-                ));
+            gui.set_behaviour(
+                toggle,
+                Toggle::new(background, marker, button_style.clone(), focus_style),
+            );
 
             let graphic =
                 Text::new([40, 40, 100, 255], "Bottom Text".to_owned(), 16.0, (-1, 0)).into();
@@ -271,38 +302,6 @@ fn main() {
             toggle
         };
         let _my_dropdown = {
-            let blocker = gui.create_control().with_active(false).build();
-            let dropmenu = gui
-                .create_control()
-                .with_active(false)
-                .with_graphic(button_style.normal.clone())
-                .with_behaviour(Menu::<&'static str, _>::new(blocker, {
-                    // let menu_button_style = menu_button_style.clone();
-                    move |data, this, ctx| {
-                        let id = ctx
-                            .create_control()
-                            .with_behaviour(MenuItem::new(this, menu_button_style.clone()))
-                            .with_parent(this)
-                            .with_min_size([10.0, 25.0])
-                            .build();
-                        let _text = ctx
-                            .create_control()
-                            .with_margins([10.0, 0.0, -10.0, 0.0])
-                            .with_graphic(
-                                Text::new([40, 40, 100, 255], data.to_string(), 16.0, (-1, 0))
-                                    .into(),
-                            )
-                            .with_parent(id)
-                            .build();
-                        id
-                    }
-                }))
-                .with_layout(VBoxLayout::new(0.0, [1.0, 1.0, 1.0, 1.0], -1))
-                .with_min_size([0.0, 80.0])
-                .build();
-            gui.set_behaviour(blocker, Blocker::new(move |_, ctx| {
-                    ctx.send_event_to(menu, CloseMenu)
-                }));
             let my_dropdown = gui
                 .create_control()
                 .with_min_size([0.0, 25.0])
@@ -322,14 +321,23 @@ fn main() {
                 )
                 .with_parent(my_dropdown)
                 .build();
-            gui.set_behaviour(my_dropdown, Dropdown::new(
-                    vec!["Item A", "Item B", "Item C", "Item D", "Item E"],
-                    dropmenu,
+            gui.set_behaviour(
+                my_dropdown,
+                Dropdown::new(
+                    vec![
+                        "Item A".to_string(),
+                        "Item B".to_string(),
+                        "Item C".to_string(),
+                        "Item D".to_string(),
+                        "Item E".to_string(),
+                    ],
+                    float_menu,
                     move |selected, _this, ctx| {
-                        ctx.get_graphic_mut(text).set_text(selected);
+                        ctx.get_graphic_mut(text).set_text(&selected);
                     },
                     button_style.clone(),
-                ));
+                ),
+            );
 
             my_dropdown
         };
@@ -585,14 +593,17 @@ fn main() {
                 .with_graphic(Text::new([0, 0, 0, 255], String::new(), 16.0, (-1, 0)).into())
                 .with_parent(input_box)
                 .build();
-            gui.set_behaviour(input_box, TextField::new(
+            gui.set_behaviour(
+                input_box,
+                TextField::new(
                     caret,
                     input_text,
                     OnFocusStyle {
                         normal: painel.clone().with_color([200, 200, 200, 255]),
                         focus: button_style.focus.clone().with_color([200, 200, 200, 255]),
                     },
-                ));
+                ),
+            );
             input_box
         };
         let scroll_view = gui
@@ -633,7 +644,10 @@ fn main() {
             )
             .with_parent(h_scroll_bar)
             .build();
-        gui.set_behaviour(h_scroll_bar, ScrollBar::new(h_scroll_bar_handle, scroll_view, false));
+        gui.set_behaviour(
+            h_scroll_bar,
+            ScrollBar::new(h_scroll_bar_handle, scroll_view, false),
+        );
         let v_scroll_bar = gui
             .create_control()
             .with_min_size([20.0, 20.0])
@@ -655,7 +669,10 @@ fn main() {
             )
             .with_parent(v_scroll_bar)
             .build();
-        gui.set_behaviour(v_scroll_bar, ScrollBar::new(v_scroll_bar_handle, scroll_view, true));
+        gui.set_behaviour(
+            v_scroll_bar,
+            ScrollBar::new(v_scroll_bar_handle, scroll_view, true),
+        );
         let list = gui
             .create_control()
             .with_layout(VBoxLayout::new(3.0, [5.0, 5.0, 5.0, 5.0], -1))
@@ -696,6 +713,15 @@ fn main() {
         let graphic = Texture::new(font_texture, [0.0, 0.0, 1.0, 1.0]).into();
         gui.create_control()
             .with_graphic(graphic)
+            .with_behaviour(ContextMenu::new(
+                vec![
+                    ("Option 0".to_string(), Box::new(|_, _| println!("Option 0"))),
+                    ("Option 1".to_string(), Box::new(|_, _| println!("Option 1"))),
+                    ("Option 2".to_string(), Box::new(|_, _| println!("Option 2"))),
+                    ("Option 3".to_string(), Box::new(|_, _| println!("Option 3"))),
+                ],
+                float_menu,
+            ))
             .with_parent(page_4)
             .build();
         page_4

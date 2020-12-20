@@ -363,7 +363,7 @@ pub fn text_glyphs_and_info<F: Font>(
     line.end += 1;
     lines.push(line);
 
-    bounding_box[3] = y + font.descent();
+    bounding_box[3] = y - font.descent();
 
     // vertical alignment
     if let 0 | 1 = align.1 {

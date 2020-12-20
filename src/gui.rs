@@ -55,8 +55,31 @@ pub struct Id {
 }
 impl Id {
     /// Get the index of the control in the controls vector inside GUI<R>
-    pub fn get_index(&self) -> usize {
+    pub fn index(&self) -> usize {
         self.index as usize
+    }
+}
+
+// pub struct Mouse {
+//     pos: [f32; 2],
+//     event: MouseEvent,
+// }
+
+#[derive(Clone, Copy, Debug)]
+pub enum MouseButton {
+    Left,
+    Right,
+    Middle,
+    Other(u8),
+}
+impl From<winit::event::MouseButton> for MouseButton {
+    fn from(x: winit::event::MouseButton) -> MouseButton {
+        match x {
+            winit::event::MouseButton::Left => MouseButton::Left,
+            winit::event::MouseButton::Right => MouseButton::Right,
+            winit::event::MouseButton::Middle => MouseButton::Middle,
+            winit::event::MouseButton::Other(x) => MouseButton::Other(x),
+        }
     }
 }
 
@@ -64,8 +87,8 @@ impl Id {
 pub enum MouseEvent {
     Enter,
     Exit,
-    Down,
-    Up,
+    Down(MouseButton),
+    Up(MouseButton),
     Moved { x: f32, y: f32 },
 }
 
@@ -77,11 +100,11 @@ pub enum KeyboardEvent {
 
 fn move_to_front(controls: &mut Controls, id: Id) {
     debug_assert!(
-        controls[id.get_index()].generation == id.generation,
+        controls[id.index()].generation == id.generation,
         "The Control with this Id is not alive anymore"
     );
-    if let Some(parent) = controls[id.get_index()].parent {
-        let children = &mut controls[parent.get_index()].children;
+    if let Some(parent) = controls[id.index()].parent {
+        let children = &mut controls[parent.index()].children;
         let i = children.iter().position(|x| *x == id).unwrap();
         children.remove(i);
         children.push(id);
@@ -90,27 +113,27 @@ fn move_to_front(controls: &mut Controls, id: Id) {
 
 fn is_child(controls: &mut Controls, parent: Id, child: Id) -> bool {
     debug_assert!(
-        controls[child.get_index()].generation == child.generation,
+        controls[child.index()].generation == child.generation,
         "The Control with this Id is not alive anymore"
     );
     debug_assert!(
-        controls[parent.get_index()].generation == parent.generation,
+        controls[parent.index()].generation == parent.generation,
         "The Control with this Id is not alive anymore"
     );
-    Some(parent) == controls[child.get_index()].parent
+    Some(parent) == controls[child.index()].parent
 }
 
 fn is_descendant(controls: &mut Controls, ascendant: Id, descendant: Id) -> bool {
     debug_assert!(
-        controls[ascendant.get_index()].generation == ascendant.generation,
+        controls[ascendant.index()].generation == ascendant.generation,
         "The Control with this Id is not alive anymore"
     );
     debug_assert!(
-        controls[descendant.get_index()].generation == descendant.generation,
+        controls[descendant.index()].generation == descendant.generation,
         "The Control with this Id is not alive anymore"
     );
     let mut curr = descendant;
-    while let Some(parent) = controls[curr.get_index()].parent {
+    while let Some(parent) = controls[curr.index()].parent {
         if parent == ascendant {
             return true;
         }
@@ -121,25 +144,25 @@ fn is_descendant(controls: &mut Controls, ascendant: Id, descendant: Id) -> bool
 
 fn get_children(controls: &Controls, id: Id) -> Vec<Id> {
     debug_assert!(
-        controls[id.get_index()].generation == id.generation,
+        controls[id.index()].generation == id.generation,
         "The Control with this Id is not alive anymore"
     );
-    controls[id.get_index()]
+    controls[id.index()]
         .children
         .iter()
         .cloned()
-        .filter(|x| controls[x.get_index()].active)
+        .filter(|x| controls[x.index()].active)
         .collect::<Vec<Id>>()
 }
 
 fn get_control_stack(controls: &Controls, id: Id) -> Vec<Id> {
     debug_assert!(
-        controls[id.get_index()].generation == id.generation,
+        controls[id.index()].generation == id.generation,
         "The Control with this Id is not alive anymore"
     );
     let mut curr = id;
     let mut stack = vec![curr];
-    while let Some(parent) = controls[curr.get_index()].parent {
+    while let Some(parent) = controls[curr.index()].parent {
         curr = parent;
         stack.push(curr);
     }
@@ -148,12 +171,18 @@ fn get_control_stack(controls: &Controls, id: Id) -> Vec<Id> {
 
 fn lowest_common_ancestor(controls: &Controls, a: Id, b: Id) -> Option<Id> {
     debug_assert!(
-        controls[a.get_index()].generation == a.generation,
-        "The Control with this Id is not alive anymore"
+        controls[a.index()].generation == a.generation,
+        "The Control with Id {}:{} is not alive anymore. Current generation is {}",
+        a.index(),
+        a.generation,
+        controls[a.index()].generation
     );
     debug_assert!(
-        controls[b.get_index()].generation == b.generation,
-        "The Control with this Id is not alive anymore"
+        controls[b.index()].generation == b.generation,
+        "The Control with Id {}:{} is not alive anymore. Current generation is {}",
+        b.index(),
+        b.generation,
+        controls[a.index()].generation
     );
     let a_stack = get_control_stack(controls, a);
     let b_stack = get_control_stack(controls, b);
@@ -350,7 +379,7 @@ impl<'a> Context<'a> {
         modifiers: ModifiersState,
     ) -> Option<(&'a mut dyn Behaviour, Self)> {
         let this_one = unsafe {
-            &mut *(controls[this.get_index()].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
+            &mut *(controls[this.index()].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
         };
         Some((
             this_one,
@@ -376,18 +405,18 @@ impl<'a> Context<'a> {
 
     fn get_control(&self, id: Id) -> &Control {
         debug_assert!(
-            self.controls[id.get_index()].generation == id.generation,
+            self.controls[id.index()].generation == id.generation,
             "The Control with this Id is not alive anymore"
         );
-        &self.controls[id.get_index()]
+        &self.controls[id.index()]
     }
 
     fn get_control_mut(&mut self, id: Id) -> &mut Control {
         debug_assert!(
-            self.controls[id.get_index()].generation == id.generation,
+            self.controls[id.index()].generation == id.generation,
             "The Control with this Id is not alive anymore"
         );
-        &mut self.controls[id.get_index()]
+        &mut self.controls[id.index()]
     }
 
     pub fn modifiers(&self) -> ModifiersState {
@@ -556,8 +585,7 @@ impl<'a> MinSizeContext<'a> {
         controls: &'a mut Controls,
         fonts: &'a [FontArc],
     ) -> (&'a mut dyn Layout, Self) {
-        let this_one =
-            unsafe { &mut *(controls[this.get_index()].layout.as_mut() as *mut dyn Layout) };
+        let this_one = unsafe { &mut *(controls[this.index()].layout.as_mut() as *mut dyn Layout) };
         (
             this_one,
             Self {
@@ -570,18 +598,18 @@ impl<'a> MinSizeContext<'a> {
 
     fn get_control(&self, id: Id) -> &Control {
         debug_assert!(
-            self.controls[id.get_index()].generation == id.generation,
+            self.controls[id.index()].generation == id.generation,
             "The Control with this Id is not alive anymore"
         );
-        &self.controls[id.get_index()]
+        &self.controls[id.index()]
     }
 
     fn get_control_mut(&mut self, id: Id) -> &mut Control {
         debug_assert!(
-            self.controls[id.get_index()].generation == id.generation,
+            self.controls[id.index()].generation == id.generation,
             "The Control with this Id is not alive anymore"
         );
-        &mut self.controls[id.get_index()]
+        &mut self.controls[id.index()]
     }
 
     pub fn get_fonts(&mut self) -> &'a [FontArc] {
@@ -650,8 +678,7 @@ pub struct LayoutContext<'a> {
 }
 impl<'a> LayoutContext<'a> {
     fn new(this: Id, controls: &'a mut Controls) -> (&'a mut dyn Layout, Self) {
-        let this_one =
-            unsafe { &mut *(controls[this.get_index()].layout.as_mut() as *mut dyn Layout) };
+        let this_one = unsafe { &mut *(controls[this.index()].layout.as_mut() as *mut dyn Layout) };
         (
             this_one,
             Self {
@@ -665,18 +692,18 @@ impl<'a> LayoutContext<'a> {
 
     fn get_control(&self, id: Id) -> &Control {
         debug_assert!(
-            self.controls[id.get_index()].generation == id.generation,
+            self.controls[id.index()].generation == id.generation,
             "The Control with this Id is not alive anymore"
         );
-        &self.controls[id.get_index()]
+        &self.controls[id.index()]
     }
 
     fn get_control_mut(&mut self, id: Id) -> &mut Control {
         debug_assert!(
-            self.controls[id.get_index()].generation == id.generation,
+            self.controls[id.index()].generation == id.generation,
             "The Control with this Id is not alive anymore"
         );
-        &mut self.controls[id.get_index()]
+        &mut self.controls[id.index()]
     }
 
     pub fn set_rect(&mut self, id: Id, rect: [f32; 4]) {
@@ -812,6 +839,7 @@ impl<'a> LayoutContext<'a> {
 struct Input {
     mouse_x: f32,
     mouse_y: f32,
+    mouse_invalid: bool,
 }
 
 struct Controls {
@@ -902,18 +930,18 @@ impl GUI {
 
     fn get_control(&self, id: Id) -> &Control {
         debug_assert!(
-            self.controls[id.get_index()].generation == id.generation,
+            self.controls[id.index()].generation == id.generation,
             "The Control with this Id is not alive anymore"
         );
-        &self.controls[id.get_index()]
+        &self.controls[id.index()]
     }
 
     fn get_control_mut(&mut self, id: Id) -> &mut Control {
         debug_assert!(
-            self.controls[id.get_index()].generation == id.generation,
+            self.controls[id.index()].generation == id.generation,
             "The Control with this Id is not alive anymore"
         );
-        &mut self.controls[id.get_index()]
+        &mut self.controls[id.index()]
     }
 
     fn get_parent(&self, id: Id) -> Option<Id> {
@@ -954,8 +982,8 @@ impl GUI {
             active,
         } = build;
         let new = reserve;
-        
-        let mut control = &mut self.controls[new.get_index() as usize];
+
+        let mut control = &mut self.controls[new.index() as usize];
         control.rect = rect;
         control.graphic = graphic;
         control.behaviour = behaviour;
@@ -963,7 +991,10 @@ impl GUI {
         control.parent = parent;
         control.active = active;
 
-        assert_eq!(self.controls[new.get_index() as usize].generation, new.generation);
+        assert_eq!(
+            self.controls[new.index() as usize].generation,
+            new.generation
+        );
         // self.controls[new.get_index() as usize].generation = new.generation;
 
         let control = self.get_control_mut(new);
@@ -1016,6 +1047,10 @@ impl GUI {
             if Some(id) == self.current_over {
                 self.send_mouse_event_to(id, MouseEvent::Exit);
                 self.current_over = None;
+                self.input.mouse_invalid = true;
+            }
+            if Some(id) == self.current_focus {
+                self.set_focus(None);
             }
             self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
         }
@@ -1025,12 +1060,12 @@ impl GUI {
 
     /// Remove a control and all of its children
     pub fn remove_control(&mut self, id: Id) {
-        if self.controls[id.get_index()].deactive() {
+        if self.controls[id.index()].deactive() {
             if let Some(parent) = self.get_parent(id) {
                 self.update_layout(parent);
             }
         }
-        if let Some(parent) = self.controls[id.get_index()].parent {
+        if let Some(parent) = self.controls[id.index()].parent {
             let children = &mut self.get_control_mut(parent).children;
             if let Some(pos) = children.iter().position(|x| *x == id) {
                 children.remove(pos);
@@ -1044,11 +1079,15 @@ impl GUI {
             if Some(id) == self.current_over {
                 self.send_mouse_event_to(id, MouseEvent::Exit);
                 self.current_over = None;
+                self.input.mouse_invalid = true;
+            }
+            if Some(id) == self.current_focus {
+                self.set_focus(None);
             }
             self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
 
-            self.controls[id.get_index()] = Control {
-                generation: self.controls[id.get_index()].generation + 1,
+            self.controls[id.index()] = Control {
+                generation: self.controls[id.index()].generation + 1,
                 ..Control::default()
             };
             self.controls.dead_controls.push(id.index);
@@ -1244,24 +1283,30 @@ impl GUI {
     }
 
     pub fn handle_event<T>(&mut self, event: &Event<T>) {
-        if let Event::WindowEvent { event, .. } = event {
-            match event {
+        match event {
+            Event::MainEventsCleared => {
+                if self.input.mouse_invalid {
+                    self.input.mouse_invalid = false;
+                    self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
+                }
+            }
+            Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CursorMoved { position, .. } => {
                     self.input.mouse_x = position.x as f32;
                     self.input.mouse_y = position.y as f32;
                     self.mouse_moved(position.x as f32, position.y as f32);
                 }
-                WindowEvent::MouseInput { state, .. } => {
+                WindowEvent::MouseInput { state, button, .. } => {
                     if let ElementState::Pressed = state {
                         self.set_focus(self.current_over);
                     }
                     if let Some(curr) = self.current_over {
                         match state {
                             ElementState::Pressed => {
-                                self.send_mouse_event_to(curr, MouseEvent::Down);
+                                self.send_mouse_event_to(curr, MouseEvent::Down((*button).into()));
                             }
                             ElementState::Released => {
-                                self.send_mouse_event_to(curr, MouseEvent::Up);
+                                self.send_mouse_event_to(curr, MouseEvent::Up((*button).into()));
                             }
                         };
                     }
@@ -1283,8 +1328,8 @@ impl GUI {
                     }
                 }
                 WindowEvent::CursorLeft { .. } => {
-                    if let Some(curr) = self.current_over.take() {
-                        if !self.over_is_locked {
+                    if !self.over_is_locked {
+                        if let Some(curr) = self.current_over.take() {
                             self.send_mouse_event_to(curr, MouseEvent::Exit);
                         }
                     }
@@ -1316,7 +1361,8 @@ impl GUI {
                     }
                 }
                 _ => {}
-            }
+            },
+            _ => {}
         }
     }
 

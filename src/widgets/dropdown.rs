@@ -1,4 +1,4 @@
-use crate::{event, widgets::ButtonStyle, Behaviour, Context, Id, MouseEvent};
+use crate::{event, style::ButtonStyle, Behaviour, Context, Id, MouseEvent, MouseButton};
 
 use std::any::Any;
 
@@ -6,11 +6,11 @@ struct SetIndex(usize);
 // struct SetOwner(Id);
 // struct SetItens<T: 'static + Clone>(Vec<T>);
 // struct SetFocus(usize);
-struct ShowMenu<T: 'static + Clone>(Id, Option<usize>, Vec<T>);
+pub struct ShowMenu<T: 'static + Clone>(pub Id, pub Option<usize>, pub Vec<T>);
 pub struct CloseMenu;
 #[derive(Clone, Copy)]
-struct ItemClicked {
-    index: usize,
+pub struct ItemClicked {
+    pub index: usize,
 }
 struct MenuClosed;
 
@@ -44,6 +44,7 @@ impl Behaviour for MenuItem {
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+        use MouseButton::*;
         match event {
             MouseEvent::Enter => {
                 self.state = 1;
@@ -57,18 +58,18 @@ impl Behaviour for MenuItem {
                     ctx.set_graphic(this, self.style.normal.clone());
                 }
             }
-            MouseEvent::Down => {
+            MouseEvent::Down(Left) => {
                 self.state = 2;
                 ctx.set_graphic(this, self.style.pressed.clone());
             }
-            MouseEvent::Up => {
+            MouseEvent::Up(Left) => {
                 if self.state == 2 {
                     ctx.send_event_to(self.menu, ItemClicked { index: self.index });
                 }
                 self.state = 1;
                 ctx.set_graphic(this, self.style.hover.clone());
             }
-            MouseEvent::Moved { .. } => {}
+            _ => {}
         }
         true
     }
@@ -95,7 +96,7 @@ impl<F: Fn(Id, &mut Context)> Blocker<F> {
 }
 impl<F: Fn(Id, &mut Context)> Behaviour for Blocker<F> {
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
-        if let MouseEvent::Down = event {
+        if let MouseEvent::Down(_) = event {
             (self.on_down)(this, ctx);
         }
         true
@@ -134,7 +135,7 @@ where
 }
 impl<T, F> Behaviour for Menu<T, F>
 where
-    T: 'static + Clone,
+    T: 'static + Clone + std::fmt::Debug,
     F: Fn(&T, Id, &mut Context) -> Id,
 {
     fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
@@ -161,6 +162,7 @@ where
             }
             self.list = itens.clone();
             // active blocker
+            ctx.active(this);
             ctx.active(self.blocker);
             ctx.move_to_front(self.blocker);
             ctx.move_to_front(this);
@@ -220,13 +222,13 @@ where
             self.selected = Some(x.index);
             (self.on_select)(self.itens[x.index].clone(), this, ctx);
             self.opened = false;
-        // ctx.send_event_to(self.menu.clo);
         } else if event.is::<MenuClosed>() {
             self.opened = false;
         }
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+        use MouseButton::*;
         match event {
             MouseEvent::Enter => {
                 self.state = 1;
@@ -240,15 +242,15 @@ where
                     ctx.set_graphic(this, self.style.normal.clone());
                 }
             }
-            MouseEvent::Down => {
+            MouseEvent::Down(Left) => {
                 self.state = 2;
                 ctx.set_graphic(this, self.style.pressed.clone());
             }
-            MouseEvent::Up => {
+            MouseEvent::Up(Left) => {
                 if self.state == 2 {
                     if !self.opened {
                         self.opened = true;
-                        ctx.active(self.menu);
+                        // ctx.active(self.menu);
                         let size = *ctx.get_rect(this);
                         ctx.set_anchors(self.menu, [0.0, 0.0, 0.0, 0.0]);
                         ctx.set_margins(self.menu, [size[0], size[3], size[2], size[3]]);
@@ -271,7 +273,7 @@ where
                 self.state = 1;
                 ctx.set_graphic(this, self.style.hover.clone());
             }
-            MouseEvent::Moved { .. } => {}
+            _ => {}
         }
         true
     }

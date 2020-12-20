@@ -1,5 +1,5 @@
 use crate::{
-    event, Behaviour, Context, Id, KeyboardEvent, Layout, LayoutContext, MinSizeContext, MouseEvent,
+    event, Behaviour, Context, Id, KeyboardEvent, Layout, LayoutContext, MinSizeContext, MouseEvent, MouseButton
 };
 
 use std::any::Any;
@@ -34,13 +34,14 @@ impl ScrollBar {
 }
 impl Behaviour for ScrollBar {
     fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) -> bool {
+        use MouseButton::*;
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {
                 ctx.get_graphic_mut(self.handle)
                     .set_color([220, 220, 220, 255]);
             }
-            MouseEvent::Down => {
+            MouseEvent::Down(Left) => {
                 self.dragging = true;
                 ctx.get_graphic_mut(self.handle)
                     .set_color([180, 180, 180, 255]);
@@ -85,7 +86,7 @@ impl Behaviour for ScrollBar {
                     }
                 }
             }
-            MouseEvent::Up => {
+            MouseEvent::Up(Left) => {
                 if self.dragging {
                     self.dragging = false;
                     ctx.send_event(event::UnlockOver);
@@ -135,7 +136,9 @@ impl Behaviour for ScrollBar {
                         graphic.set_color([200, 200, 200, 255]);
                     }
                 }
-            }
+            },
+            MouseEvent::Up(_) => {}
+            MouseEvent::Down(_) => {}
         }
         true
     }

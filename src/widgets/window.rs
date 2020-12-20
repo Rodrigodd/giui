@@ -1,4 +1,4 @@
-use crate::{event, Behaviour, Context, Id, MouseEvent};
+use crate::{event, Behaviour, Context, Id, MouseEvent, MouseButton};
 
 const LEFT: u8 = 0x1;
 const RIGHT: u8 = 0x2;
@@ -24,10 +24,11 @@ impl Window {
 }
 impl Behaviour for Window {
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+        use MouseButton::*;
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {}
-            MouseEvent::Down => {
+            MouseEvent::Down(Left) => {
                 let rect = *ctx.get_rect(this);
                 if self.mouse_pos[0] - rect[0] < 5.0 {
                     self.state |= LEFT;
@@ -55,7 +56,7 @@ impl Behaviour for Window {
                 self.start_dragging = self.mouse_pos;
                 self.start_margins = margins;
             }
-            MouseEvent::Up => {
+            MouseEvent::Up(Left) => {
                 self.state = 0;
                 ctx.send_event(event::UnlockOver);
             }
@@ -117,6 +118,8 @@ impl Behaviour for Window {
                 }
                 self.mouse_pos = [x, y];
             }
+            MouseEvent::Up(_) => {}
+            MouseEvent::Down(_) => {}
         }
         true
     }

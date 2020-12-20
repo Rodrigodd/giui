@@ -1,7 +1,7 @@
 use crate::{
     event,
-    widgets::{ButtonStyle, OnFocusStyle},
-    Behaviour, Context, Id, MouseEvent,
+    style::{ButtonStyle, OnFocusStyle},
+    Behaviour, Context, Id, MouseEvent, MouseButton
 };
 
 pub struct Toggle {
@@ -53,6 +53,7 @@ impl Behaviour for Toggle {
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+        use MouseButton::*;
         match event {
             MouseEvent::Enter => {
                 let graphic = ctx.get_graphic_mut(self.button);
@@ -63,12 +64,12 @@ impl Behaviour for Toggle {
                 let graphic = ctx.get_graphic_mut(self.button);
                 graphic.set_color([200, 200, 200, 255]);
             }
-            MouseEvent::Down => {
+            MouseEvent::Down(Left) => {
                 self.click = true;
                 let graphic = ctx.get_graphic_mut(self.button);
                 graphic.set_color([170, 170, 170, 255]);
             }
-            MouseEvent::Up => {
+            MouseEvent::Up(Left) => {
                 let graphic = ctx.get_graphic_mut(self.button);
                 graphic.set_color([190, 190, 190, 255]);
                 if self.click {
@@ -85,6 +86,8 @@ impl Behaviour for Toggle {
                 }
             }
             MouseEvent::Moved { .. } => {}
+            MouseEvent::Up(_) => {}
+            MouseEvent::Down(_) => {}
         }
         true
     }
