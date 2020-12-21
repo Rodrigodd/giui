@@ -1,4 +1,8 @@
-use crate::{render::Graphic, util::cmp_float};
+use crate::{
+    context::{Context, LayoutContext, MinSizeContext},
+    render::Graphic,
+    Control, ControlBuild, ControlBuilder, Controls, LayoutDirtyFlags, Rect,
+};
 use ab_glyph::FontArc;
 use std::any::Any;
 use std::collections::VecDeque;
@@ -50,13 +54,17 @@ pub const ROOT_ID: Id = Id {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Id {
-    index: u32,
-    generation: u32,
+    pub(crate) index: u32,
+    pub(crate) generation: u32,
 }
 impl Id {
     /// Get the index of the control in the controls vector inside GUI<R>
     pub fn index(&self) -> usize {
         self.index as usize
+    }
+    /// Get the generation of the control it is refering
+    pub fn generation(&self) -> u32 {
+        self.generation as u32
     }
 }
 
@@ -98,792 +106,11 @@ pub enum KeyboardEvent {
     Pressed(VirtualKeyCode),
 }
 
-fn move_to_front(controls: &mut Controls, id: Id) {
-    debug_assert!(
-        controls[id.index()].generation == id.generation,
-        "The Control with this Id is not alive anymore"
-    );
-    if let Some(parent) = controls[id.index()].parent {
-        let children = &mut controls[parent.index()].children;
-        let i = children.iter().position(|x| *x == id).unwrap();
-        children.remove(i);
-        children.push(id);
-    }
-}
-
-fn is_child(controls: &mut Controls, parent: Id, child: Id) -> bool {
-    debug_assert!(
-        controls[child.index()].generation == child.generation,
-        "The Control with this Id is not alive anymore"
-    );
-    debug_assert!(
-        controls[parent.index()].generation == parent.generation,
-        "The Control with this Id is not alive anymore"
-    );
-    Some(parent) == controls[child.index()].parent
-}
-
-fn is_descendant(controls: &mut Controls, ascendant: Id, descendant: Id) -> bool {
-    debug_assert!(
-        controls[ascendant.index()].generation == ascendant.generation,
-        "The Control with this Id is not alive anymore"
-    );
-    debug_assert!(
-        controls[descendant.index()].generation == descendant.generation,
-        "The Control with this Id is not alive anymore"
-    );
-    let mut curr = descendant;
-    while let Some(parent) = controls[curr.index()].parent {
-        if parent == ascendant {
-            return true;
-        }
-        curr = parent;
-    }
-    false
-}
-
-fn get_children(controls: &Controls, id: Id) -> Vec<Id> {
-    debug_assert!(
-        controls[id.index()].generation == id.generation,
-        "The Control with this Id is not alive anymore"
-    );
-    controls[id.index()]
-        .children
-        .iter()
-        .cloned()
-        .filter(|x| controls[x.index()].active)
-        .collect::<Vec<Id>>()
-}
-
-fn get_control_stack(controls: &Controls, id: Id) -> Vec<Id> {
-    debug_assert!(
-        controls[id.index()].generation == id.generation,
-        "The Control with this Id is not alive anymore"
-    );
-    let mut curr = id;
-    let mut stack = vec![curr];
-    while let Some(parent) = controls[curr.index()].parent {
-        curr = parent;
-        stack.push(curr);
-    }
-    stack
-}
-
-fn lowest_common_ancestor(controls: &Controls, a: Id, b: Id) -> Option<Id> {
-    debug_assert!(
-        controls[a.index()].generation == a.generation,
-        "The Control with Id {}:{} is not alive anymore. Current generation is {}",
-        a.index(),
-        a.generation,
-        controls[a.index()].generation
-    );
-    debug_assert!(
-        controls[b.index()].generation == b.generation,
-        "The Control with Id {}:{} is not alive anymore. Current generation is {}",
-        b.index(),
-        b.generation,
-        controls[a.index()].generation
-    );
-    let a_stack = get_control_stack(controls, a);
-    let b_stack = get_control_stack(controls, b);
-    // lowest common anscertor
-    a_stack
-        .iter()
-        .rev()
-        .zip(b_stack.iter().rev())
-        .take_while(|(a, b)| *a == *b)
-        .last()
-        .map(|(a, _)| *a)
-}
-
-pub struct ControlBuilder<'a> {
-    builder: Box<dyn FnOnce(ControlBuild) -> Id + 'a>,
-    build: ControlBuild,
-}
-impl<'a> ControlBuilder<'a> {
-    fn new(builder: Box<dyn FnOnce(ControlBuild) -> Id + 'a>) -> Self {
-        Self {
-            builder,
-            build: ControlBuild::default(),
-        }
-    }
-    pub fn with_anchors(mut self, anchors: [f32; 4]) -> Self {
-        self.build.rect.anchors = anchors;
-        self
-    }
-    pub fn with_margins(mut self, margins: [f32; 4]) -> Self {
-        self.build.rect.margins = margins;
-        self
-    }
-    pub fn with_min_size(mut self, min_size: [f32; 2]) -> Self {
-        self.build.rect.min_size = min_size;
-        self
-    }
-    pub fn with_min_width(mut self, min_width: f32) -> Self {
-        self.build.rect.min_size[0] = min_width;
-        self
-    }
-    pub fn with_min_height(mut self, min_height: f32) -> Self {
-        self.build.rect.min_size[1] = min_height;
-        self
-    }
-    pub fn with_fill_x(mut self, fill: RectFill) -> Self {
-        self.build.rect.set_fill_x(fill);
-        self
-    }
-    pub fn with_fill_y(mut self, fill: RectFill) -> Self {
-        self.build.rect.set_fill_y(fill);
-        self
-    }
-    pub fn with_expand_x(mut self, expand: bool) -> Self {
-        self.build.rect.expand_x = expand;
-        self
-    }
-    pub fn with_expand_y(mut self, expand: bool) -> Self {
-        self.build.rect.expand_y = expand;
-        self
-    }
-    pub fn with_behaviour<T: Behaviour + 'static>(mut self, behaviour: T) -> Self {
-        // TODO: remove this in production!!
-        debug_assert!(self.build.behaviour.is_none());
-        self.build.behaviour = Some(Box::new(behaviour));
-        self
-    }
-    pub fn with_layout<T: Layout + 'static>(mut self, layout: T) -> Self {
-        self.build.layout = Box::new(layout);
-        self
-    }
-    pub fn with_graphic(mut self, graphic: Graphic) -> Self {
-        self.build.graphic = graphic;
-        self
-    }
-    pub fn with_parent(mut self, parent: Id) -> Self {
-        self.build.parent = Some(parent);
-        self
-    }
-    pub fn with_active(mut self, active: bool) -> Self {
-        self.build.active = active;
-        self
-    }
-    pub fn build(self) -> Id {
-        let Self { build, builder } = self;
-        (builder)(build)
-    }
-}
-
-#[derive(Default)]
-pub struct Control {
-    generation: u32,
-    rect: Rect,
-    graphic: Graphic,
-    behaviour: Option<Box<dyn Behaviour>>,
-    layout: Box<dyn Layout>,
-    parent: Option<Id>,
-    children: Vec<Id>,
-    active: bool,
-}
-impl Control {
-    /// add one more behaviour to the control
-    pub fn with_behaviour(mut self, behaviour: Box<dyn Behaviour>) -> Self {
-        self.behaviour = Some(behaviour);
-        self
-    }
-
-    /// add one more behaviour to the control
-    pub fn set_behaviour(&mut self, behaviour: Box<dyn Behaviour>) {
-        self.behaviour = Some(behaviour);
-    }
-
-    pub fn set_layout(&mut self, layout: Box<dyn Layout>) {
-        self.layout = layout;
-    }
-
-    fn add_children(&mut self, child: Id) {
-        if !self.children.iter().any(|x| *x == child) {
-            self.children.push(child)
-        }
-    }
-
-    /// Set the widget with that id to active = true.
-    /// Return true if the active was false.
-    fn active(&mut self) -> bool {
-        if self.active {
-            false
-        } else {
-            self.active = true;
-            true
-        }
-    }
-
-    #[inline]
-    /// Set the widget with that id to active = false.
-    /// Return true if the active was true.
-    fn deactive(&mut self) -> bool {
-        if self.active {
-            self.active = false;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-pub struct ControlBuild {
-    rect: Rect,
-    graphic: Graphic,
-    behaviour: Option<Box<dyn Behaviour>>,
-    layout: Box<dyn Layout>,
-    parent: Option<Id>,
-    active: bool,
-}
-impl Default for ControlBuild {
-    fn default() -> Self {
-        Self {
-            rect: Rect::default(),
-            graphic: Graphic::None,
-            layout: Default::default(),
-            behaviour: None,
-            parent: None,
-            active: true,
-        }
-    }
-}
-
-// contains a reference to all the controls, except the behaviour of one control
-pub struct Context<'a> {
-    modifiers: ModifiersState,
-    controls: &'a mut Controls,
-    fonts: &'a [FontArc],
-    events: Vec<Box<dyn Any>>,
-    events_to: Vec<(Id, Box<dyn Any>)>,
-    dirtys: Vec<Id>,
-    render_dirty: bool,
-}
-impl<'a> Context<'a> {
-    fn new(controls: &'a mut Controls, fonts: &'a [FontArc], modifiers: ModifiersState) -> Self {
-        Self {
-            modifiers,
-            controls,
-            events: Vec::new(),
-            events_to: Vec::new(),
-            fonts,
-            dirtys: Vec::new(),
-            render_dirty: false,
-        }
-    }
-
-    fn new_with_mut_behaviour(
-        this: Id,
-        controls: &'a mut Controls,
-        fonts: &'a [FontArc],
-        modifiers: ModifiersState,
-    ) -> Option<(&'a mut dyn Behaviour, Self)> {
-        let this_one = unsafe {
-            &mut *(controls[this.index()].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
-        };
-        Some((
-            this_one,
-            Self {
-                modifiers,
-                controls,
-                events: Vec::new(),
-                events_to: Vec::new(),
-                fonts,
-                dirtys: Vec::new(),
-                render_dirty: false,
-            },
-        ))
-    }
-
-    pub fn create_control(&mut self) -> ControlBuilder {
-        let id = self.controls.reserve();
-        ControlBuilder::new(Box::new(move |build| {
-            self.send_event((id, build));
-            id
-        }))
-    }
-
-    fn get_control(&self, id: Id) -> &Control {
-        debug_assert!(
-            self.controls[id.index()].generation == id.generation,
-            "The Control with this Id is not alive anymore"
-        );
-        &self.controls[id.index()]
-    }
-
-    fn get_control_mut(&mut self, id: Id) -> &mut Control {
-        debug_assert!(
-            self.controls[id.index()].generation == id.generation,
-            "The Control with this Id is not alive anymore"
-        );
-        &mut self.controls[id.index()]
-    }
-
-    pub fn modifiers(&self) -> ModifiersState {
-        self.modifiers
-    }
-
-    pub fn get_fonts(&mut self) -> &'a [FontArc] {
-        self.fonts
-    }
-
-    pub fn send_event<T: 'static>(&mut self, event: T) {
-        self.events.push(Box::new(event));
-    }
-    pub fn send_event_to<T: 'static>(&mut self, id: Id, event: T) {
-        self.events_to.push((id, Box::new(event)));
-    }
-
-    pub fn get_layouting(&mut self, id: Id) -> &mut Rect {
-        &mut self.get_control_mut(id).rect
-    }
-
-    pub fn dirty_layout(&mut self, id: Id) {
-        if !self.dirtys.iter().any(|x| *x == id) {
-            self.dirtys.push(id);
-        }
-    }
-
-    pub fn get_rect(&self, id: Id) -> &[f32; 4] {
-        &self.get_control(id).rect.rect
-    }
-
-    pub fn get_size(&mut self, id: Id) -> [f32; 2] {
-        self.get_control(id).rect.get_size()
-    }
-
-    pub fn get_margins(&self, id: Id) -> &[f32; 4] {
-        &self.get_control(id).rect.margins
-    }
-
-    pub fn set_margins(&mut self, id: Id, margins: [f32; 4]) {
-        self.get_control_mut(id).rect.margins = margins;
-        self.dirty_layout(id);
-    }
-
-    pub fn get_anchors(&self, id: Id) -> &[f32; 4] {
-        &self.get_control(id).rect.anchors
-    }
-
-    pub fn set_margin_left(&mut self, id: Id, margin: f32) {
-        self.get_control_mut(id).rect.margins[0] = margin;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_margin_top(&mut self, id: Id, margin: f32) {
-        self.get_control_mut(id).rect.margins[1] = margin;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_margin_right(&mut self, id: Id, margin: f32) {
-        self.get_control_mut(id).rect.margins[2] = margin;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_margin_bottom(&mut self, id: Id, margin: f32) {
-        self.get_control_mut(id).rect.margins[3] = margin;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_anchors(&mut self, id: Id, anchors: [f32; 4]) {
-        self.get_control_mut(id).rect.anchors = anchors;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_anchor_left(&mut self, id: Id, anchor: f32) {
-        self.get_control_mut(id).rect.anchors[0] = anchor;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_anchor_top(&mut self, id: Id, anchor: f32) {
-        self.get_control_mut(id).rect.anchors[1] = anchor;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_anchor_right(&mut self, id: Id, anchor: f32) {
-        self.get_control_mut(id).rect.anchors[2] = anchor;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_anchor_bottom(&mut self, id: Id, anchor: f32) {
-        self.get_control_mut(id).rect.anchors[3] = anchor;
-        self.dirty_layout(id);
-    }
-
-    pub fn get_min_size(&self, id: Id) -> [f32; 2] {
-        self.get_control(id).rect.get_min_size()
-    }
-
-    pub fn set_min_size(&mut self, id: Id, min_size: [f32; 2]) {
-        self.get_control_mut(id).rect.set_min_size(min_size);
-        self.dirty_layout(id);
-    }
-
-    pub fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
-        self.render_dirty = true;
-        &mut self.get_control_mut(id).graphic
-    }
-
-    pub fn set_graphic(&mut self, id: Id, graphic: Graphic) {
-        let control = self.get_control_mut(id);
-        control.graphic = graphic;
-        control.rect.dirty_render_dirty_flags();
-        self.render_dirty = true;
-    }
-
-    pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
-        let control = self.get_control_mut(id);
-        if let Graphic::None = control.graphic {
-            None
-        } else {
-            Some((&mut control.rect, &mut control.graphic))
-        }
-    }
-
-    pub fn is_active(&self, id: Id) -> bool {
-        self.get_control(id).active
-    }
-
-    /// This only took effect when Controls is dropped
-    pub fn active(&mut self, id: Id) {
-        self.events.push(Box::new(event::ActiveControl { id }));
-    }
-
-    /// This only took effect when Controls is dropped
-    pub fn deactive(&mut self, id: Id) {
-        self.events.push(Box::new(event::DeactiveControl { id }));
-    }
-
-    /// Destroy the control, drop it, invalidating all of its referencing Id's
-    /// This only took effect when Controls is dropped
-    pub fn remove(&mut self, id: Id) {
-        self.events.push(Box::new(event::RemoveControl { id }));
-    }
-
-    pub fn move_to_front(&mut self, id: Id) {
-        move_to_front(self.controls, id);
-        self.dirty_layout(id);
-    }
-
-    pub fn get_parent(&self, id: Id) -> Option<Id> {
-        self.get_control(id).parent
-    }
-
-    pub fn get_children(&self, id: Id) -> Vec<Id> {
-        get_children(&self.controls, id)
-    }
-}
-
-pub struct MinSizeContext<'a> {
-    this: Id,
-    controls: &'a mut Controls,
-    fonts: &'a [FontArc],
-}
-impl<'a> MinSizeContext<'a> {
-    fn new(
-        this: Id,
-        controls: &'a mut Controls,
-        fonts: &'a [FontArc],
-    ) -> (&'a mut dyn Layout, Self) {
-        let this_one = unsafe { &mut *(controls[this.index()].layout.as_mut() as *mut dyn Layout) };
-        (
-            this_one,
-            Self {
-                this,
-                controls,
-                fonts,
-            },
-        )
-    }
-
-    fn get_control(&self, id: Id) -> &Control {
-        debug_assert!(
-            self.controls[id.index()].generation == id.generation,
-            "The Control with this Id is not alive anymore"
-        );
-        &self.controls[id.index()]
-    }
-
-    fn get_control_mut(&mut self, id: Id) -> &mut Control {
-        debug_assert!(
-            self.controls[id.index()].generation == id.generation,
-            "The Control with this Id is not alive anymore"
-        );
-        &mut self.controls[id.index()]
-    }
-
-    pub fn get_fonts(&mut self) -> &'a [FontArc] {
-        self.fonts
-    }
-
-    pub fn get_layouting(&self, id: Id) -> &Rect {
-        &self.get_control(id).rect
-    }
-
-    pub fn get_rect(&self, id: Id) -> &[f32; 4] {
-        &self.get_control(id).rect.rect
-    }
-
-    pub fn get_size(&mut self, id: Id) -> [f32; 2] {
-        self.get_control(id).rect.get_size()
-    }
-
-    pub fn get_margins(&self, id: Id) -> &[f32; 4] {
-        &self.get_control(id).rect.margins
-    }
-
-    pub fn get_anchors(&self, id: Id) -> &[f32; 4] {
-        &self.get_control(id).rect.anchors
-    }
-
-    pub fn get_min_size(&self, id: Id) -> [f32; 2] {
-        self.get_control(id).rect.get_min_size()
-    }
-
-    pub fn set_this_min_size(&mut self, min_size: [f32; 2]) {
-        self.get_control_mut(self.this).rect.set_min_size(min_size);
-    }
-
-    pub fn get_graphic(&mut self, id: Id) -> &mut Graphic {
-        &mut self.get_control_mut(id).graphic
-    }
-
-    pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
-        let control = self.get_control_mut(id);
-        if let Graphic::None = control.graphic {
-            None
-        } else {
-            Some((&mut control.rect, &mut control.graphic))
-        }
-    }
-
-    pub fn is_active(&self, id: Id) -> bool {
-        self.get_control(id).active
-    }
-
-    pub fn get_parent(&self, id: Id) -> Option<Id> {
-        self.get_control(id).parent
-    }
-
-    pub fn get_children(&self, id: Id) -> Vec<Id> {
-        get_children(&self.controls, id)
-    }
-}
-
-pub struct LayoutContext<'a> {
-    this: Id,
-    controls: &'a mut Controls,
-    dirtys: Vec<Id>,
-    events: Vec<Box<dyn Any>>,
-}
-impl<'a> LayoutContext<'a> {
-    fn new(this: Id, controls: &'a mut Controls) -> (&'a mut dyn Layout, Self) {
-        let this_one = unsafe { &mut *(controls[this.index()].layout.as_mut() as *mut dyn Layout) };
-        (
-            this_one,
-            Self {
-                this,
-                controls,
-                dirtys: Vec::new(),
-                events: Vec::new(),
-            },
-        )
-    }
-
-    fn get_control(&self, id: Id) -> &Control {
-        debug_assert!(
-            self.controls[id.index()].generation == id.generation,
-            "The Control with this Id is not alive anymore"
-        );
-        &self.controls[id.index()]
-    }
-
-    fn get_control_mut(&mut self, id: Id) -> &mut Control {
-        debug_assert!(
-            self.controls[id.index()].generation == id.generation,
-            "The Control with this Id is not alive anymore"
-        );
-        &mut self.controls[id.index()]
-    }
-
-    pub fn set_rect(&mut self, id: Id, rect: [f32; 4]) {
-        self.get_control_mut(id).rect.set_rect(rect);
-    }
-
-    pub fn set_designed_rect(&mut self, id: Id, rect: [f32; 4]) {
-        self.get_control_mut(id).rect.set_designed_rect(rect);
-    }
-
-    pub fn get_layouting(&self, id: Id) -> &Rect {
-        &self.get_control(id).rect
-    }
-
-    pub fn dirty_layout(&mut self, id: Id) {
-        debug_assert!(
-            !is_child(self.controls, self.this, id),
-            "It is only allowed to modify a child using set_rect, or set_designed_rect."
-        );
-        debug_assert!(
-            is_descendant(self.controls, self.this, id),
-            "It is only allowed to modify descendant controls."
-        );
-        if !self.dirtys.iter().any(|x| *x == id) {
-            self.dirtys.push(id);
-        }
-    }
-
-    pub fn get_rect(&self, id: Id) -> &[f32; 4] {
-        &self.get_control(id).rect.rect
-    }
-
-    pub fn get_size(&mut self, id: Id) -> [f32; 2] {
-        self.get_control_mut(id).rect.get_size()
-    }
-
-    pub fn get_margins(&self, id: Id) -> &[f32; 4] {
-        &self.get_control(id).rect.margins
-    }
-
-    pub fn set_margins(&mut self, id: Id, margins: [f32; 4]) {
-        self.get_control_mut(id).rect.margins = margins;
-        self.dirty_layout(id);
-    }
-
-    pub fn get_anchors(&self, id: Id) -> &[f32; 4] {
-        &self.get_control(id).rect.anchors
-    }
-
-    pub fn set_margin_left(&mut self, id: Id, margin: f32) {
-        self.get_control_mut(id).rect.margins[0] = margin;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_margin_top(&mut self, id: Id, margin: f32) {
-        self.get_control_mut(id).rect.margins[1] = margin;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_margin_right(&mut self, id: Id, margin: f32) {
-        self.get_control_mut(id).rect.margins[2] = margin;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_margin_bottom(&mut self, id: Id, margin: f32) {
-        self.get_control_mut(id).rect.margins[3] = margin;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_anchors(&mut self, id: Id, anchors: [f32; 4]) {
-        self.get_control_mut(id).rect.anchors = anchors;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_anchor_left(&mut self, id: Id, anchor: f32) {
-        self.get_control_mut(id).rect.anchors[0] = anchor;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_anchor_top(&mut self, id: Id, anchor: f32) {
-        self.get_control_mut(id).rect.anchors[1] = anchor;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_anchor_right(&mut self, id: Id, anchor: f32) {
-        self.get_control_mut(id).rect.anchors[2] = anchor;
-        self.dirty_layout(id);
-    }
-
-    pub fn set_anchor_bottom(&mut self, id: Id, anchor: f32) {
-        self.get_control_mut(id).rect.anchors[3] = anchor;
-        self.dirty_layout(id);
-    }
-
-    pub fn get_min_size(&self, id: Id) -> [f32; 2] {
-        self.get_control(id).rect.get_min_size()
-    }
-
-    pub fn set_min_size(&mut self, id: Id, min_size: [f32; 2]) {
-        self.get_control_mut(id).rect.set_min_size(min_size);
-        self.dirty_layout(id);
-    }
-
-    pub fn is_active(&self, id: Id) -> bool {
-        self.get_control(id).active
-    }
-
-    /// This only took effect when Controls is dropped
-    pub fn active(&mut self, id: Id) {
-        self.events.push(Box::new(event::ActiveControl { id }));
-    }
-
-    /// This only took effect when Controls is dropped
-    pub fn deactive(&mut self, id: Id) {
-        self.events.push(Box::new(event::DeactiveControl { id }));
-    }
-
-    pub fn move_to_front(&mut self, id: Id) {
-        move_to_front(self.controls, id);
-        self.dirty_layout(id);
-    }
-
-    pub fn get_parent(&self, id: Id) -> Option<Id> {
-        self.get_control(id).parent
-    }
-
-    pub fn get_children(&self, id: Id) -> Vec<Id> {
-        get_children(&self.controls, id)
-    }
-}
-
 #[derive(Default)]
 struct Input {
     mouse_x: f32,
     mouse_y: f32,
     mouse_invalid: bool,
-}
-
-struct Controls {
-    dead_controls: Vec<u32>,
-    controls: Vec<Control>,
-}
-impl Controls {
-    fn reserve(&mut self) -> Id {
-        if let Some(index) = self.dead_controls.pop() {
-            Id {
-                generation: self.controls[index as usize].generation,
-                index,
-            }
-        } else {
-            let control = Control {
-                generation: 0,
-                ..Control::default()
-            };
-            self.controls.push(control);
-            Id {
-                generation: 0,
-                index: self.controls.len() as u32 - 1,
-            }
-        }
-    }
-}
-impl std::ops::Index<usize> for Controls {
-    type Output = Control;
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.controls[index]
-    }
-}
-impl std::ops::IndexMut<usize> for Controls {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.controls[index]
-    }
-}
-impl From<Vec<Control>> for Controls {
-    fn from(controls: Vec<Control>) -> Self {
-        Self {
-            dead_controls: Vec::new(),
-            controls,
-        }
-    }
 }
 
 pub struct GUI {
@@ -928,28 +155,12 @@ impl GUI {
         }
     }
 
-    fn get_control(&self, id: Id) -> &Control {
-        debug_assert!(
-            self.controls[id.index()].generation == id.generation,
-            "The Control with this Id is not alive anymore"
-        );
-        &self.controls[id.index()]
-    }
-
-    fn get_control_mut(&mut self, id: Id) -> &mut Control {
-        debug_assert!(
-            self.controls[id.index()].generation == id.generation,
-            "The Control with this Id is not alive anymore"
-        );
-        &mut self.controls[id.index()]
-    }
-
     fn get_parent(&self, id: Id) -> Option<Id> {
-        self.get_control(id).parent
+        self.controls[id].parent
     }
 
     fn get_children(&self, id: Id) -> Vec<Id> {
-        get_children(&self.controls, id)
+        self.controls.get_children(id)
     }
 
     pub fn reserve_id(&mut self) -> Id {
@@ -967,12 +178,12 @@ impl GUI {
         }))
     }
 
-    pub fn add_control(&mut self, build: ControlBuild) -> Id {
+    fn add_control(&mut self, build: ControlBuild) -> Id {
         let reserve = self.controls.reserve();
         self.add_control_reserved(build, reserve)
     }
 
-    pub fn add_control_reserved(&mut self, build: ControlBuild, reserve: Id) -> Id {
+    fn add_control_reserved(&mut self, build: ControlBuild, reserve: Id) -> Id {
         let ControlBuild {
             rect,
             graphic,
@@ -983,7 +194,7 @@ impl GUI {
         } = build;
         let new = reserve;
 
-        let mut control = &mut self.controls[new.index() as usize];
+        let mut control = &mut self.controls[new];
         control.rect = rect;
         control.graphic = graphic;
         control.behaviour = behaviour;
@@ -991,19 +202,16 @@ impl GUI {
         control.parent = parent;
         control.active = active;
 
-        assert_eq!(
-            self.controls[new.index() as usize].generation,
-            new.generation
-        );
+        assert_eq!(self.controls[new].generation, new.generation);
         // self.controls[new.get_index() as usize].generation = new.generation;
 
-        let control = self.get_control_mut(new);
+        let control = &mut self.controls[new];
 
         if let Some(parent) = control.parent {
-            self.get_control_mut(parent).add_children(new);
+            self.controls[parent].add_children(new);
         } else {
             control.parent = Some(ROOT_ID);
-            self.get_control_mut(ROOT_ID).add_children(new);
+            self.controls[ROOT_ID].add_children(new);
         }
 
         if active {
@@ -1019,7 +227,7 @@ impl GUI {
     }
 
     pub fn active_control(&mut self, id: Id) {
-        if !self.get_control_mut(id).active() {
+        if !self.controls[id].active() {
             return;
         }
         if let Some(parent) = self.get_parent(id) {
@@ -1035,7 +243,7 @@ impl GUI {
     }
 
     pub fn deactive_control(&mut self, id: Id) {
-        if !self.get_control_mut(id).deactive() {
+        if !self.controls[id].deactive() {
             return;
         }
         if let Some(parent) = self.get_parent(id) {
@@ -1060,13 +268,13 @@ impl GUI {
 
     /// Remove a control and all of its children
     pub fn remove_control(&mut self, id: Id) {
-        if self.controls[id.index()].deactive() {
+        if self.controls[id].deactive() {
             if let Some(parent) = self.get_parent(id) {
                 self.update_layout(parent);
             }
         }
-        if let Some(parent) = self.controls[id.index()].parent {
-            let children = &mut self.get_control_mut(parent).children;
+        if let Some(parent) = self.controls[id].parent {
+            let children = &mut self.controls[parent].children;
             if let Some(pos) = children.iter().position(|x| *x == id) {
                 children.remove(pos);
             }
@@ -1085,12 +293,7 @@ impl GUI {
                 self.set_focus(None);
             }
             self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
-
-            self.controls[id.index()] = Control {
-                generation: self.controls[id.index()].generation + 1,
-                ..Control::default()
-            };
-            self.controls.dead_controls.push(id.index);
+            self.controls.remove(id);
         }
         // uncommenting the line below allow infinity recursion to happen
         // self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
@@ -1112,23 +315,23 @@ impl GUI {
     }
 
     pub fn set_behaviour<T: Behaviour + 'static>(&mut self, id: Id, behaviour: T) {
-        self.get_control_mut(id).set_behaviour(Box::new(behaviour));
+        self.controls[id].set_behaviour(Box::new(behaviour));
     }
 
     pub fn set_layout<T: Layout + 'static>(&mut self, id: Id, layout: T) {
-        self.get_control_mut(id).set_layout(Box::new(layout));
+        self.controls[id].set_layout(Box::new(layout));
     }
 
     pub fn get_graphic(&mut self, id: Id) -> &mut Graphic {
-        &mut self.get_control_mut(id).graphic
+        &mut self.controls[id].graphic
     }
 
     pub fn get_rect(&self, id: Id) -> &Rect {
-        &self.get_control(id).rect
+        &self.controls[id].rect
     }
 
     pub fn resize(&mut self, width: f32, height: f32) {
-        self.get_control_mut(ROOT_ID)
+        self.controls[ROOT_ID]
             .rect
             .set_rect([0.0, 0.0, width, height]);
         self.update_layout(ROOT_ID);
@@ -1245,7 +448,7 @@ impl GUI {
             }
         }
         if !handled {
-            if let Some(parent) = self.get_control_mut(id).parent {
+            if let Some(parent) = self.controls[id].parent {
                 self.call_event_chain(parent, event);
             }
         }
@@ -1257,7 +460,7 @@ impl GUI {
         while let Some(id) = parents.pop() {
             self.call_event(id, |this, id, ctx| this.on_start(id, ctx));
             // when acessing childs directly, the inactive controls is also picked.
-            parents.extend(self.get_control_mut(id).children.iter().rev());
+            parents.extend(self.controls[id].children.iter().rev());
         }
         parents.clear();
         parents.push(ROOT_ID);
@@ -1266,7 +469,7 @@ impl GUI {
             parents.extend(self.get_children(id));
         }
         fn print_tree(deep: usize, id: Id, gui: &mut GUI) {
-            let childs = gui.get_control(id).children.clone();
+            let childs = gui.controls[id].children.clone();
             let len = childs.len();
             for (i, child) in childs.iter().enumerate() {
                 println!(
@@ -1372,7 +575,7 @@ impl GUI {
         }
 
         if let (Some(prev), Some(next)) = (self.current_focus, id) {
-            let lca = lowest_common_ancestor(&self.controls, prev, next);
+            let lca = self.controls.lowest_common_ancestor(prev, next);
 
             let mut curr = Some(prev);
             if curr != lca {
@@ -1428,7 +631,7 @@ impl GUI {
         'l: loop {
             // the interator is reversed because the last child block the previous ones
             for child in self.get_children(curr).iter().rev() {
-                if self.get_control_mut(*child).rect.contains(mouse_x, mouse_y) {
+                if self.controls[*child].rect.contains(mouse_x, mouse_y) {
                     curr = *child;
                     continue 'l;
                 }
@@ -1476,12 +679,11 @@ impl GUI {
             layout.compute_min_size(id, &mut ctx);
         }
         while let Some(parent) = self.get_parent(id) {
-            self.get_control_mut(id)
+            self.controls[id]
                 .rect
                 .layout_dirty_flags
                 .insert(LayoutDirtyFlags::DIRTY);
-            if self
-                .get_control_mut(id)
+            if self.controls[id]
                 .rect
                 .get_layout_dirty_flags()
                 .intersects(LayoutDirtyFlags::MIN_WIDTH | LayoutDirtyFlags::MIN_HEIGHT)
@@ -1509,10 +711,10 @@ impl GUI {
                     //TODO: think carefully about this deactives
                     if let Some(event::DeactiveControl { id }) = event.downcast_ref() {
                         // self.deactive_control(*id)
-                        self.get_control_mut(*id).active = false;
+                        self.controls[*id].active = false;
                     } else if let Some(event::ActiveControl { id }) = event.downcast_ref() {
                         // self.active_control(*id)
-                        self.get_control_mut(*id).active = true;
+                        self.controls[*id].active = true;
                     }
                 }
                 for dirty in dirtys {
@@ -1530,14 +732,13 @@ impl GUI {
             }
 
             for child in self.get_children(id).iter().rev() {
-                if !self
-                    .get_control_mut(*child)
+                if !self.controls[*child]
                     .rect
                     .get_layout_dirty_flags()
                     .is_empty()
                 {
                     parents.push(*child);
-                    self.get_control_mut(*child).rect.clear_layout_dirty_flags();
+                    self.controls[*child].rect.clear_layout_dirty_flags();
                 }
             }
         }
@@ -1573,320 +774,15 @@ impl GUI {
                     //TODO: think carefully about this deactives
                     if let Some(event::DeactiveControl { id }) = event.downcast_ref() {
                         // self.deactive_control(*id)
-                        self.get_control_mut(*id).active = false;
+                        self.controls[*id].active = false;
                     } else if let Some(event::ActiveControl { id }) = event.downcast_ref() {
                         // self.active_control(*id)
-                        self.get_control_mut(*id).active = true;
+                        self.controls[*id].active = true;
                     }
                 }
             }
             parents.extend(self.get_children(parent).iter().rev());
         }
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-pub enum RectFill {
-    Fill,
-    ShrinkStart,
-    ShrinkCenter,
-    ShrinkEnd,
-}
-impl Default for RectFill {
-    fn default() -> Self {
-        RectFill::Fill
-    }
-}
-
-bitflags! {
-    pub struct RenderDirtyFlags: u8 {
-        /// The width of the rect has changed
-        const WIDTH = 0x1;
-        /// The height of the rect has changed
-        const HEIGHT = 0x2;
-        /// The rect of the rect has changed
-        const RECT = 0x4;
-    }
-}
-impl Default for RenderDirtyFlags {
-    fn default() -> Self {
-        RenderDirtyFlags::all()
-    }
-}
-
-bitflags! {
-    pub struct LayoutDirtyFlags: u16 {
-        /// The width of the rect has changed
-        const WIDTH = 0x01;
-        /// The height of the rect has changed
-        const HEIGHT = 0x02;
-        /// The rect of the rect has changed
-        const RECT = 0x04;
-
-        const MIN_WIDTH = 0x08;
-        const MIN_HEIGHT = 0x10;
-
-        const DIRTY = 0x20;
-    }
-}
-impl Default for LayoutDirtyFlags {
-    fn default() -> Self {
-        LayoutDirtyFlags::all()
-    }
-}
-
-/// The basic component of a UI element.
-/// The final rect of the element is calculate
-/// by the fomula ```anchor*parend_size + margins```.
-///
-/// For example, a Rect with margins 0 0 0 0, and
-/// margins 10 10 40 40, will be a rect always located
-/// in the top left corner of the screen, in the position
-/// 10 10, and with width and height 30 30.
-pub struct Rect {
-    pub anchors: [f32; 4],
-    pub margins: [f32; 4],
-    min_size: [f32; 2],
-    rect: [f32; 4],
-    expand_x: bool,
-    expand_y: bool,
-    fill_x: RectFill,
-    fill_y: RectFill,
-    pub ratio_x: f32,
-    pub ratio_y: f32,
-    render_dirty_flags: RenderDirtyFlags,
-    layout_dirty_flags: LayoutDirtyFlags,
-}
-impl Default for Rect {
-    fn default() -> Self {
-        Self {
-            anchors: [0.0, 0.0, 1.0, 1.0],
-            margins: [0.0, 0.0, 0.0, 0.0],
-            min_size: [0.0; 2],
-            rect: [0.0; 4],
-            expand_x: false,
-            expand_y: false,
-            fill_x: RectFill::default(),
-            fill_y: RectFill::default(),
-            ratio_x: 1.0,
-            ratio_y: 1.0,
-            render_dirty_flags: RenderDirtyFlags::default(),
-            layout_dirty_flags: LayoutDirtyFlags::default(),
-        }
-    }
-}
-impl Rect {
-    pub fn new(anchors: [f32; 4], margins: [f32; 4]) -> Self {
-        Self {
-            anchors,
-            margins,
-            ..Default::default()
-        }
-    }
-
-    /// Get the dirty flags. The dirty flags keep track if some values have changed
-    /// since last call to clear_dirty_flags.
-    pub fn get_render_dirty_flags(&mut self) -> RenderDirtyFlags {
-        self.render_dirty_flags
-    }
-
-    pub fn clear_render_dirty_flags(&mut self) {
-        self.render_dirty_flags = RenderDirtyFlags::empty();
-    }
-
-    pub fn dirty_render_dirty_flags(&mut self) {
-        self.render_dirty_flags = RenderDirtyFlags::all();
-    }
-
-    pub fn get_layout_dirty_flags(&mut self) -> LayoutDirtyFlags {
-        self.layout_dirty_flags
-    }
-
-    pub fn clear_layout_dirty_flags(&mut self) {
-        self.layout_dirty_flags = LayoutDirtyFlags::empty();
-    }
-
-    pub fn dirty_layout_dirty_flags(&mut self) {
-        self.layout_dirty_flags = LayoutDirtyFlags::all();
-    }
-
-    pub fn set_rect(&mut self, rect: [f32; 4]) {
-        #[allow(clippy::float_cmp)]
-        if rect == self.rect {
-            return;
-        }
-        self.render_dirty_flags.insert(RenderDirtyFlags::RECT);
-        self.layout_dirty_flags.insert(LayoutDirtyFlags::RECT);
-        if !cmp_float(self.get_width(), rect[2] - rect[0]) {
-            self.render_dirty_flags.insert(RenderDirtyFlags::WIDTH);
-            self.layout_dirty_flags.insert(LayoutDirtyFlags::WIDTH);
-        }
-        if !cmp_float(self.get_height(), rect[3] - rect[1]) {
-            self.render_dirty_flags.insert(RenderDirtyFlags::HEIGHT);
-            self.layout_dirty_flags.insert(LayoutDirtyFlags::HEIGHT);
-        }
-        self.rect = rect;
-    }
-
-    /// Set the designed area for this rect. This rect will decide its own size,
-    /// based on its size flags and the designed area.
-    pub fn set_designed_rect(&mut self, rect: [f32; 4]) {
-        let mut new_rect = [0.0; 4];
-        if rect[2] - rect[0] <= self.get_min_size()[0] {
-            new_rect[0] = rect[0];
-            new_rect[2] = rect[0] + self.get_min_size()[0];
-        } else {
-            match self.fill_x {
-                RectFill::Fill => {
-                    new_rect[0] = rect[0];
-                    new_rect[2] = rect[2];
-                }
-                RectFill::ShrinkStart => {
-                    new_rect[0] = rect[0];
-                    new_rect[2] = rect[0] + self.get_min_size()[0];
-                }
-                RectFill::ShrinkCenter => {
-                    let x = (rect[2] - rect[0] - self.get_min_size()[0]) / 2.0;
-                    new_rect[0] = rect[0] + x;
-                    new_rect[2] = rect[2] - x;
-                }
-                RectFill::ShrinkEnd => {
-                    new_rect[0] = rect[2] - self.get_min_size()[0];
-                    new_rect[2] = rect[2];
-                }
-            }
-        }
-
-        if rect[3] - rect[1] <= self.get_min_size()[1] {
-            new_rect[1] = rect[1];
-            new_rect[3] = rect[1] + self.get_min_size()[1];
-        } else {
-            match self.fill_y {
-                RectFill::Fill => {
-                    new_rect[1] = rect[1];
-                    new_rect[3] = rect[3];
-                }
-                RectFill::ShrinkStart => {
-                    new_rect[1] = rect[1];
-                    new_rect[3] = rect[1] + self.get_min_size()[1];
-                }
-                RectFill::ShrinkCenter => {
-                    let x = (rect[3] - rect[1] - self.get_min_size()[1]) / 2.0;
-                    new_rect[1] = rect[1] + x;
-                    new_rect[3] = rect[3] - x;
-                }
-                RectFill::ShrinkEnd => {
-                    new_rect[1] = rect[3] - self.get_min_size()[1];
-                    new_rect[3] = rect[3];
-                }
-            }
-        }
-        self.set_rect(new_rect);
-    }
-
-    pub fn set_fill_x(&mut self, fill: RectFill) {
-        self.fill_x = fill;
-    }
-
-    pub fn set_fill_y(&mut self, fill: RectFill) {
-        self.fill_y = fill;
-    }
-
-    #[inline]
-    pub fn get_min_size(&self) -> [f32; 2] {
-        self.min_size
-    }
-
-    #[inline]
-    pub fn set_min_size(&mut self, min_size: [f32; 2]) {
-        if !cmp_float(self.min_size[0], min_size[0]) {
-            self.layout_dirty_flags.insert(LayoutDirtyFlags::MIN_WIDTH);
-            self.min_size[0] = min_size[0];
-        }
-        if !cmp_float(self.min_size[1], min_size[1]) {
-            self.layout_dirty_flags.insert(LayoutDirtyFlags::MIN_HEIGHT);
-            self.min_size[1] = min_size[1];
-        }
-
-        if self.get_width() < self.get_min_size()[0] {
-            self.set_width(min_size[0]);
-        }
-        if self.get_height() < self.get_min_size()[1] {
-            self.set_height(min_size[1]);
-        }
-    }
-
-    /// Return true if this have the size_flag::EXPAND_X flag.
-    #[inline]
-    pub fn is_expand_x(&self) -> bool {
-        self.expand_x
-    }
-
-    /// Return true if this have the size_flag::EXPAND_Y flag.
-    #[inline]
-    pub fn is_expand_y(&self) -> bool {
-        self.expand_y
-    }
-
-    #[inline]
-    pub fn get_top_left(&self) -> (f32, f32) {
-        (self.rect[0], self.rect[1])
-    }
-
-    #[inline]
-    pub fn get_rect(&self) -> &[f32; 4] {
-        &self.rect
-    }
-
-    #[inline]
-    pub fn get_center(&self) -> (f32, f32) {
-        (
-            (self.rect[0] + self.rect[2]) / 2.0,
-            (self.rect[1] + self.rect[3]) / 2.0,
-        )
-    }
-
-    #[inline]
-    pub fn get_width(&self) -> f32 {
-        self.rect[2] - self.rect[0]
-    }
-
-    #[inline]
-    pub fn set_width(&mut self, width: f32) {
-        if !cmp_float(self.get_width(), width) {
-            self.render_dirty_flags.insert(RenderDirtyFlags::WIDTH);
-            self.layout_dirty_flags.insert(LayoutDirtyFlags::WIDTH);
-        }
-        self.rect[2] = self.rect[0] + width;
-    }
-
-    #[inline]
-    pub fn get_height(&self) -> f32 {
-        self.rect[3] - self.rect[1]
-    }
-
-    #[inline]
-    pub fn set_height(&mut self, height: f32) {
-        if !cmp_float(self.get_height(), height) {
-            self.render_dirty_flags.insert(RenderDirtyFlags::HEIGHT);
-            self.layout_dirty_flags.insert(LayoutDirtyFlags::HEIGHT);
-        }
-        self.rect[3] = self.rect[1] + height;
-    }
-
-    #[inline]
-    pub fn get_size(&self) -> [f32; 2] {
-        [self.rect[2] - self.rect[0], self.rect[3] - self.rect[1]]
-    }
-
-    #[inline]
-    pub fn get_relative_x(&self, x: f32) -> f32 {
-        (x - self.rect[0]) / self.get_width()
-    }
-
-    #[inline]
-    pub fn contains(&self, x: f32, y: f32) -> bool {
-        self.rect[0] < x && x < self.rect[2] && self.rect[1] < y && y < self.rect[3]
     }
 }
 

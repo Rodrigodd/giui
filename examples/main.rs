@@ -715,10 +715,22 @@ fn main() {
             .with_graphic(graphic)
             .with_behaviour(ContextMenu::new(
                 vec![
-                    ("Option 0".to_string(), Box::new(|_, _| println!("Option 0"))),
-                    ("Option 1".to_string(), Box::new(|_, _| println!("Option 1"))),
-                    ("Option 2".to_string(), Box::new(|_, _| println!("Option 2"))),
-                    ("Option 3".to_string(), Box::new(|_, _| println!("Option 3"))),
+                    (
+                        "Option 0".to_string(),
+                        Box::new(|_, _| println!("Option 0")),
+                    ),
+                    (
+                        "Option 1".to_string(),
+                        Box::new(|_, _| println!("Option 1")),
+                    ),
+                    (
+                        "Option 2".to_string(),
+                        Box::new(|_, _| println!("Option 2")),
+                    ),
+                    (
+                        "Option 3".to_string(),
+                        Box::new(|_, _| println!("Option 3")),
+                    ),
                 ],
                 float_menu,
             ))

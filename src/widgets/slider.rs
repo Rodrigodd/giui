@@ -1,4 +1,4 @@
-use crate::{event, style::OnFocusStyle, Behaviour, Context, Id, MouseEvent, MouseButton};
+use crate::{event, style::OnFocusStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
 
 pub struct Slider {
     handle: Id,

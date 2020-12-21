@@ -1,10 +1,16 @@
-use crate::{Layout, Id, LayoutContext, MinSizeContext};
+use crate::{
+    context::{LayoutContext, MinSizeContext},
+    Id, Layout,
+};
 
 pub struct FitText;
 impl Layout for FitText {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
         let fonts = ctx.get_fonts();
-        let min_size = ctx.get_graphic(this).compute_min_size(fonts).unwrap_or([0.0, 0.0]);
+        let min_size = ctx
+            .get_graphic(this)
+            .compute_min_size(fonts)
+            .unwrap_or([0.0, 0.0]);
         ctx.set_this_min_size(min_size);
     }
     fn update_layouts(&mut self, _: Id, _: &mut LayoutContext) {}

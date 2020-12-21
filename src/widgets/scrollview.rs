@@ -1,5 +1,6 @@
 use crate::{
-    event, Behaviour, Context, Id, KeyboardEvent, Layout, LayoutContext, MinSizeContext, MouseEvent, MouseButton
+    event, Behaviour, Context, Id, KeyboardEvent, Layout, LayoutContext, MinSizeContext,
+    MouseButton, MouseEvent,
 };
 
 use std::any::Any;
@@ -136,7 +137,7 @@ impl Behaviour for ScrollBar {
                         graphic.set_color([200, 200, 200, 255]);
                     }
                 }
-            },
+            }
             MouseEvent::Up(_) => {}
             MouseEvent::Down(_) => {}
         }
@@ -320,7 +321,9 @@ impl<T: Behaviour> Behaviour for std::rc::Rc<std::cell::RefCell<T>> {
     }
 
     fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
-        self.as_ref().borrow_mut().on_keyboard_event(event, this, ctx)
+        self.as_ref()
+            .borrow_mut()
+            .on_keyboard_event(event, this, ctx)
     }
 }
 

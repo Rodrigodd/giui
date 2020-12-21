@@ -1,7 +1,7 @@
 use crate::{
     event,
     style::{ButtonStyle, OnFocusStyle},
-    Behaviour, Context, Id, MouseEvent, MouseButton
+    Behaviour, Context, Id, MouseButton, MouseEvent,
 };
 
 pub struct Toggle {

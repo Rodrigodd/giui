@@ -1,4 +1,4 @@
-use crate::{event, style::ButtonStyle, Behaviour, Context, Id, MouseEvent, MouseButton};
+use crate::{event, style::ButtonStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
 
 use std::any::Any;
 

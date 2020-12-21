@@ -1,4 +1,4 @@
-use crate::{style::ButtonStyle, Behaviour, Context, Id, MouseEvent, MouseButton};
+use crate::{style::ButtonStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
 
 pub struct Button<F: Fn(Id, &mut Context)> {
     state: u8, // 0 - normal, 1 - hover, 2 - pressed

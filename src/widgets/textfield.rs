@@ -1,6 +1,6 @@
 use crate::{
-    event, render::Graphic, text::TextInfo, style::OnFocusStyle, Behaviour, Context, Id,
-    KeyboardEvent, MouseEvent, MouseButton
+    event, render::Graphic, style::OnFocusStyle, text::TextInfo, Behaviour, Context, Id,
+    KeyboardEvent, MouseButton, MouseEvent,
 };
 use copypasta::{ClipboardContext, ClipboardProvider};
 use std::any::Any;
@@ -83,7 +83,8 @@ impl TextField {
         caret_pos[0] -= self.x_scroll;
 
         if let Some(selection_index) = self.selection_index {
-            ctx.get_graphic_mut(self.caret).set_color([51, 153, 255, 255]);
+            ctx.get_graphic_mut(self.caret)
+                .set_color([51, 153, 255, 255]);
             let mut selection_pos = self.text_info.get_caret_pos(selection_index);
             selection_pos[0] -= self.x_scroll;
             let mut margins = [

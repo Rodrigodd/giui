@@ -1,4 +1,4 @@
-use crate::{style::TabStyle, Behaviour, Context, Id, MouseEvent, MouseButton};
+use crate::{style::TabStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
 
 use std::any::Any;
 

@@ -1,4 +1,4 @@
-use crate::{event, Behaviour, Context, Id, MouseEvent, MouseButton};
+use crate::{event, Behaviour, Context, Id, MouseButton, MouseEvent};
 
 const LEFT: u8 = 0x1;
 const RIGHT: u8 = 0x2;
@@ -8,7 +8,7 @@ const DRAGGING: u8 = LEFT | RIGHT | TOP | BOTTOM;
 
 pub struct Window {
     state: u8,
-    start_dragging:[f32; 2],
+    start_dragging: [f32; 2],
     start_margins: [f32; 4],
     mouse_pos: [f32; 2],
 }
@@ -62,7 +62,9 @@ impl Behaviour for Window {
             }
             MouseEvent::Moved { mut x, mut y } => {
                 if self.state != 0 {
-                    let parent = ctx.get_parent(this).expect("A window cannot be the root control");
+                    let parent = ctx
+                        .get_parent(this)
+                        .expect("A window cannot be the root control");
 
                     // ensure that the window cannot be easily drag out of reach
                     let desktop = *ctx.get_rect(parent);
@@ -108,12 +110,15 @@ impl Behaviour for Window {
                         }
                         ctx.set_margins(this, margins);
                     } else {
-                        ctx.set_margins(this, [
-                            margins[0] + delta[0],
-                            margins[1] + delta[1],
-                            margins[2] + delta[0],
-                            margins[3] + delta[1],
-                        ]);
+                        ctx.set_margins(
+                            this,
+                            [
+                                margins[0] + delta[0],
+                                margins[1] + delta[1],
+                                margins[2] + delta[0],
+                                margins[3] + delta[1],
+                            ],
+                        );
                     }
                 }
                 self.mouse_pos = [x, y];

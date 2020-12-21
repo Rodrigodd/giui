@@ -1,7 +1,7 @@
-use super::{Context, Id, RenderDirtyFlags};
 use crate::{
+    context::Context,
     text::{FontGlyph, TextInfo},
-    Rect,
+    Id, Rect, RenderDirtyFlags,
 };
 use ab_glyph::{Font, FontArc};
 use glyph_brush_draw_cache::{DrawCache, DrawCacheBuilder};
