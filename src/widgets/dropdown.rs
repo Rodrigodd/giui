@@ -6,10 +6,10 @@ struct SetIndex(usize);
 // struct SetOwner(Id);
 // struct SetItens<T: 'static + Clone>(Vec<T>);
 // struct SetFocus(usize);
-pub struct ShowMenu<T: 'static + Clone>(pub Id, pub Option<usize>, pub Vec<T>);
+struct ShowMenu<T: 'static + Clone>(pub Id, pub Option<usize>, pub Vec<T>);
 pub struct CloseMenu;
 #[derive(Clone, Copy)]
-pub struct ItemClicked {
+struct ItemClicked {
     pub index: usize,
 }
 struct MenuClosed;
@@ -103,7 +103,7 @@ impl<F: Fn(Id, &mut Context)> Behaviour for Blocker<F> {
     }
 }
 
-pub struct Menu<T, F>
+pub struct DropMenu<T, F>
 where
     T: 'static + Clone,
     F: Fn(&T, Id, &mut Context) -> Id,
@@ -113,7 +113,7 @@ where
     create_item: F,
     owner: Id,
 }
-impl<T, F> Menu<T, F>
+impl<T, F> DropMenu<T, F>
 where
     T: 'static + Clone,
     F: Fn(&T, Id, &mut Context) -> Id,
@@ -133,7 +133,7 @@ where
         ctx.send_event_to(self.owner, MenuClosed);
     }
 }
-impl<T, F> Behaviour for Menu<T, F>
+impl<T, F> Behaviour for DropMenu<T, F>
 where
     T: 'static + Clone + std::fmt::Debug,
     F: Fn(&T, Id, &mut Context) -> Id,

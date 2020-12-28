@@ -154,8 +154,8 @@ impl Controls {
         self[id]
             .children
             .iter()
+            .filter(|x| self[**x].active)
             .cloned()
-            .filter(|x| self[*x].active)
             .collect::<Vec<Id>>()
     }
 

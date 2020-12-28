@@ -1,50 +1,71 @@
-use std::any::Any;
+use std::{any::Any, rc::Rc};
 
 use crate::{
-    widgets::{ItemClicked, ShowMenu},
+    layouts::VBoxLayout,
+    style::MenuStyle,
+    widgets::{CloseMenu, ItemClicked, Menu, MenuBehaviour},
     Behaviour, Context, Id, MouseButton, MouseEvent,
 };
+
+use super::Blocker;
 
 struct Repos;
 
 pub struct ContextMenu {
-    itens: Vec<(String, Box<dyn Fn(Id, &mut Context)>)>,
-    menu: Id,
+    menu: Rc<Menu>,
+    open: Option<Id>,
     mouse_pos: [f32; 2],
+    style: MenuStyle,
+    blocker: Option<Id>,
 }
 impl ContextMenu {
-    pub fn new(itens: Vec<(String, Box<dyn Fn(Id, &mut Context)>)>, menu: Id) -> Self {
+    pub fn new(style: MenuStyle, menu: Rc<Menu>) -> Self {
         Self {
-            itens,
             menu,
+            open: None,
             mouse_pos: [0.0, 0.0],
+            style,
+            blocker: None,
         }
     }
 }
 impl Behaviour for ContextMenu {
-    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
-        if let Some(ItemClicked { index }) = event.downcast_ref() {
-            (self.itens[*index].1)(this, ctx);
+    fn on_start(&mut self, this: Id, ctx: &mut Context) {
+        let blocker = ctx
+            .create_control()
+            .with_behaviour(Blocker::new(move |_, ctx| {
+                ctx.send_event_to(this, CloseMenu)
+            }))
+            .with_active(false)
+            .build();
+        self.blocker = Some(blocker);
+    }
+
+    fn on_event(&mut self, event: &dyn Any, _this: Id, ctx: &mut Context) {
+        if event.is::<ItemClicked>() || event.is::<CloseMenu>() {
+            if let Some(menu) = self.open.take() {
+                ctx.remove(menu);
+                ctx.deactive(self.blocker.unwrap());
+            }
         } else if event.is::<Repos>() {
-            let desktop = *ctx.get_rect(
-                ctx.get_parent(self.menu)
-                    .expect("Menu cannot be the root control"),
-            );
+            if let Some(menu) = self.open {
+                let desktop = *ctx.get_rect(ctx.get_parent(menu).unwrap());
 
-            let menu_rect = ctx.get_rect(self.menu);
-            let width = menu_rect[2] - menu_rect[0];
-            let height = menu_rect[3] - menu_rect[1];
+                let menu_rect = ctx.get_rect(menu);
+                let width = menu_rect[2] - menu_rect[0];
+                let height = menu_rect[3] - menu_rect[1];
 
-            let mut margins = *ctx.get_margins(self.menu);
-            if menu_rect[2] > desktop[2] && menu_rect[0] - width > 0.0 {
-                margins[0] -= width;
-                margins[2] = margins[0];
+                let mut margins = *ctx.get_margins(menu);
+                if menu_rect[2] > desktop[2] && menu_rect[0] - width > 0.0 {
+                    margins[0] -= width;
+                    margins[2] = margins[0];
+                }
+                if menu_rect[3] > desktop[3] && menu_rect[1] - height > 0.0 {
+                    margins[1] -= height;
+                    margins[3] = margins[1];
+                }
+                ctx.set_margins(menu, margins);
             }
-            if menu_rect[3] > desktop[3] && menu_rect[1] - height > 0.0 {
-                margins[1] -= height;
-                margins[3] = margins[1];
-            }
-            ctx.set_margins(self.menu, margins);
         }
     }
 
@@ -52,19 +73,27 @@ impl Behaviour for ContextMenu {
         use MouseButton::*;
         match event {
             MouseEvent::Up(Right) => {
-                let [x, y] = self.mouse_pos;
-                ctx.set_anchors(self.menu, [0.0, 0.0, 0.0, 0.0]);
-                ctx.set_margins(self.menu, [x, y, x + 20.0, y]);
-                ctx.send_event_to(
-                    self.menu,
-                    ShowMenu(
-                        this,
-                        None,
-                        self.itens.iter().map(|(a, _)| a.clone()).collect(),
-                    ),
-                );
-                // when 'this' receive the event 'Repos', the 'menu' will already have its size defined.
-                ctx.send_event_to(this, Repos);
+                if self.open.is_none() {
+                    let [x, y] = self.mouse_pos;
+
+                    let menu = ctx
+                        .create_control()
+                        .with_anchors([0.0, 0.0, 0.0, 0.0])
+                        .with_margins([x, y, x, y])
+                        .with_behaviour(MenuBehaviour::new(
+                            self.menu.clone(),
+                            self.style.clone(),
+                            this,
+                        ))
+                        .with_graphic(self.style.button.normal.clone())
+                        .with_layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
+                        .build();
+                    self.open = Some(menu);
+                    // when 'this' receive the event 'Repos', the 'menu' will already have its size defined.
+                    ctx.send_event_to(this, Repos);
+                    ctx.move_to_front(self.blocker.unwrap());
+                    ctx.active(self.blocker.unwrap());
+                }
                 true
             }
             MouseEvent::Moved { x, y } => {

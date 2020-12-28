@@ -21,3 +21,10 @@ pub struct TabStyle {
     pub pressed: Graphic,
     pub selected: Graphic,
 }
+
+#[derive(Clone)]
+pub struct MenuStyle {
+    pub button: ButtonStyle,
+    pub separator: Graphic,
+    pub arrow: Graphic,
+}

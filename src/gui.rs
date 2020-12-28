@@ -217,6 +217,7 @@ impl GUI {
         if active {
             let mut parents = vec![new];
             while let Some(id) = parents.pop() {
+                self.call_event(id, |this, id, ctx| this.on_start(id, ctx));
                 self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
                 parents.extend(self.get_children(id).iter().rev());
             }
@@ -293,6 +294,10 @@ impl GUI {
                 self.set_focus(None);
             }
             self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
+        }
+        let mut parents = vec![id];
+        while let Some(id) = parents.pop() {
+            parents.extend(self.get_children(id).iter().rev());
             self.controls.remove(id);
         }
         // uncommenting the line below allow infinity recursion to happen
@@ -456,18 +461,19 @@ impl GUI {
 
     pub fn start(&mut self) {
         self.update_all_layouts();
-        let mut parents = vec![ROOT_ID];
-        while let Some(id) = parents.pop() {
-            self.call_event(id, |this, id, ctx| this.on_start(id, ctx));
-            // when acessing childs directly, the inactive controls is also picked.
-            parents.extend(self.controls[id].children.iter().rev());
-        }
-        parents.clear();
-        parents.push(ROOT_ID);
-        while let Some(id) = parents.pop() {
-            self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
-            parents.extend(self.get_children(id));
-        }
+        // TODO: maybe on_start and on_active must be called in-order in NewEvents, instead of immediatily after creation
+        // let mut parents = vec![ROOT_ID];
+        // while let Some(id) = parents.pop() {
+        //     self.call_event(id, |this, id, ctx| this.on_start(id, ctx));
+        //     // when acessing childs directly, instead of get_children(), the inactive controls is also picked.
+        //     parents.extend(self.controls[id].children.iter().rev());
+        // }
+        // parents.clear();
+        // parents.push(ROOT_ID);
+        // while let Some(id) = parents.pop() {
+        //     self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
+        //     parents.extend(self.get_children(id));
+        // }
         fn print_tree(deep: usize, id: Id, gui: &mut GUI) {
             let childs = gui.controls[id].children.clone();
             let len = childs.len();

@@ -1,14 +1,18 @@
 #![allow(clippy::useless_vec)]
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteRender};
 use ui_engine::{
     event as ui_event,
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
     render::{GUISpriteRender, Graphic, Panel, Text, Texture},
-    style::{ButtonStyle, OnFocusStyle, TabStyle},
+    style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
     widgets::{
-        self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, Dropdown, Hoverable, Menu,
-        MenuItem, NoneLayout, ScrollBar, ScrollView, Slider, TabButton, TextField, Toggle,
+        self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, DropMenu, Dropdown, Hoverable,
+        Item, Menu, MenuBar, MenuItem, NoneLayout, ScrollBar, ScrollView, Slider, TabButton,
+        TextField, Toggle,
     },
     Context, ControlBuilder, Id, RectFill, GUI,
 };
@@ -41,6 +45,11 @@ fn main() {
         let data = data.to_rgba();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
+    let icon_texture = {
+        let data = image::open("D:/repos/rust/ui_engine/examples/icons.png").unwrap();
+        let data = data.to_rgba();
+        render.new_texture(data.width(), data.height(), data.as_ref(), true)
+    };
     let mut screen_camera = sprite_render::Camera::new(
         window_size.width,
         window_size.height,
@@ -64,6 +73,13 @@ fn main() {
         pressed: Graphic::from(Texture::new(texture, [0.1, 0.6, 0.3, 0.3])),
         focus: Graphic::from(Texture::new(texture, [0.5, 0.5, 0.001, 0.001])),
     };
+    let menu_style = MenuStyle {
+        button: menu_button_style.clone(),
+        arrow: Texture::new(icon_texture, [0.0, 0.0, 1.0, 1.0]).into(),
+        separator: Texture::new(texture, [0.2, 0.2, 0.2, 0.2])
+            .with_color([180, 180, 180, 255])
+            .into(),
+    };
     let tab_style = TabStyle {
         hover: Graphic::from(Panel::new(tab_texture, [0.5, 0.0, 0.5, 0.5], 10.0)),
         pressed: Graphic::from(Panel::new(tab_texture, [0.0, 0.5, 0.5, 0.5], 10.0)),
@@ -75,10 +91,6 @@ fn main() {
         focus: button_style.focus.clone(),
     };
 
-    let page_area = gui
-        .create_control()
-        .with_margins([0.0, 45.0, 0.0, 0.0])
-        .build();
     let (hover, hover_label) = {
         let graphic = painel
             .clone()
@@ -113,8 +125,8 @@ fn main() {
             .create_control()
             .with_active(false)
             .with_graphic(button_style.normal.clone())
-            .with_behaviour(Menu::<String, _>::new(blocker, {
-                // let menu_button_style = menu_button_style.clone();
+            .with_behaviour(DropMenu::<String, _>::new(blocker, {
+                let menu_button_style = menu_button_style.clone();
                 move |data, this, ctx| {
                     let id = ctx
                         .create_control()
@@ -144,6 +156,138 @@ fn main() {
         );
         menu
     };
+    let surface = gui
+        .create_control()
+        .with_layout(VBoxLayout::new(0.0, [0.0; 4], -1))
+        .build();
+    let _menubar = {
+        let menu = gui.reserve_id();
+        let blocker = gui
+            .create_control()
+            .with_active(false)
+            .with_margins([0.0, 20.0, 0.0, 0.0])
+            .with_behaviour(Blocker::new(move |_, ctx| {
+                ctx.send_event_to(menu, CloseMenu)
+            }))
+            .build();
+        use Item::*;
+        let proxy = event_loop.create_proxy();
+        gui.create_control_reserved(menu)
+            .with_graphic(menu_button_style.normal)
+            .with_behaviour(MenuBar::new(
+                menu_style.clone(),
+                blocker,
+                vec![
+                    Rc::new(Menu::new(
+                        "File".to_string(),
+                        vec![
+                            Button(
+                                "Open".to_string(),
+                                Box::new(move |_, _| println!("Click on 'Open'")),
+                            ),
+                            Button(
+                                "About".to_string(),
+                                Box::new(move |_, _| println!("Click on 'About'")),
+                            ),
+                            Separator,
+                            Button(
+                                "Close".to_string(),
+                                Box::new(move |_, _| {
+                                    let _ = proxy.send_event(());
+                                }),
+                            ),
+                        ],
+                    )),
+                    Rc::new(Menu::new(
+                        "Edit".to_string(),
+                        vec![
+                            SubMenu(Rc::new(Menu::new(
+                                "Submenu".to_string(),
+                                vec![
+                                    Button(
+                                        "Open".to_string(),
+                                        Box::new(move |_, _| println!("Click on 'Open'")),
+                                    ),
+                                    Button(
+                                        "About".to_string(),
+                                        Box::new(move |_, _| println!("Click on 'About'")),
+                                    ),
+                                    Separator,
+                                    SubMenu(Rc::new(Menu::new(
+                                        "SubSubmenu".to_string(),
+                                        vec![
+                                            Button(
+                                                "Open".to_string(),
+                                                Box::new(move |_, _| println!("Click on 'Open'")),
+                                            ),
+                                            Button(
+                                                "About".to_string(),
+                                                Box::new(move |_, _| println!("Click on 'About'")),
+                                            ),
+                                        ],
+                                    ))),
+                                ],
+                            ))),
+                            Separator,
+                            Button(
+                                "Undo".to_string(),
+                                Box::new(move |_, _| println!("Click on 'Undo'")),
+                            ),
+                            Button(
+                                "Redo".to_string(),
+                                Box::new(move |_, _| println!("Click on 'Redo'")),
+                            ),
+                            Separator,
+                            Button(
+                                "Copy".to_string(),
+                                Box::new(move |_, _| println!("Click on 'Copy'")),
+                            ),
+                            Button(
+                                "Paste".to_string(),
+                                Box::new(move |_, _| println!("Click on 'Paste'")),
+                            ),
+                            Button(
+                                "Cut".to_string(),
+                                Box::new(move |_, _| println!("Click on 'Cut'")),
+                            ),
+                        ],
+                    )),
+                    Rc::new(Menu::new(
+                        "Help".to_string(),
+                        vec![
+                            Button(
+                                "Please".to_string(),
+                                Box::new(move |_, _| println!("Click on 'Please'")),
+                            ),
+                            Button(
+                                "Help".to_string(),
+                                Box::new(move |_, _| println!("Click on 'Help'")),
+                            ),
+                            Button(
+                                "Me".to_string(),
+                                Box::new(move |_, _| println!("Click on 'Me'")),
+                            ),
+                        ],
+                    )),
+                ],
+            ))
+            .with_layout(HBoxLayout::new(0.0, [0.0; 4], -1))
+            .with_parent(surface)
+            .build()
+    };
+
+    let header = gui
+        .create_control()
+        .with_layout(HBoxLayout::new(3.0, [10.0, 10.0, 10.0, 10.0], -1))
+        .with_parent(surface)
+        .build();
+
+    let page_area = gui
+        .create_control()
+        .with_margins([0.0, 45.0, 0.0, 0.0])
+        .with_parent(surface)
+        .with_expand_y(true)
+        .build();
     let (page_1, top_text, bottom_text, my_slider, my_toggle) = {
         let page_1 = gui.create_control().with_parent(page_area).build();
         let menu = {
@@ -687,8 +831,6 @@ fn main() {
             v_scroll_bar,
             v_scroll_bar_handle,
         );
-        use std::cell::RefCell;
-        use std::rc::Rc;
         let behaviour = Rc::new(RefCell::new(behaviour));
         gui.set_behaviour(scroll_view, behaviour.clone());
         gui.set_layout(scroll_view, behaviour);
@@ -713,27 +855,31 @@ fn main() {
         let graphic = Texture::new(font_texture, [0.0, 0.0, 1.0, 1.0]).into();
         gui.create_control()
             .with_graphic(graphic)
-            .with_behaviour(ContextMenu::new(
-                vec![
-                    (
-                        "Option 0".to_string(),
-                        Box::new(|_, _| println!("Option 0")),
-                    ),
-                    (
-                        "Option 1".to_string(),
-                        Box::new(|_, _| println!("Option 1")),
-                    ),
-                    (
-                        "Option 2".to_string(),
-                        Box::new(|_, _| println!("Option 2")),
-                    ),
-                    (
-                        "Option 3".to_string(),
-                        Box::new(|_, _| println!("Option 3")),
-                    ),
-                ],
-                float_menu,
-            ))
+            .with_behaviour(ContextMenu::new(menu_style, {
+                use Item::*;
+                Rc::new(Menu::new(
+                    String::new(),
+                    vec![
+                        Button(
+                            "Option 0".to_string(),
+                            Box::new(|_, _| println!("Option 0")),
+                        ),
+                        Button(
+                            "Option 1".to_string(),
+                            Box::new(|_, _| println!("Option 1")),
+                        ),
+                        Separator,
+                        Button(
+                            "Option A".to_string(),
+                            Box::new(|_, _| println!("Option A")),
+                        ),
+                        Button(
+                            "Option B".to_string(),
+                            Box::new(|_, _| println!("Option B")),
+                        ),
+                    ],
+                ))
+            }))
             .with_parent(page_4)
             .build();
         page_4
@@ -754,18 +900,12 @@ fn main() {
         page_na
     };
     let _tabs = {
-        let header = gui
-            .create_control()
-            .with_anchors([0.0, 0.0, 1.0, 0.0])
-            .with_margins([10.0, 10.0, -10.0, 40.0])
-            .with_layout(HBoxLayout::new(3.0, [0.0, 0.0, 0.0, 0.0], -1))
-            .build();
-
         let tab_group = ButtonGroup::new();
         let create_button = |gui: &mut GUI, page: Id, selected: bool, label: String| {
             let button = gui
                 .create_control()
                 .with_graphic(painel.clone())
+                .with_min_size([0.0, 30.0])
                 .with_parent(header)
                 .with_expand_x(true)
                 .with_behaviour(TabButton::new(
@@ -944,6 +1084,7 @@ fn main() {
                 }
                 _ => {}
             },
+            Event::UserEvent(()) => *control = ControlFlow::Exit,
             Event::RedrawRequested(window_id) if window_id == window.id() => {
                 let mut ctx = gui.get_render_context();
                 gui_render.prepare_render(&mut ctx, &mut render);
