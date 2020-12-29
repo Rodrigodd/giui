@@ -75,13 +75,13 @@ impl Behaviour for TabButton {
         use MouseButton::*;
         match event {
             MouseEvent::Enter => {
+                self.click = false;
                 if !self.selected {
                     ctx.set_graphic(this, self.style.hover.clone());
                 }
             }
             MouseEvent::Exit => {
                 if !self.selected {
-                    self.click = false;
                     ctx.set_graphic(this, self.style.unselected.clone());
                 }
             }
