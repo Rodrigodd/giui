@@ -214,6 +214,7 @@ pub(crate) struct Control {
     pub(crate) parent: Option<Id>,
     pub(crate) children: Vec<Id>,
     pub(crate) active: bool,
+    pub(crate) really_active: bool,
 }
 impl Control {
     /// add one more behaviour to the control
@@ -225,32 +226,9 @@ impl Control {
         self.layout = layout;
     }
 
-    pub fn add_children(&mut self, child: Id) {
+    pub fn add_child(&mut self, child: Id) {
         if !self.children.iter().any(|x| *x == child) {
             self.children.push(child)
-        }
-    }
-
-    /// Set the widget with that id to active = true.
-    /// Return true if the active was false.
-    pub fn active(&mut self) -> bool {
-        if self.active {
-            false
-        } else {
-            self.active = true;
-            true
-        }
-    }
-
-    #[inline]
-    /// Set the widget with that id to active = false.
-    /// Return true if the active was true.
-    pub fn deactive(&mut self) -> bool {
-        if self.active {
-            self.active = false;
-            true
-        } else {
-            false
         }
     }
 }

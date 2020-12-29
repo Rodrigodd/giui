@@ -143,6 +143,7 @@ impl GUI {
                 parent: None,
                 children: Vec::new(),
                 active: true,
+                really_active: true,
             }]
             .into(),
             input: Input::default(),
@@ -192,76 +193,93 @@ impl GUI {
             parent,
             active,
         } = build;
-        let new = reserve;
+        let this = reserve;
+        let has_behaviour = behaviour.is_some();
 
-        let mut control = &mut self.controls[new];
+        let mut control = &mut self.controls[this];
         control.rect = rect;
         control.graphic = graphic;
         control.behaviour = behaviour;
         control.layout = layout;
         control.parent = parent;
-        control.active = active;
+        // control.active = active;
 
-        assert_eq!(self.controls[new].generation, new.generation);
-        // self.controls[new.get_index() as usize].generation = new.generation;
-
-        let control = &mut self.controls[new];
+        assert_eq!(control.generation, this.generation);
 
         if let Some(parent) = control.parent {
-            self.controls[parent].add_children(new);
+            self.controls[parent].add_child(this);
         } else {
             control.parent = Some(ROOT_ID);
-            self.controls[ROOT_ID].add_children(new);
+            self.controls[ROOT_ID].add_child(this);
+        }
+
+        if has_behaviour {
+            self.call_event(this, |this, id, ctx| this.on_start(id, ctx));
         }
 
         if active {
-            let mut parents = vec![new];
-            while let Some(id) = parents.pop() {
-                self.call_event(id, |this, id, ctx| this.on_start(id, ctx));
-                self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
-                parents.extend(self.get_children(id).iter().rev());
-            }
+            self.active_control(this);
         }
 
-        self.update_layout(new);
-        new
+        self.update_layout(this);
+        this
     }
 
     pub fn active_control(&mut self, id: Id) {
-        if !self.controls[id].active() {
+        if self.controls[id].active {
             return;
         }
+        self.controls[id].active = true;
+
         if let Some(parent) = self.get_parent(id) {
             self.update_layout(parent);
         }
-        let mut parents = vec![id];
-        while let Some(id) = parents.pop() {
-            parents.extend(self.get_children(id).iter().rev());
-            self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
+        if self
+            .get_parent(id)
+            .map(|x| self.controls[x].really_active)
+            .unwrap_or(true)
+        {
+            self.controls[id].really_active = true;
+            let mut parents = vec![id];
+            while let Some(id) = parents.pop() {
+                parents.extend(self.get_children(id).iter().rev());
+                self.controls[id].really_active = true;
+                self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
+            }
         }
         // uncommenting the line below allow infinity recursion to happen
         // self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
     }
 
     pub fn deactive_control(&mut self, id: Id) {
-        if !self.controls[id].deactive() {
+        if !self.controls[id].active {
             return;
         }
+        self.controls[id].active = false;
+
         if let Some(parent) = self.get_parent(id) {
             self.update_layout(parent);
         }
-        let mut parents = vec![id];
-        while let Some(id) = parents.pop() {
-            parents.extend(self.get_children(id).iter().rev());
-            if Some(id) == self.current_over {
-                self.send_mouse_event_to(id, MouseEvent::Exit);
-                self.current_over = None;
-                self.input.mouse_invalid = true;
+        if self
+            .get_parent(id)
+            .map(|x| self.controls[x].really_active)
+            .unwrap_or(true)
+        {
+            self.controls[id].really_active = false;
+            let mut parents = vec![id];
+            while let Some(id) = parents.pop() {
+                parents.extend(self.get_children(id).iter().rev());
+                if Some(id) == self.current_over {
+                    self.send_mouse_event_to(id, MouseEvent::Exit);
+                    self.current_over = None;
+                    self.input.mouse_invalid = true;
+                }
+                if Some(id) == self.current_focus {
+                    self.set_focus(None);
+                }
+                self.controls[id].really_active = false;
+                self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
             }
-            if Some(id) == self.current_focus {
-                self.set_focus(None);
-            }
-            self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
         }
         // uncommenting the line below allow infinity recursion to happen
         // self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
@@ -269,7 +287,8 @@ impl GUI {
 
     /// Remove a control and all of its children
     pub fn remove_control(&mut self, id: Id) {
-        if self.controls[id].deactive() {
+        if self.controls[id].active {
+            self.controls[id].active = false;
             if let Some(parent) = self.get_parent(id) {
                 self.update_layout(parent);
             }
@@ -293,7 +312,9 @@ impl GUI {
             if Some(id) == self.current_focus {
                 self.set_focus(None);
             }
-            self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
+            if self.controls[id].really_active {
+                self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
+            }
         }
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
@@ -320,7 +341,14 @@ impl GUI {
     }
 
     pub fn set_behaviour<T: Behaviour + 'static>(&mut self, id: Id, behaviour: T) {
+        if self.controls[id].really_active {
+            self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
+        }
         self.controls[id].set_behaviour(Box::new(behaviour));
+        self.call_event(id, |this, id, ctx| this.on_start(id, ctx));
+        if self.controls[id].really_active {
+            self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
+        }
     }
 
     pub fn set_layout<T: Layout + 'static>(&mut self, id: Id, layout: T) {
@@ -461,19 +489,6 @@ impl GUI {
 
     pub fn start(&mut self) {
         self.update_all_layouts();
-        // TODO: maybe on_start and on_active must be called in-order in NewEvents, instead of immediatily after creation
-        // let mut parents = vec![ROOT_ID];
-        // while let Some(id) = parents.pop() {
-        //     self.call_event(id, |this, id, ctx| this.on_start(id, ctx));
-        //     // when acessing childs directly, instead of get_children(), the inactive controls is also picked.
-        //     parents.extend(self.controls[id].children.iter().rev());
-        // }
-        // parents.clear();
-        // parents.push(ROOT_ID);
-        // while let Some(id) = parents.pop() {
-        //     self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
-        //     parents.extend(self.get_children(id));
-        // }
         fn print_tree(deep: usize, id: Id, gui: &mut GUI) {
             let childs = gui.controls[id].children.clone();
             let len = childs.len();
