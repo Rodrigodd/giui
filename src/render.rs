@@ -4,22 +4,26 @@ use crate::{
     Id, Rect, RenderDirtyFlags,
 };
 use ab_glyph::{Font, FontArc};
-use glyph_brush_draw_cache::{DrawCache, DrawCacheBuilder};
-use sprite_render::{Camera, Renderer, SpriteInstance, SpriteRender};
+use glyph_brush_draw_cache::{DrawCache, DrawCacheBuilder, Rectangle};
 use std::ops::Range;
 
-pub trait GUIRender: 'static {}
+#[derive(Clone)]
+pub struct Sprite {
+    pub texture: u32,
+    pub color: [u8; 4],
+    pub rect: [f32; 4],
+    pub uv_rect: [f32; 4],
+}
 
-pub struct GUISpriteRender {
+pub struct GUIRender {
     draw_cache: DrawCache,
     font_texture: u32,
-    last_sprites: Vec<SpriteInstance>,
+    last_sprites: Vec<Sprite>,
     last_sprites_map: Vec<(Id, Range<usize>)>,
-    sprites: Vec<SpriteInstance>,
+    sprites: Vec<Sprite>,
     sprites_map: Vec<(Id, Range<usize>)>,
 }
-impl GUIRender for GUISpriteRender {}
-impl<'a> GUISpriteRender {
+impl GUIRender {
     pub fn new(font_texture: u32) -> Self {
         //TODO: change this to default dimensions, and allow resizing
         let draw_cache = DrawCacheBuilder::default().dimensions(1024, 1024).build();
@@ -57,7 +61,7 @@ impl<'a> GUISpriteRender {
         }
     }
 
-    pub fn prepare_render(&mut self, ctx: &mut Context, renderer: &mut dyn SpriteRender) {
+    pub fn render<'a, F: FnMut(Rectangle<u32>, &[u8])>(&'a mut self, ctx: &mut Context, mut update_font_texure: F) -> &'a [Sprite] {
         use crate::ROOT_ID;
         let mut parents = vec![ROOT_ID];
         self.sprites.clear();
@@ -157,15 +161,11 @@ impl<'a> GUISpriteRender {
                             ..
                         }) => {
                             let rect = rect;
-                            let size = rect.get_size();
-                            let center = rect.get_center();
-                            let mut sprite = SpriteInstance {
-                                scale: size,
-                                angle: 0.0,
-                                uv_rect: *uv_rect,
-                                color: *color,
-                                pos: [center.0, center.1],
+                            let mut sprite = Sprite {
                                 texture: *texture,
+                                color: *color,
+                                rect: *rect.get_rect(),
+                                uv_rect: *uv_rect,
                             };
                             if cut_sprite(&mut sprite, &mask) {
                                 self.sprites.push(sprite);
@@ -179,28 +179,9 @@ impl<'a> GUISpriteRender {
                                 self.draw_cache
                                     .queue_glyph(glyph.font_id.0, glyph.glyph.clone());
                             }
-                            let texture = self.font_texture;
                             //TODO: I should queue all the glyphs, before calling cache_queued
                             self.draw_cache
-                                .cache_queued(&fonts, |rect, tex_data| {
-                                    let mut data = Vec::with_capacity(tex_data.len() * 4);
-                                    for byte in tex_data.iter() {
-                                        data.push(255);
-                                        data.push(255);
-                                        data.push(255);
-                                        data.push(*byte);
-                                    }
-                                    renderer.update_texture(
-                                        texture,
-                                        &data,
-                                        Some([
-                                            rect.min[0],
-                                            rect.min[1],
-                                            rect.width(),
-                                            rect.height(),
-                                        ]),
-                                    );
-                                })
+                                .cache_queued(&fonts, |a,b| update_font_texure(a,b))
                                 .unwrap();
                             for glyph in glyphs {
                                 if let Some((tex_coords, pixel_coords)) =
@@ -213,11 +194,12 @@ impl<'a> GUISpriteRender {
                                     {
                                         // glyph is totally outside the bounds
                                     } else {
-                                        self.sprites.push(to_vertex(
+                                        self.sprites.push(to_sprite(
                                             tex_coords,
                                             pixel_coords,
                                             mask,
                                             color,
+                                            self.font_texture,
                                         ));
                                     }
                                 }
@@ -234,12 +216,10 @@ impl<'a> GUISpriteRender {
             ctx.get_layouting(parent).clear_render_dirty_flags();
             parents.extend(ctx.get_children(parent).iter().rev())
         }
-    }
 
-    pub fn render(&mut self, renderer: &mut dyn Renderer, camera: &mut Camera) {
-        renderer.draw_sprites(camera, &self.sprites);
         std::mem::swap(&mut self.sprites, &mut self.last_sprites);
         std::mem::swap(&mut self.sprites_map, &mut self.last_sprites_map);
+        &self.last_sprites
     }
 }
 
@@ -566,7 +546,7 @@ impl Graphic {
 
 #[derive(Clone)]
 pub struct Painel {
-    sprites: [SpriteInstance; 9],
+    sprites: [Sprite; 9],
     border: f32,
 }
 impl Painel {
@@ -574,15 +554,21 @@ impl Painel {
     pub fn new(texture: u32, uv_rect: [f32; 4], border: f32) -> Self {
         let w = uv_rect[2] / 3.0;
         let h = uv_rect[3] / 3.0;
-        let sprite = SpriteInstance::new(0.0, 0.0, 1.0, 1.0, texture, [0.0, 0.0, 0.0, 0.0]);
-        let mut sprites: [SpriteInstance; 9] = unsafe { std::mem::zeroed() };
+        let sprite = Sprite {
+            texture,
+            color: [255; 4],
+            rect: [0.0, 0.0, 1.0, 1.0],
+            uv_rect: [0.0, 0.0, 0.0, 0.0],
+        };
+        let mut sprites: [Sprite; 9] = unsafe { std::mem::zeroed() };
         for i in 0..9 {
-            sprites[i] = sprite.clone().with_uv_rect([
+            sprites[i] = sprite.clone();
+            sprites[i].uv_rect = [
                 uv_rect[0] + w * (i % 3) as f32,
                 uv_rect[1] + h * (i / 3) as f32,
                 w,
                 h,
-            ]);
+            ];
         }
         Self { sprites, border }
     }
@@ -618,27 +604,27 @@ impl Painel {
         let width = (rect[2] - rect[0]).max(0.0);
         let height = (rect[3] - rect[1]).max(0.0);
         let border = self.border.min(width / 2.0).min(height / 2.0).round();
-        let x1 = rect[0] + border / 2.0;
-        let x2 = (rect[0] + rect[2]) / 2.0;
-        let x3 = rect[2] - border / 2.0;
+        let x1 = rect[0];
+        let x2 = rect[0] + border;
+        let x3 = rect[2] - border;
 
-        let y1 = rect[1] + border / 2.0;
-        let y2 = (rect[1] + rect[3]) / 2.0;
-        let y3 = rect[3] - border / 2.0;
+        let y1 = rect[1];
+        let y2 = rect[1] + border;
+        let y3 = rect[3] - border;
 
         let inner_width = width - border * 2.0;
         let inner_height = height - border * 2.0;
 
         for i in 0..9 {
-            self.sprites[i].set_position([x1, x2, x3][i % 3], [y1, y2, y3][i / 3]);
-            self.sprites[i].set_size(
-                [border, inner_width, border][i % 3],
-                [border, inner_height, border][i / 3],
-            );
+            let x = [x1, x2, x3][i % 3];
+            let y = [y1, y2, y3][i / 3];
+            let w = [border, inner_width, border][i % 3];
+            let h = [border, inner_height, border][i / 3];
+            self.sprites[i].rect = [x, y, x + w, y + h];
         }
     }
     #[inline]
-    pub fn get_sprites(&self) -> &[SpriteInstance] {
+    pub fn get_sprites(&self) -> &[Sprite] {
         &self.sprites
     }
 }
@@ -675,13 +661,8 @@ impl Painel {
 // }
 
 #[inline]
-pub fn cut_sprite(sprite: &mut SpriteInstance, bounds: &[f32; 4]) -> bool {
-    let mut rect = [
-        sprite.pos[0] - sprite.get_width() / 2.0,
-        sprite.pos[1] - sprite.get_height() / 2.0,
-        sprite.pos[0] + sprite.get_width() / 2.0,
-        sprite.pos[1] + sprite.get_height() / 2.0,
-    ];
+pub fn cut_sprite(sprite: &mut Sprite, bounds: &[f32; 4]) -> bool {
+    let rect = &mut sprite.rect;
     if rect[0] < bounds[0] {
         let d = (bounds[0] - rect[0]) / (rect[2] - rect[0]);
         rect[0] = bounds[0];
@@ -705,28 +686,27 @@ pub fn cut_sprite(sprite: &mut SpriteInstance, bounds: &[f32; 4]) -> bool {
         rect[3] = bounds[3];
         sprite.uv_rect[3] *= 1.0 - d;
     }
-    sprite.pos = [(rect[0] + rect[2]) / 2.0, (rect[1] + rect[3]) / 2.0];
-    sprite.scale = [(rect[2] - rect[0]), (rect[3] - rect[1])];
 
-    !(sprite.scale[0] < 0.0 || sprite.scale[1] < 0.0)
+    !(rect[2] - rect[0] < 0.0 || rect[3] - rect[1] < 0.0)
 }
 
 #[inline]
-pub fn to_vertex(
+pub fn to_sprite(
     tex_coords: ab_glyph::Rect,
     pixel_coords: ab_glyph::Rect,
     bounds: [f32; 4],
     color: [u8; 4],
-) -> SpriteInstance {
-    let mut sprite = SpriteInstance {
-        pos: [
-            (pixel_coords.min.x + pixel_coords.max.x) / 2.0,
-            (pixel_coords.min.y + pixel_coords.max.y) / 2.0,
-        ],
-        scale: [pixel_coords.width(), pixel_coords.height()],
+    font_texture: u32,
+) -> Sprite {
+    let mut sprite = Sprite {
+        texture: font_texture,
         color,
-        angle: 0.0,
-        texture: 1,
+        rect: [
+            pixel_coords.min.x,
+            pixel_coords.min.y,
+            pixel_coords.max.x,
+            pixel_coords.max.y,
+        ],
         uv_rect: [
             tex_coords.min.x,
             tex_coords.min.y,

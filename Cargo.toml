@@ -8,14 +8,14 @@ edition = "2018"
 
 [dependencies]
 
-sprite-render = { path = "../sprite-render-rs", features=["opengl"] }
 glyph_brush_draw_cache = "0.1"
 ab_glyph = "0.2"
 xi-unicode = "0.2"
 winit = "0.22"
 bitflags = "1"
-copypasta = "0.7.0"
+copypasta = "0.7"
 
 [dev-dependencies]
 
 image = { version = "0.23", default-features = false, features=["png"] }
+sprite-render = { path = "../sprite-render-rs", features=["opengl"] }

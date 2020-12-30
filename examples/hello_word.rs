@@ -1,7 +1,7 @@
 use ab_glyph::FontArc;
-use sprite_render::{Camera, GLSpriteRender, SpriteRender};
+use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use ui_engine::{
-    render::{GUISpriteRender, Text},
+    render::{GUIRender, Text},
     GUI,
 };
 use winit::{
@@ -50,7 +50,7 @@ fn main() {
 
     // create the gui, and the gui_render
     let mut gui = GUI::new(0.0, 0.0, fonts);
-    let mut gui_render = GUISpriteRender::new(font_texture);
+    let mut gui_render = GUIRender::new(font_texture);
 
     // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
     let _text = gui
@@ -84,10 +84,37 @@ fn main() {
             Event::RedrawRequested(_) => {
                 // render the gui
                 let mut ctx = gui.get_render_context();
-                gui_render.prepare_render(&mut ctx, &mut render);
+                let sprites = gui_render.render(&mut ctx, |rect, tex_data| {
+                    let mut data = Vec::with_capacity(tex_data.len() * 4);
+                    for byte in tex_data.iter() {
+                        data.extend([0xff, 0xff, 0xff, *byte].iter());
+                    }
+                    render.update_texture(
+                        font_texture,
+                        &data,
+                        Some([rect.min[0], rect.min[1], rect.width(), rect.height()]),
+                    );
+                });
                 let mut renderer = render.render();
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
-                gui_render.render(renderer.as_mut(), &mut camera);
+                renderer.draw_sprites(
+                    &mut camera,
+                    &sprites
+                        .iter()
+                        .map(|x| {
+                            let width = x.rect[2] - x.rect[0];
+                            let height = x.rect[3] - x.rect[1];
+                            SpriteInstance {
+                                scale: [width, height],
+                                angle: 0.0,
+                                uv_rect: x.uv_rect,
+                                color: x.color,
+                                pos: [x.rect[0] + width / 2.0, x.rect[1] + height / 2.0],
+                                texture: x.texture,
+                            }
+                        })
+                        .collect::<Vec<_>>(),
+                );
                 renderer.finish();
             }
             _ => {}

@@ -3,11 +3,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use ab_glyph::FontArc;
-use sprite_render::{Camera, GLSpriteRender, SpriteRender};
+use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use ui_engine::{
     event as ui_event,
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    render::{GUISpriteRender, Graphic, Panel, Text, Texture},
+    render::{GUIRender, Graphic, Panel, Text, Texture},
     style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
     widgets::{
         self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, DropMenu, Dropdown, Hoverable,
@@ -29,7 +29,7 @@ fn main() {
     let (window, mut render) = GLSpriteRender::new(wb, &event_loop, true);
     let window_size = window.inner_size();
     let font_texture = render.new_texture(1024, 1024, &vec![0; 1024 * 1024 * 4], true);
-    let mut gui_render = GUISpriteRender::new(font_texture);
+    let mut gui_render = GUIRender::new(font_texture);
     let fonts: Vec<FontArc> = [include_bytes!("../examples/NotoSans-Regular.ttf")]
         .iter()
         .map(|&font| FontArc::try_from_slice(font).unwrap())
@@ -1087,10 +1087,37 @@ fn main() {
             Event::UserEvent(()) => *control = ControlFlow::Exit,
             Event::RedrawRequested(window_id) if window_id == window.id() => {
                 let mut ctx = gui.get_render_context();
-                gui_render.prepare_render(&mut ctx, &mut render);
+                let sprites = gui_render.render(&mut ctx, |rect, tex_data| {
+                    let mut data = Vec::with_capacity(tex_data.len() * 4);
+                    for byte in tex_data.iter() {
+                        data.extend([0xff, 0xff, 0xff, *byte].iter());
+                    }
+                    render.update_texture(
+                        font_texture,
+                        &data,
+                        Some([rect.min[0], rect.min[1], rect.width(), rect.height()]),
+                    );
+                });
                 let mut renderer = render.render();
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
-                gui_render.render(renderer.as_mut(), &mut screen_camera);
+                renderer.draw_sprites(
+                    &mut screen_camera,
+                    &sprites
+                        .iter()
+                        .map(|x| {
+                            let width = x.rect[2] - x.rect[0];
+                            let height = x.rect[3] - x.rect[1];
+                            SpriteInstance {
+                                scale: [width, height],
+                                angle: 0.0,
+                                uv_rect: x.uv_rect,
+                                color: x.color,
+                                pos: [x.rect[0] + width / 2.0, x.rect[1] + height / 2.0],
+                                texture: x.texture,
+                            }
+                        })
+                        .collect::<Vec<_>>(),
+                );
                 renderer.finish();
             }
             _ => {}
