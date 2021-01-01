@@ -7,7 +7,7 @@ use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use ui_engine::{
     event as ui_event,
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    render::{GUIRender, Graphic, Panel, Text, Texture},
+    render::{GUIRender, GUIRenderer, Graphic, Panel, Text, Texture},
     style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
     widgets::{
         self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, DropMenu, Dropdown, Hoverable,
@@ -1086,32 +1086,31 @@ fn main() {
             },
             Event::UserEvent(()) => *control = ControlFlow::Exit,
             Event::RedrawRequested(window_id) if window_id == window.id() => {
+                struct Render<'a>(&'a mut GLSpriteRender);
+                impl<'a> GUIRenderer for Render<'a> {
+                    fn update_font_texure(
+                        &mut self,
+                        font_texture: u32,
+                        rect: [u32; 4],
+                        data_tex: &[u8],
+                    ) {
+                        let mut data = Vec::with_capacity(data_tex.len() * 4);
+                        for byte in data_tex.iter() {
+                            data.extend([0xff, 0xff, 0xff, *byte].iter());
+                        }
+                        self.0.update_texture(
+                            font_texture,
+                            &data,
+                            Some([rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]]),
+                        );
+                    }
+                    fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]) {
+                        self.0
+                            .resize_texture(font_texture, new_size[0], new_size[1], &[]);
+                    }
+                }
                 let mut ctx = gui.get_render_context();
-                let sprites = {
-                    let render = RefCell::new(&mut render);
-                    gui_render.render(
-                        &mut ctx,
-                        |rect, tex_data| {
-                            let mut data = Vec::with_capacity(tex_data.len() * 4);
-                            for byte in tex_data.iter() {
-                                data.extend([0xff, 0xff, 0xff, *byte].iter());
-                            }
-                            render.borrow_mut().update_texture(
-                                font_texture,
-                                &data,
-                                Some([rect.min[0], rect.min[1], rect.width(), rect.height()]),
-                            );
-                        },
-                        |new_size| {
-                            render.borrow_mut().resize_texture(
-                                font_texture,
-                                new_size[0],
-                                new_size[1],
-                                &[],
-                            );
-                        },
-                    )
-                };
+                let sprites = gui_render.render(&mut ctx, Render(&mut render));
                 let mut renderer = render.render();
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
                 renderer.draw_sprites(

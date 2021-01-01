@@ -4,7 +4,7 @@ use crate::{
     Id, Rect, RenderDirtyFlags, ROOT_ID,
 };
 use ab_glyph::{Font, FontArc};
-use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder, Rectangle};
+use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
 use std::ops::Range;
 
 #[derive(Clone)]
@@ -13,6 +13,10 @@ pub struct Sprite {
     pub color: [u8; 4],
     pub rect: [f32; 4],
     pub uv_rect: [f32; 4],
+}
+pub trait GUIRenderer {
+    fn update_font_texure(&mut self, font_texture: u32, rect: [u32; 4], data: &[u8]);
+    fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]);
 }
 
 pub struct GUIRender {
@@ -63,11 +67,10 @@ impl GUIRender {
         }
     }
 
-    pub fn render<'a, F: FnMut(Rectangle<u32>, &[u8]), G: FnMut([u32; 2])>(
+    pub fn render<'a, T: GUIRenderer>(
         &'a mut self,
         ctx: &mut Context,
-        mut update_font_texure: F,
-        mut resize_font_texture: G,
+        mut renderer: T,
     ) -> &'a [Sprite] {
         self.sprites.clear();
         self.sprites_map.clear();
@@ -100,13 +103,13 @@ impl GUIRender {
                 }
             }
         }
-        
+
         // update the font_texture
+        let font_texture = self.font_texture;
         let font_texture_valid;
-        match self
-            .draw_cache
-            .cache_queued(&fonts, |a, b| update_font_texure(a, b))
-        {
+        match self.draw_cache.cache_queued(&fonts, |r, d| {
+            renderer.update_font_texure(font_texture, [r.min[0], r.min[1], r.max[0], r.max[1]], d)
+        }) {
             Ok(CachedBy::Adding) => {
                 font_texture_valid = true;
             }
@@ -119,11 +122,11 @@ impl GUIRender {
                     .dimensions(width * 2, height * 2)
                     .build();
                 println!("{}: resizing to {}, {}", x, width * 2, height * 2);
-                resize_font_texture([width * 2, height * 2]);
-                return self.render(ctx, update_font_texure, resize_font_texture);
+                renderer.resize_font_texture(font_texture, [width * 2, height * 2]);
+                return self.render(ctx, renderer);
             }
         }
-        
+
         let mut parents = vec![ROOT_ID];
         'tree: while let Some(parent) = parents.pop() {
             let (mask, mask_changed) = {
