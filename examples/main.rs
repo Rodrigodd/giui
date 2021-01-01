@@ -28,8 +28,8 @@ fn main() {
     let wb = WindowBuilder::new().with_inner_size(PhysicalSize::new(800, 600));
     let (window, mut render) = GLSpriteRender::new(wb, &event_loop, true);
     let window_size = window.inner_size();
-    let font_texture = render.new_texture(1024, 1024, &vec![0; 1024 * 1024 * 4], true);
-    let mut gui_render = GUIRender::new(font_texture);
+    let font_texture = render.new_texture(128, 128, &[], false);
+    let mut gui_render = GUIRender::new(font_texture, [128, 128]);
     let fonts: Vec<FontArc> = [include_bytes!("../examples/NotoSans-Regular.ttf")]
         .iter()
         .map(|&font| FontArc::try_from_slice(font).unwrap())
@@ -37,17 +37,17 @@ fn main() {
     let mut gui = GUI::new(window_size.width as f32, window_size.height as f32, fonts);
     let texture = {
         let data = image::open("D:/repos/rust/ui_engine/examples/panel.png").unwrap();
-        let data = data.to_rgba();
+        let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
     let tab_texture = {
         let data = image::open("D:/repos/rust/ui_engine/examples/tab.png").unwrap();
-        let data = data.to_rgba();
+        let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
     let icon_texture = {
         let data = image::open("D:/repos/rust/ui_engine/examples/icons.png").unwrap();
-        let data = data.to_rgba();
+        let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
     let mut screen_camera = sprite_render::Camera::new(
@@ -1087,17 +1087,31 @@ fn main() {
             Event::UserEvent(()) => *control = ControlFlow::Exit,
             Event::RedrawRequested(window_id) if window_id == window.id() => {
                 let mut ctx = gui.get_render_context();
-                let sprites = gui_render.render(&mut ctx, |rect, tex_data| {
-                    let mut data = Vec::with_capacity(tex_data.len() * 4);
-                    for byte in tex_data.iter() {
-                        data.extend([0xff, 0xff, 0xff, *byte].iter());
-                    }
-                    render.update_texture(
-                        font_texture,
-                        &data,
-                        Some([rect.min[0], rect.min[1], rect.width(), rect.height()]),
-                    );
-                });
+                let sprites = {
+                    let render = RefCell::new(&mut render);
+                    gui_render.render(
+                        &mut ctx,
+                        |rect, tex_data| {
+                            let mut data = Vec::with_capacity(tex_data.len() * 4);
+                            for byte in tex_data.iter() {
+                                data.extend([0xff, 0xff, 0xff, *byte].iter());
+                            }
+                            render.borrow_mut().update_texture(
+                                font_texture,
+                                &data,
+                                Some([rect.min[0], rect.min[1], rect.width(), rect.height()]),
+                            );
+                        },
+                        |new_size| {
+                            render.borrow_mut().resize_texture(
+                                font_texture,
+                                new_size[0],
+                                new_size[1],
+                                &[],
+                            );
+                        },
+                    )
+                };
                 let mut renderer = render.render();
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
                 renderer.draw_sprites(

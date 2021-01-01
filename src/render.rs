@@ -1,10 +1,10 @@
 use crate::{
     context::Context,
     text::{FontGlyph, TextInfo},
-    Id, Rect, RenderDirtyFlags,
+    Id, Rect, RenderDirtyFlags, ROOT_ID,
 };
 use ab_glyph::{Font, FontArc};
-use glyph_brush_draw_cache::{DrawCache, DrawCacheBuilder, Rectangle};
+use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder, Rectangle};
 use std::ops::Range;
 
 #[derive(Clone)]
@@ -24,9 +24,11 @@ pub struct GUIRender {
     sprites_map: Vec<(Id, Range<usize>)>,
 }
 impl GUIRender {
-    pub fn new(font_texture: u32) -> Self {
+    pub fn new(font_texture: u32, font_texture_size: [u32; 2]) -> Self {
         //TODO: change this to default dimensions, and allow resizing
-        let draw_cache = DrawCacheBuilder::default().dimensions(1024, 1024).build();
+        let draw_cache = DrawCacheBuilder::default()
+            .dimensions(font_texture_size[0], font_texture_size[1])
+            .build();
         Self {
             draw_cache,
             font_texture,
@@ -61,9 +63,12 @@ impl GUIRender {
         }
     }
 
-    pub fn render<'a, F: FnMut(Rectangle<u32>, &[u8])>(&'a mut self, ctx: &mut Context, mut update_font_texure: F) -> &'a [Sprite] {
-        use crate::ROOT_ID;
-        let mut parents = vec![ROOT_ID];
+    pub fn render<'a, F: FnMut(Rectangle<u32>, &[u8]), G: FnMut([u32; 2])>(
+        &'a mut self,
+        ctx: &mut Context,
+        mut update_font_texure: F,
+        mut resize_font_texture: G,
+    ) -> &'a [Sprite] {
         self.sprites.clear();
         self.sprites_map.clear();
         let mut masks: Vec<(usize, [f32; 4], bool)> = Vec::new();
@@ -81,6 +86,45 @@ impl GUIRender {
             ])
         }
 
+        // queue all glyphs for cache
+        let mut parents = vec![ROOT_ID];
+        while let Some(parent) = parents.pop() {
+            parents.extend(ctx.get_children(parent).iter());
+            if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
+                if let Graphic::Text(text) = graphic {
+                    let glyphs = text.get_glyphs(rect, &fonts);
+                    for glyph in glyphs {
+                        self.draw_cache
+                            .queue_glyph(glyph.font_id.0, glyph.glyph.clone());
+                    }
+                }
+            }
+        }
+        
+        // update the font_texture
+        let font_texture_valid;
+        match self
+            .draw_cache
+            .cache_queued(&fonts, |a, b| update_font_texure(a, b))
+        {
+            Ok(CachedBy::Adding) => {
+                font_texture_valid = true;
+            }
+            Ok(CachedBy::Reordering) => {
+                font_texture_valid = false;
+            }
+            Err(x) => {
+                let (width, height) = self.draw_cache.dimensions();
+                self.draw_cache = DrawCacheBuilder::default()
+                    .dimensions(width * 2, height * 2)
+                    .build();
+                println!("{}: resizing to {}, {}", x, width * 2, height * 2);
+                resize_font_texture([width * 2, height * 2]);
+                return self.render(ctx, update_font_texure, resize_font_texture);
+            }
+        }
+        
+        let mut parents = vec![ROOT_ID];
         'tree: while let Some(parent) = parents.pop() {
             let (mask, mask_changed) = {
                 let rect = ctx.get_layouting(parent);
@@ -110,12 +154,19 @@ impl GUIRender {
             };
             let mut compute_sprite = true;
             if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
+                let is_text = if let Graphic::Text(_) = graphic {
+                    true
+                } else {
+                    false
+                };
+
                 let len = self.sprites.len();
-                if !rect
+                if !(rect
                     .get_render_dirty_flags()
                     .contains(RenderDirtyFlags::RECT)
-                    && !mask_changed
-                    && !graphic.need_rebuild()
+                    || mask_changed
+                    || graphic.need_rebuild()
+                    || (is_text && !font_texture_valid))
                 {
                     if let Some(range) = self
                         .last_sprites_map
@@ -175,14 +226,6 @@ impl GUIRender {
                             let color = text.color;
                             let glyphs = text.get_glyphs(rect, &fonts);
 
-                            for glyph in glyphs {
-                                self.draw_cache
-                                    .queue_glyph(glyph.font_id.0, glyph.glyph.clone());
-                            }
-                            //TODO: I should queue all the glyphs, before calling cache_queued
-                            self.draw_cache
-                                .cache_queued(&fonts, |a,b| update_font_texure(a,b))
-                                .unwrap();
                             for glyph in glyphs {
                                 if let Some((tex_coords, pixel_coords)) =
                                     self.draw_cache.rect_for(glyph.font_id.0, &glyph.glyph)
