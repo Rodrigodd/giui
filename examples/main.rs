@@ -61,35 +61,35 @@ fn main() {
     );
     let painel: Graphic = Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0).into();
 
-    let button_style = ButtonStyle {
+    let button_style = Rc::new(ButtonStyle {
         normal: Graphic::from(Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0)),
         hover: Graphic::from(Panel::new(texture, [0.5, 0.0, 0.5, 0.5], 10.0)),
         pressed: Graphic::from(Panel::new(texture, [0.0, 0.5, 0.5, 0.5], 10.0)),
         focus: Graphic::from(Panel::new(texture, [0.5, 0.5, 0.5, 0.5], 10.0)),
-    };
-    let menu_button_style = ButtonStyle {
+    });
+    let menu_button_style = Rc::new(ButtonStyle {
         normal: Graphic::from(Texture::new(texture, [0.1, 0.1, 0.3, 0.3])),
         hover: Graphic::from(Texture::new(texture, [0.6, 0.1, 0.3, 0.3])),
         pressed: Graphic::from(Texture::new(texture, [0.1, 0.6, 0.3, 0.3])),
         focus: Graphic::from(Texture::new(texture, [0.5, 0.5, 0.001, 0.001])),
-    };
-    let menu_style = MenuStyle {
-        button: menu_button_style.clone(),
+    });
+    let menu_style = Rc::new(MenuStyle {
+        button: (*menu_button_style).clone(),
         arrow: Texture::new(icon_texture, [0.0, 0.0, 1.0, 1.0]).into(),
         separator: Texture::new(texture, [0.2, 0.2, 0.2, 0.2])
             .with_color([180, 180, 180, 255])
             .into(),
-    };
-    let tab_style = TabStyle {
+    });
+    let tab_style = Rc::new(TabStyle {
         hover: Graphic::from(Panel::new(tab_texture, [0.5, 0.0, 0.5, 0.5], 10.0)),
         pressed: Graphic::from(Panel::new(tab_texture, [0.0, 0.5, 0.5, 0.5], 10.0)),
         unselected: Graphic::from(Panel::new(tab_texture, [0.0, 0.0, 0.5, 0.5], 10.0)),
         selected: Graphic::from(Panel::new(tab_texture, [0.5, 0.5, 0.5, 0.5], 10.0)),
-    };
-    let focus_style = OnFocusStyle {
+    });
+    let focus_style = Rc::new(OnFocusStyle {
         normal: Graphic::None,
         focus: button_style.focus.clone(),
-    };
+    });
 
     let (hover, hover_label) = {
         let graphic = painel
@@ -162,6 +162,7 @@ fn main() {
         .build();
     let _menubar = {
         let menu = gui.reserve_id();
+        // TODO: the menu_bar's blocker espect that I know the size of menu_bar
         let blocker = gui
             .create_control()
             .with_active(false)
@@ -173,7 +174,7 @@ fn main() {
         use Item::*;
         let proxy = event_loop.create_proxy();
         gui.create_control_reserved(menu)
-            .with_graphic(menu_button_style.normal)
+            .with_graphic(menu_button_style.normal.clone())
             .with_behaviour(MenuBar::new(
                 menu_style.clone(),
                 blocker,
@@ -745,7 +746,8 @@ fn main() {
                     OnFocusStyle {
                         normal: painel.clone().with_color([200, 200, 200, 255]),
                         focus: button_style.focus.clone().with_color([200, 200, 200, 255]),
-                    },
+                    }
+                    .into(),
                 ),
             );
             input_box
@@ -945,12 +947,12 @@ fn main() {
             .with_fill_y(RectFill::ShrinkStart)
             .with_parent(window)
             .build();
-        let style = ButtonStyle {
+        let style = Rc::new(ButtonStyle {
             normal: painel.clone().with_color([255, 0, 0, 255]),
             hover: painel.clone().with_color([240, 0, 0, 255]),
             pressed: painel.clone().with_color([230, 0, 0, 255]),
             focus: painel.clone().with_color([255, 0, 0, 255]),
-        };
+        });
         let _title = gui
             .create_control()
             .with_graphic(Graphic::from(Text::new(
@@ -1144,7 +1146,7 @@ fn create_item(
     texture: u32,
     text: String,
     color: [u8; 4],
-    button_style: ButtonStyle,
+    button_style: Rc<ButtonStyle>,
 ) {
     let painel: Graphic =
         Panel::new(texture, [0.0 / 2.0, 0.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0], 10.0).into();
@@ -1184,7 +1186,7 @@ fn create_item(
 fn create_button<F: Fn(Id, &mut Context) + 'static>(
     gui: &mut GUI,
     text: String,
-    button_style: ButtonStyle,
+    button_style: Rc<ButtonStyle>,
     on_click: F,
 ) -> ControlBuilder {
     let button_id: Id = gui.reserve_id();

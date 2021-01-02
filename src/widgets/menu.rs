@@ -1,13 +1,12 @@
-use std::{any::Any, rc::Rc};
-
 use crate::{
     layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
     render::Text,
     style::MenuStyle,
+    widgets::CloseMenu,
     Behaviour, Context, Id, MouseButton, MouseEvent, RectFill,
 };
 
-use super::CloseMenu;
+use std::{any::Any, rc::Rc};
 
 pub enum Item {
     Separator,
@@ -33,11 +32,11 @@ pub struct MenuBehaviour {
     is_over: bool,
     open: Option<Id>,
     click: bool,
-    style: MenuStyle,
+    style: Rc<MenuStyle>,
     owner: Id,
 }
 impl MenuBehaviour {
-    pub fn new(menu: Rc<Menu>, style: MenuStyle, owner: Id) -> Self {
+    pub fn new(menu: Rc<Menu>, style: Rc<MenuStyle>, owner: Id) -> Self {
         Self {
             menu,
             over: None,
@@ -203,11 +202,11 @@ pub struct MenuBar {
     over: Option<usize>,
     is_over: bool,
     open: Option<Id>,
-    style: MenuStyle,
+    style: Rc<MenuStyle>,
     blocker: Id,
 }
 impl MenuBar {
-    pub fn new(style: MenuStyle, blocker: Id, menus: Vec<Rc<Menu>>) -> Self {
+    pub fn new(style: Rc<MenuStyle>, blocker: Id, menus: Vec<Rc<Menu>>) -> Self {
         Self {
             menus,
             over: None,

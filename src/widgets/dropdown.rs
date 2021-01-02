@@ -1,6 +1,7 @@
 use crate::{event, style::ButtonStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
 
 use std::any::Any;
+use std::rc::Rc;
 
 struct SetIndex(usize);
 // struct SetOwner(Id);
@@ -18,11 +19,11 @@ pub struct MenuItem {
     index: usize,
     state: u8,
     menu: Id,
-    style: ButtonStyle,
+    style: Rc<ButtonStyle>,
     focus: bool,
 }
 impl MenuItem {
-    pub fn new(menu: Id, style: ButtonStyle) -> Self {
+    pub fn new(menu: Id, style: Rc<ButtonStyle>) -> Self {
         Self {
             index: 0,
             state: 0,
@@ -185,7 +186,7 @@ where
     selected: Option<usize>,
     menu: Id,
     state: u8,
-    style: ButtonStyle,
+    style: Rc<ButtonStyle>,
     focus: bool,
     on_select: F,
     opened: bool,
@@ -195,7 +196,7 @@ where
     T: 'static + Clone,
     F: Fn(T, Id, &mut Context),
 {
-    pub fn new(itens: Vec<T>, menu: Id, on_select: F, style: ButtonStyle) -> Self {
+    pub fn new(itens: Vec<T>, menu: Id, on_select: F, style: Rc<ButtonStyle>) -> Self {
         Self {
             itens,
             selected: None,

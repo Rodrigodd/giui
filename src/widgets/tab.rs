@@ -1,6 +1,7 @@
 use crate::{style::TabStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
 
 use std::any::Any;
+use std::rc::Rc;
 
 struct Unselected;
 struct Selected;
@@ -25,10 +26,10 @@ pub struct TabButton {
     page: Id,
     selected: bool,
     click: bool,
-    style: TabStyle,
+    style: Rc<TabStyle>,
 }
 impl TabButton {
-    pub fn new(tab_group: ButtonGroup, page: Id, selected: bool, style: TabStyle) -> Self {
+    pub fn new(tab_group: ButtonGroup, page: Id, selected: bool, style: Rc<TabStyle>) -> Self {
         Self {
             tab_group,
             page,

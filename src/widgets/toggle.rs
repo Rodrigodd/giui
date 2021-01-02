@@ -4,20 +4,22 @@ use crate::{
     Behaviour, Context, Id, MouseButton, MouseEvent,
 };
 
+use std::rc::Rc;
+
 pub struct Toggle {
     click: bool,
     enable: bool,
     button: Id,
     marker: Id,
-    button_style: ButtonStyle,
-    background_style: OnFocusStyle,
+    button_style: Rc<ButtonStyle>,
+    background_style: Rc<OnFocusStyle>,
 }
 impl Toggle {
     pub fn new(
         button: Id,
         marker: Id,
-        button_style: ButtonStyle,
-        background_style: OnFocusStyle,
+        button_style: Rc<ButtonStyle>,
+        background_style: Rc<OnFocusStyle>,
     ) -> Self {
         Self {
             click: false,

@@ -2,8 +2,10 @@ use crate::{
     event, render::Graphic, style::OnFocusStyle, text::TextInfo, Behaviour, Context, Id,
     KeyboardEvent, MouseButton, MouseEvent,
 };
+
 use copypasta::{ClipboardContext, ClipboardProvider};
 use std::any::Any;
+use std::rc::Rc;
 use winit::event::VirtualKeyCode;
 
 pub struct TextField {
@@ -18,10 +20,10 @@ pub struct TextField {
     on_focus: bool,
     mouse_x: f32,
     mouse_down: bool,
-    style: OnFocusStyle,
+    style: Rc<OnFocusStyle>,
 }
 impl TextField {
-    pub fn new(caret: Id, label: Id, style: OnFocusStyle) -> Self {
+    pub fn new(caret: Id, label: Id, style: Rc<OnFocusStyle>) -> Self {
         Self {
             caret,
             label,
@@ -37,8 +39,7 @@ impl TextField {
             style,
         }
     }
-}
-impl TextField {
+
     fn update_text(&mut self, this: Id, ctx: &mut Context) {
         let fonts = ctx.get_fonts();
         if let Some((ref mut rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {

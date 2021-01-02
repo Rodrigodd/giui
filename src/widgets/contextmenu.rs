@@ -1,13 +1,11 @@
-use std::{any::Any, rc::Rc};
-
 use crate::{
     layouts::VBoxLayout,
     style::MenuStyle,
-    widgets::{CloseMenu, ItemClicked, Menu, MenuBehaviour},
+    widgets::{Blocker, CloseMenu, ItemClicked, Menu, MenuBehaviour},
     Behaviour, Context, Id, MouseButton, MouseEvent,
 };
 
-use super::Blocker;
+use std::{any::Any, rc::Rc};
 
 struct Repos;
 
@@ -15,11 +13,11 @@ pub struct ContextMenu {
     menu: Rc<Menu>,
     open: Option<Id>,
     mouse_pos: [f32; 2],
-    style: MenuStyle,
+    style: Rc<MenuStyle>,
     blocker: Option<Id>,
 }
 impl ContextMenu {
-    pub fn new(style: MenuStyle, menu: Rc<Menu>) -> Self {
+    pub fn new(style: Rc<MenuStyle>, menu: Rc<Menu>) -> Self {
         Self {
             menu,
             open: None,

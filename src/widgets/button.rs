@@ -1,13 +1,15 @@
 use crate::{style::ButtonStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
 
+use std::rc::Rc;
+
 pub struct Button<F: Fn(Id, &mut Context)> {
     state: u8, // 0 - normal, 1 - hover, 2 - pressed
     focus: bool,
     on_click: F,
-    style: ButtonStyle,
+    style: Rc<ButtonStyle>,
 }
 impl<F: Fn(Id, &mut Context)> Button<F> {
-    pub fn new(style: ButtonStyle, on_click: F) -> Self {
+    pub fn new(style: Rc<ButtonStyle>, on_click: F) -> Self {
         Self {
             state: 0,
             focus: false,

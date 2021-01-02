@@ -1,5 +1,7 @@
 use crate::{event, style::OnFocusStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
 
+use std::rc::Rc;
+
 pub struct Slider {
     handle: Id,
     slide_area: Id, //TODO: I should remove this slide_area
@@ -8,7 +10,7 @@ pub struct Slider {
     min_value: f32,
     max_value: f32,
     value: f32,
-    style: OnFocusStyle,
+    style: Rc<OnFocusStyle>,
 }
 impl Slider {
     pub fn new(
@@ -17,7 +19,7 @@ impl Slider {
         min_value: f32,
         max_value: f32,
         start_value: f32,
-        style: OnFocusStyle,
+        style: Rc<OnFocusStyle>,
     ) -> Self {
         Self {
             handle,
