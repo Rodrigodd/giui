@@ -3,30 +3,41 @@ use std::any::Any;
 use ab_glyph::FontArc;
 use winit::event::ModifiersState;
 
-use crate::{event, render::Graphic, Behaviour, ControlBuilder, Controls, Id, Layout, Rect};
+use crate::{event, render::Graphic, Behaviour, ControlBuilder, Controls, Id, Layout, Rect, GUI};
 
 // contains a reference to all the controls, except the behaviour of one control
 pub struct Context<'a> {
-    modifiers: ModifiersState,
-    controls: &'a mut Controls,
+    gui: &'a mut GUI,
+    // modifiers: ModifiersState,
+    // controls: &'a mut Controls,
     fonts: &'a [FontArc],
     pub(crate) events: Vec<Box<dyn Any>>,
     pub(crate) events_to: Vec<(Id, Box<dyn Any>)>,
     pub(crate) dirtys: Vec<Id>,
     pub(crate) render_dirty: bool,
 }
+impl<'a> Drop for Context<'a> {
+    fn drop(&mut self) {
+        let Context {
+            events,
+            events_to,
+            dirtys,
+            render_dirty,
+            ..
+        } = self;
+        self.gui
+            .context_drop(events, events_to, dirtys, *render_dirty);
+    }
+}
 impl<'a> Context<'a> {
-    pub(crate) fn new(
-        controls: &'a mut Controls,
-        fonts: &'a [FontArc],
-        modifiers: ModifiersState,
-    ) -> Self {
+    pub(crate) fn new(gui: &'a mut GUI) -> Self {
+        let fonts = unsafe { std::mem::transmute(gui.fonts.as_slice()) };
         Self {
-            modifiers,
-            controls,
+            gui,
+            fonts,
             events: Vec::new(),
             events_to: Vec::new(),
-            fonts,
+
             dirtys: Vec::new(),
             render_dirty: false,
         }
@@ -34,20 +45,19 @@ impl<'a> Context<'a> {
 
     pub(crate) fn new_with_mut_behaviour(
         this: Id,
-        controls: &'a mut Controls,
-        fonts: &'a [FontArc],
-        modifiers: ModifiersState,
+        gui: &'a mut GUI,
     ) -> Option<(&'a mut dyn Behaviour, Self)> {
-        let this_one =
-            unsafe { &mut *(controls[this].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour) };
+        let this_one = unsafe {
+            &mut *(gui.controls[this].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
+        };
+        let fonts = unsafe { std::mem::transmute(gui.fonts.as_slice()) };
         Some((
             this_one,
             Self {
-                modifiers,
-                controls,
+                gui,
+                fonts,
                 events: Vec::new(),
                 events_to: Vec::new(),
-                fonts,
                 dirtys: Vec::new(),
                 render_dirty: false,
             },
@@ -55,7 +65,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn create_control(&mut self) -> ControlBuilder {
-        let id = self.controls.reserve();
+        let id = self.gui.controls.reserve();
         ControlBuilder::new(Box::new(move |build| {
             self.send_event((id, build));
             id
@@ -63,10 +73,10 @@ impl<'a> Context<'a> {
     }
 
     pub fn modifiers(&self) -> ModifiersState {
-        self.modifiers
+        self.gui.modifiers
     }
 
-    pub fn get_fonts(&mut self) -> &'a [FontArc] {
+    pub fn get_fonts(&self) -> &'a [FontArc] {
         self.fonts
     }
 
@@ -78,7 +88,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn get_layouting(&mut self, id: Id) -> &mut Rect {
-        &mut self.controls[id].rect
+        &mut self.gui.controls[id].rect
     }
 
     pub fn dirty_layout(&mut self, id: Id) {
@@ -88,94 +98,94 @@ impl<'a> Context<'a> {
     }
 
     pub fn get_rect(&self, id: Id) -> &[f32; 4] {
-        &self.controls[id].rect.rect
+        &self.gui.controls[id].rect.rect
     }
 
     pub fn get_size(&mut self, id: Id) -> [f32; 2] {
-        self.controls[id].rect.get_size()
+        self.gui.controls[id].rect.get_size()
     }
 
     pub fn get_margins(&self, id: Id) -> &[f32; 4] {
-        &self.controls[id].rect.margins
+        &self.gui.controls[id].rect.margins
     }
 
     pub fn set_margins(&mut self, id: Id, margins: [f32; 4]) {
-        self.controls[id].rect.margins = margins;
+        self.gui.controls[id].rect.margins = margins;
         self.dirty_layout(id);
     }
 
     pub fn get_anchors(&self, id: Id) -> &[f32; 4] {
-        &self.controls[id].rect.anchors
+        &self.gui.controls[id].rect.anchors
     }
 
     pub fn set_margin_left(&mut self, id: Id, margin: f32) {
-        self.controls[id].rect.margins[0] = margin;
+        self.gui.controls[id].rect.margins[0] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_margin_top(&mut self, id: Id, margin: f32) {
-        self.controls[id].rect.margins[1] = margin;
+        self.gui.controls[id].rect.margins[1] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_margin_right(&mut self, id: Id, margin: f32) {
-        self.controls[id].rect.margins[2] = margin;
+        self.gui.controls[id].rect.margins[2] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_margin_bottom(&mut self, id: Id, margin: f32) {
-        self.controls[id].rect.margins[3] = margin;
+        self.gui.controls[id].rect.margins[3] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_anchors(&mut self, id: Id, anchors: [f32; 4]) {
-        self.controls[id].rect.anchors = anchors;
+        self.gui.controls[id].rect.anchors = anchors;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_left(&mut self, id: Id, anchor: f32) {
-        self.controls[id].rect.anchors[0] = anchor;
+        self.gui.controls[id].rect.anchors[0] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_top(&mut self, id: Id, anchor: f32) {
-        self.controls[id].rect.anchors[1] = anchor;
+        self.gui.controls[id].rect.anchors[1] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_right(&mut self, id: Id, anchor: f32) {
-        self.controls[id].rect.anchors[2] = anchor;
+        self.gui.controls[id].rect.anchors[2] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_bottom(&mut self, id: Id, anchor: f32) {
-        self.controls[id].rect.anchors[3] = anchor;
+        self.gui.controls[id].rect.anchors[3] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn get_min_size(&self, id: Id) -> [f32; 2] {
-        self.controls[id].rect.get_min_size()
+        self.gui.controls[id].rect.get_min_size()
     }
 
     pub fn set_min_size(&mut self, id: Id, min_size: [f32; 2]) {
-        self.controls[id].rect.set_min_size(min_size);
+        self.gui.controls[id].rect.set_min_size(min_size);
         self.dirty_layout(id);
     }
 
     pub fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
         self.render_dirty = true;
-        &mut self.controls[id].graphic
+        &mut self.gui.controls[id].graphic
     }
 
     pub fn set_graphic(&mut self, id: Id, graphic: Graphic) {
-        let control = &mut self.controls[id];
+        let control = &mut self.gui.controls[id];
         control.graphic = graphic;
         control.rect.dirty_render_dirty_flags();
         self.render_dirty = true;
     }
 
     pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
-        let control = &mut self.controls[id];
+        let control = &mut self.gui.controls[id];
         if let Graphic::None = control.graphic {
             None
         } else {
@@ -184,7 +194,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn is_active(&self, id: Id) -> bool {
-        self.controls[id].active
+        self.gui.controls[id].active
     }
 
     /// This only took effect when Controls is dropped
@@ -204,16 +214,16 @@ impl<'a> Context<'a> {
     }
 
     pub fn move_to_front(&mut self, id: Id) {
-        self.controls.move_to_front(id);
+        self.gui.controls.move_to_front(id);
         self.dirty_layout(id);
     }
 
     pub fn get_parent(&self, id: Id) -> Option<Id> {
-        self.controls[id].parent
+        self.gui.controls[id].parent
     }
 
     pub fn get_children(&self, id: Id) -> Vec<Id> {
-        self.controls.get_children(id)
+        self.gui.controls.get_children(id)
     }
 }
 

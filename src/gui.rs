@@ -5,7 +5,6 @@ use crate::{
 };
 use ab_glyph::FontArc;
 use std::any::Any;
-use std::collections::VecDeque;
 use winit::event::{
     ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent,
 };
@@ -114,11 +113,11 @@ struct Input {
 }
 
 pub struct GUI {
-    controls: Controls,
+    pub(crate) controls: Controls,
+    pub(crate) fonts: Vec<FontArc>,
+    pub(crate) modifiers: ModifiersState,
     events: Vec<Box<dyn Any>>,
     redraw: bool,
-    fonts: Vec<FontArc>,
-    modifiers: ModifiersState,
     input: Input,
     current_over: Option<Id>,
     current_focus: Option<Id>,
@@ -334,10 +333,31 @@ impl GUI {
     }
 
     #[inline]
-    pub fn get_render_context(&mut self) -> Context {
+    pub fn get_context(&mut self) -> Context {
         //TODO: Context -> RenderContext
         self.redraw = false;
-        Context::new(&mut self.controls, &self.fonts, self.modifiers)
+        Context::new(self)
+    }
+
+    pub(crate) fn context_drop(
+        &mut self,
+        events: &mut Vec<Box<dyn Any>>,
+        events_to: &mut Vec<(Id, Box<dyn Any>)>,
+        dirtys: &mut Vec<Id>,
+        render_dirty: bool,
+    ) {
+        if render_dirty {
+            self.redraw = true;
+        }
+        for event in events.drain(..) {
+            self.send_event(event);
+        }
+        for (id, event) in events_to.drain(..).rev() {
+            self.send_event_to(id, event);
+        }
+        for dirty in dirtys.drain(..) {
+            self.update_layout(dirty);
+        }
     }
 
     pub fn set_behaviour<T: Behaviour + 'static>(&mut self, id: Id, behaviour: T) {
@@ -396,57 +416,14 @@ impl GUI {
     }
 
     pub fn send_event_to(&mut self, id: Id, event: Box<dyn Any>) {
-        if let Some((this, mut ctx)) =
-            Context::new_with_mut_behaviour(id, &mut self.controls, &self.fonts, self.modifiers)
-        {
+        if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
             this.on_event(event.as_ref(), id, &mut ctx);
-            let Context {
-                events,
-                events_to,
-                dirtys,
-                render_dirty,
-                ..
-            } = ctx;
-            if render_dirty {
-                self.redraw = true;
-            }
-            for event in events {
-                self.send_event(event);
-            }
-            for (id, event) in events_to {
-                self.send_event_to(id, event);
-            }
-            for dirty in dirtys {
-                self.update_layout(dirty);
-            }
         }
     }
 
     pub fn call_event<F: Fn(&mut dyn Behaviour, Id, &mut Context)>(&mut self, id: Id, event: F) {
-        if let Some((this, mut ctx)) =
-            Context::new_with_mut_behaviour(id, &mut self.controls, &self.fonts, self.modifiers)
-        {
+        if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
             event(this, id, &mut ctx);
-            let Context {
-                events,
-                events_to,
-                dirtys,
-                render_dirty,
-                ..
-            } = ctx;
-            if render_dirty {
-                self.redraw = true;
-            }
-            for event in events {
-                self.send_event(event);
-            }
-            let mut event_queue = VecDeque::from(events_to);
-            while let Some((id, event)) = event_queue.pop_back() {
-                self.send_event_to(id, event);
-            }
-            for dirty in dirtys {
-                self.update_layout(dirty);
-            }
         }
     }
 
@@ -456,29 +433,8 @@ impl GUI {
         event: F,
     ) {
         let mut handled = false;
-        if let Some((this, mut ctx)) =
-            Context::new_with_mut_behaviour(id, &mut self.controls, &self.fonts, self.modifiers)
-        {
+        if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
             handled = event(this, id, &mut ctx);
-            let Context {
-                events,
-                events_to,
-                dirtys,
-                render_dirty,
-                ..
-            } = ctx;
-            if render_dirty {
-                self.redraw = true;
-            }
-            for event in events {
-                self.send_event(event);
-            }
-            for (id, event) in events_to {
-                self.send_event_to(id, event);
-            }
-            for dirty in dirtys {
-                self.update_layout(dirty);
-            }
         }
         if !handled {
             if let Some(parent) = self.controls[id].parent {

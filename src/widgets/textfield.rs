@@ -8,10 +8,36 @@ use std::any::Any;
 use std::rc::Rc;
 use winit::event::VirtualKeyCode;
 
-pub struct TextField {
+pub trait TextFieldCallback {
+    fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool;
+    fn on_change(&mut self, this: Id, ctx: &mut Context, text: &mut String);
+    fn on_unfocus(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool;
+}
+impl<F: FnMut(Id, &mut Context, &mut String) -> bool + 'static> TextFieldCallback for F {
+    fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool {
+        self(this, ctx, text)
+    }
+    fn on_change(&mut self, _: Id, _: &mut Context, _: &mut String) {}
+    fn on_unfocus(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
+        true
+    }
+}
+impl TextFieldCallback for () {
+    fn on_submit(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
+        true
+    }
+    fn on_change(&mut self, _: Id, _: &mut Context, _: &mut String) {}
+    fn on_unfocus(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
+        true
+    }
+}
+
+pub struct TextField<C: TextFieldCallback> {
+    callback: C,
     caret: Id,
     label: Id,
     text: String,
+    previous_text: String,
     caret_index: usize,
     selection_index: Option<usize>,
     text_info: TextInfo,
@@ -22,12 +48,14 @@ pub struct TextField {
     mouse_down: bool,
     style: Rc<OnFocusStyle>,
 }
-impl TextField {
-    pub fn new(caret: Id, label: Id, style: Rc<OnFocusStyle>) -> Self {
+impl<C: TextFieldCallback> TextField<C> {
+    pub fn new(caret: Id, label: Id, style: Rc<OnFocusStyle>, callback: C) -> Self {
         Self {
+            callback,
             caret,
             label,
             text: String::new(),
+            previous_text: String::new(),
             caret_index: 0,
             selection_index: None,
             text_info: TextInfo::default(),
@@ -162,7 +190,7 @@ impl TextField {
         self.update_text(this, ctx);
     }
 }
-impl Behaviour for TextField {
+impl<C: TextFieldCallback> Behaviour for TextField<C> {
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         self.update_text(this, ctx);
         ctx.move_to_front(self.label);
@@ -240,6 +268,16 @@ impl Behaviour for TextField {
             ctx.set_graphic(this, self.style.focus.clone());
         } else {
             ctx.set_graphic(this, self.style.normal.clone());
+
+            let x = self.text_info.get_caret_pos(self.caret_index)[0];
+            if self.callback.on_unfocus(this, ctx, &mut self.text) {
+                self.previous_text.clone_from(&self.text);
+            } else {
+                self.text.clone_from(&self.previous_text);
+            }
+            self.selection_index = None;
+            self.caret_index = self.text_info.get_caret_index_at_pos(0, x);
+            self.update_text(this, ctx);
         }
         self.update_carret(this, ctx, true);
     }
@@ -305,10 +343,16 @@ impl Behaviour for TextField {
                     }
                 }
                 VirtualKeyCode::Return => {
-                    ctx.send_event(event::SubmitText {
-                        id: this,
-                        text: self.text.clone(),
-                    });
+                    let x = self.text_info.get_caret_pos(self.caret_index)[0];
+                    if self.callback.on_submit(this, ctx, &mut self.text) {
+                        self.previous_text.clone_from(&self.text);
+                    } else {
+                        self.text.clone_from(&self.previous_text);
+                    }
+                    self.update_text(this, ctx);
+                    self.selection_index = None;
+                    self.caret_index = self.text_info.get_caret_index_at_pos(0, x);
+                    self.update_carret(this, ctx, true);
                 }
                 VirtualKeyCode::Back | VirtualKeyCode::Delete if self.selection_index.is_some() => {
                     self.delete_selection(this, ctx);

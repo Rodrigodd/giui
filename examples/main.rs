@@ -700,14 +700,15 @@ fn main() {
 
         page_2
     };
-    let (page_3, input_box, list) = {
+    let page_3 = {
         let page_3 = gui
             .create_control()
             .with_graphic(painel.clone())
             .with_parent(page_area)
             .with_layout(VBoxLayout::new(5.0, [10.0, 10.0, 10.0, 10.0], -1))
             .build();
-        let input_box = {
+        let list = gui.reserve_id();
+        let _input_box = {
             let hbox = gui
                 .create_control()
                 .with_parent(page_3)
@@ -748,6 +749,22 @@ fn main() {
                         focus: button_style.focus.clone().with_color([200, 200, 200, 255]),
                     }
                     .into(),
+                    {
+                        let button_style = button_style.clone();
+                        move |_this: Id, ctx: &mut Context, text: &mut String| {
+                            println!("Submited {}!", text);
+                            create_item(
+                                ctx,
+                                list,
+                                texture,
+                                text.clone(),
+                                [130, 150, 255, 255],
+                                button_style.clone(),
+                            );
+                            text.clear();
+                            true
+                        }
+                    },
                 ),
             );
             input_box
@@ -820,7 +837,7 @@ fn main() {
             ScrollBar::new(v_scroll_bar_handle, scroll_view, true),
         );
         let list = gui
-            .create_control()
+            .create_control_reserved(list)
             .with_layout(VBoxLayout::new(3.0, [5.0, 5.0, 5.0, 5.0], -1))
             .with_parent(view)
             .build();
@@ -844,9 +861,9 @@ fn main() {
         seed = seed ^ (seed << 64);
         for i in 0..5 {
             let color = (seed.rotate_left(i * 3)) as u32 | 0xff;
-            create_item(&mut gui, list, texture, format!("This is the item number {} with the color which hexadecimal representation is #{:0x}", i + 1, color), color.to_be_bytes(),button_style.clone());
+            create_item(&mut gui.get_context(), list, texture, format!("This is the item number {} with the color which hexadecimal representation is #{:0x}", i + 1, color), color.to_be_bytes(),button_style.clone());
         }
-        (page_3, input_box, list)
+        page_3
     };
     let page_4 = {
         let page_4 = gui
@@ -1056,21 +1073,6 @@ fn main() {
                         gui.deactive_control(bottom_text);
                     }
                 }
-            } else if let Ok(ui_event::SubmitText { id, text }) =
-                event.downcast::<ui_event::SubmitText>().map(|x| *x)
-            {
-                if id == input_box {
-                    println!("Submited {}!", text);
-                    gui.send_event_to(id, Box::new(ui_event::ClearText));
-                    create_item(
-                        &mut gui,
-                        list,
-                        texture,
-                        text,
-                        [130, 150, 255, 255],
-                        button_style.clone(),
-                    );
-                }
             }
         }
 
@@ -1111,7 +1113,7 @@ fn main() {
                             .resize_texture(font_texture, new_size[0], new_size[1], &[]);
                     }
                 }
-                let mut ctx = gui.get_render_context();
+                let mut ctx = gui.get_context();
                 let sprites = gui_render.render(&mut ctx, Render(&mut render));
                 let mut renderer = render.render();
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
@@ -1141,7 +1143,7 @@ fn main() {
 }
 
 fn create_item(
-    gui: &mut GUI,
+    ctx: &mut Context,
     list: Id,
     texture: u32,
     text: String,
@@ -1150,7 +1152,7 @@ fn create_item(
 ) {
     let painel: Graphic =
         Panel::new(texture, [0.0 / 2.0, 0.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0], 10.0).into();
-    let item = gui
+    let item = ctx
         .create_control()
         .with_min_size([100.0, 35.0])
         .with_graphic(painel.clone().with_color(color))
@@ -1159,18 +1161,18 @@ fn create_item(
         .build();
     // TODO: there must be a better way of set the minsize of the control above,
     // instead of relying in a child.
-    gui.create_control()
+    ctx.create_control()
         .with_min_height(35.0)
         .with_parent(item)
         .build();
-    let _text = gui
+    let _text = ctx
         .create_control()
         .with_parent(item)
         .with_graphic(Text::new([0, 0, 0, 255], text, 16.0, (-1, 0)).into())
         .with_layout(FitText)
         .with_expand_x(true)
         .build();
-    let _button = gui
+    let _button = ctx
         .create_control()
         .with_parent(item)
         .with_graphic(painel)

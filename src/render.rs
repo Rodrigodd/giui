@@ -75,7 +75,6 @@ impl GUIRender {
         self.sprites.clear();
         self.sprites_map.clear();
         let mut masks: Vec<(usize, [f32; 4], bool)> = Vec::new();
-        let fonts = ctx.get_fonts();
 
         fn intersection(a: &[f32; 4], b: &[f32; 4]) -> Option<[f32; 4]> {
             if a[0] > b[2] || a[2] < b[0] || a[1] > b[3] || a[3] < b[1] {
@@ -89,13 +88,15 @@ impl GUIRender {
             ])
         }
 
+        let fonts = ctx.get_fonts();
+
         // queue all glyphs for cache
         let mut parents = vec![ROOT_ID];
         while let Some(parent) = parents.pop() {
             parents.extend(ctx.get_children(parent).iter());
             if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
                 if let Graphic::Text(text) = graphic {
-                    let glyphs = text.get_glyphs(rect, &fonts);
+                    let glyphs = text.get_glyphs(rect, fonts);
                     for glyph in glyphs {
                         self.draw_cache
                             .queue_glyph(glyph.font_id.0, glyph.glyph.clone());
@@ -107,7 +108,7 @@ impl GUIRender {
         // update the font_texture
         let font_texture = self.font_texture;
         let font_texture_valid;
-        match self.draw_cache.cache_queued(&fonts, |r, d| {
+        match self.draw_cache.cache_queued(fonts, |r, d| {
             renderer.update_font_texure(font_texture, [r.min[0], r.min[1], r.max[0], r.max[1]], d)
         }) {
             Ok(CachedBy::Adding) => {
@@ -227,7 +228,7 @@ impl GUIRender {
                         }
                         Graphic::Text(ref mut text) => {
                             let color = text.color;
-                            let glyphs = text.get_glyphs(rect, &fonts);
+                            let glyphs = text.get_glyphs(rect, fonts);
 
                             for glyph in glyphs {
                                 if let Some((tex_coords, pixel_coords)) =
