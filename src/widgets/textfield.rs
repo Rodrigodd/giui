@@ -49,13 +49,13 @@ pub struct TextField<C: TextFieldCallback> {
     style: Rc<OnFocusStyle>,
 }
 impl<C: TextFieldCallback> TextField<C> {
-    pub fn new(caret: Id, label: Id, style: Rc<OnFocusStyle>, callback: C) -> Self {
+    pub fn new(text: String, caret: Id, label: Id, style: Rc<OnFocusStyle>, callback: C) -> Self {
         Self {
             callback,
             caret,
             label,
-            text: String::new(),
-            previous_text: String::new(),
+            previous_text: text.clone(),
+            text,
             caret_index: 0,
             selection_index: None,
             text_info: TextInfo::default(),

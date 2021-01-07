@@ -289,7 +289,7 @@ fn main() {
         .with_parent(surface)
         .with_expand_y(true)
         .build();
-    let (page_1, top_text, bottom_text, my_slider, my_toggle) = {
+    let (page_1, bottom_text, my_toggle) = {
         let page_1 = gui.create_control().with_parent(page_area).build();
         let menu = {
             let graphic = painel.clone();
@@ -378,7 +378,7 @@ fn main() {
         //         .build();
         //     button
         // };
-        let my_slider = {
+        let _slider = {
             let slider = gui
                 .create_control()
                 .with_min_size([0.0, 30.0])
@@ -400,7 +400,19 @@ fn main() {
                 .build();
             gui.set_behaviour(
                 slider,
-                Slider::new(handle, slide_area, 10.0, 30.0, 25.0, focus_style.clone()),
+                Slider::new(
+                    handle,
+                    slide_area,
+                    100,
+                    300,
+                    250,
+                    focus_style.clone(),
+                    move |_, ctx: &mut Context, value: i32| {
+                        if let Graphic::Text(text) = ctx.get_graphic_mut(top_text) {
+                            text.set_font_size(value as f32 / 10.0);
+                        }
+                    },
+                ),
             );
             slider
         };
@@ -486,7 +498,7 @@ fn main() {
 
             my_dropdown
         };
-        (page_1, top_text, bottom_text, my_slider, my_toggle)
+        (page_1, bottom_text, my_toggle)
     };
     let page_2 = {
         let page_2 = gui
@@ -742,6 +754,7 @@ fn main() {
             gui.set_behaviour(
                 input_box,
                 TextField::new(
+                    "".into(),
                     caret,
                     input_text,
                     OnFocusStyle {
@@ -1026,6 +1039,7 @@ fn main() {
         window
     };
     drop(painel);
+    drop(button_style);
 
     println!("Starting");
     gui.start();
@@ -1051,20 +1065,7 @@ fn main() {
         gui.handle_event(&event);
 
         for event in gui.get_events().collect::<Vec<_>>() {
-            if let Some(ui_event::ValueChanged { id, value }) = event.downcast_ref() {
-                if *id == my_slider {
-                    if let Graphic::Text(text) = gui.get_graphic(top_text) {
-                        text.set_font_size(*value);
-                    }
-                }
-            } else if let Some(ui_event::ValueSet { id, value }) = event.downcast_ref() {
-                if *id == my_slider {
-                    if let Graphic::Text(text) = gui.get_graphic(top_text) {
-                        text.set_font_size(*value);
-                    }
-                    println!("Slide value set!! {}", value);
-                }
-            } else if let Some(ui_event::ToggleChanged { id, value }) = event.downcast_ref() {
+            if let Some(ui_event::ToggleChanged { id, value }) = event.downcast_ref() {
                 if *id == my_toggle {
                     println!("Toogle changed to {}!", value);
                     if *value {

@@ -31,14 +31,6 @@ pub mod event {
         pub text: String,
     }
     pub struct ClearText;
-    pub struct ValueChanged {
-        pub id: Id,
-        pub value: f32,
-    }
-    pub struct ValueSet {
-        pub id: Id,
-        pub value: f32,
-    }
 
     pub struct ToggleChanged {
         pub id: Id,
