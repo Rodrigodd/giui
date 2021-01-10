@@ -25,12 +25,7 @@ pub mod event {
     pub struct RemoveControl {
         pub id: Id,
     }
-
-    pub struct SubmitText {
-        pub id: Id,
-        pub text: String,
-    }
-    pub struct ClearText;
+    pub struct SetValue<T>(pub T);
 
     pub struct ToggleChanged {
         pub id: Id,
@@ -108,7 +103,6 @@ pub struct GUI {
     pub(crate) controls: Controls,
     pub(crate) fonts: Vec<FontArc>,
     pub(crate) modifiers: ModifiersState,
-    events: Vec<Box<dyn Any>>,
     redraw: bool,
     input: Input,
     current_over: Option<Id>,
@@ -141,7 +135,6 @@ impl GUI {
             current_over: None,
             current_focus: None,
             over_is_locked: false,
-            events: Vec::new(),
             fonts,
             redraw: true,
         }
@@ -382,10 +375,6 @@ impl GUI {
         self.update_layout(ROOT_ID);
     }
 
-    pub fn get_events(&mut self) -> std::vec::Drain<'_, Box<dyn Any>> {
-        self.events.drain(..)
-    }
-
     pub fn send_event(&mut self, event: Box<dyn Any>) {
         if let Some(event::ActiveControl { id }) = event.downcast_ref() {
             self.active_control(*id);
@@ -402,8 +391,6 @@ impl GUI {
         } else if event.is::<(Id, ControlBuild)>() {
             let (id, build) = *event.downcast::<(Id, ControlBuild)>().unwrap();
             self.add_control_reserved(build, id);
-        } else {
-            self.events.push(event);
         }
     }
 

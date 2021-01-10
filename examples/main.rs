@@ -444,7 +444,21 @@ fn main() {
                 .build();
             gui.set_behaviour(
                 toggle,
-                Toggle::new(background, marker, button_style.clone(), focus_style),
+                Toggle::new(
+                    background,
+                    marker,
+                    false,
+                    button_style.clone(),
+                    focus_style,
+                    move |_, ctx, value| {
+                        println!("Toogle changed to {}!", value);
+                        if value {
+                            ctx.active(bottom_text);
+                        } else {
+                            ctx.deactive(bottom_text);
+                        }
+                    },
+                ),
             );
 
             let graphic =
@@ -1063,19 +1077,6 @@ fn main() {
     event_loop.run(move |event, _, control| {
         *control = ControlFlow::Wait;
         gui.handle_event(&event);
-
-        for event in gui.get_events().collect::<Vec<_>>() {
-            if let Some(ui_event::ToggleChanged { id, value }) = event.downcast_ref() {
-                if *id == my_toggle {
-                    println!("Toogle changed to {}!", value);
-                    if *value {
-                        gui.active_control(bottom_text);
-                    } else {
-                        gui.deactive_control(bottom_text);
-                    }
-                }
-            }
-        }
 
         if gui.render_is_dirty() {
             window.request_redraw();

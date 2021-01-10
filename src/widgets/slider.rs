@@ -1,3 +1,5 @@
+use event::SetValue;
+
 use crate::{event, style::OnFocusStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
 
 use std::{any::Any, rc::Rc};
@@ -89,6 +91,10 @@ impl<C: SliderCallback> Behaviour for Slider<C> {
         } else if let Some(SetMinValue(x)) = event.downcast_ref::<SetMinValue>() {
             self.min = *x;
             self.set_handle_pos(this, ctx);
+        } else if let Some(SetValue(x)) = event.downcast_ref::<SetValue<i32>>() {
+            self.value = *x;
+            self.set_handle_pos(this, ctx);
+            self.callback.on_change(this, ctx, self.value);
         }
     }
 

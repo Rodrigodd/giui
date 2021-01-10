@@ -1,6 +1,9 @@
 use crate::{
-    event, render::Graphic, style::OnFocusStyle, text::TextInfo, Behaviour, Context, Id,
-    KeyboardEvent, MouseButton, MouseEvent,
+    event::{self, SetValue},
+    render::Graphic,
+    style::OnFocusStyle,
+    text::TextInfo,
+    Behaviour, Context, Id, KeyboardEvent, MouseButton, MouseEvent,
 };
 
 use copypasta::{ClipboardContext, ClipboardProvider};
@@ -198,11 +201,14 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     }
 
     fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
-        if event.is::<event::ClearText>() {
-            self.text.clear();
-            self.caret_index = 0;
-            self.selection_index = None;
+        if let Some(SetValue(text)) = event.downcast_ref::<SetValue<String>>() {
+            let x = self.text_info.get_caret_pos(self.caret_index)[0];
+            self.text.clone_from(text);
+            self.previous_text.clone_from(text);
             self.update_text(this, ctx);
+            self.selection_index = None;
+            self.caret_index = self.text_info.get_caret_index_at_pos(0, x);
+            self.update_carret(this, ctx, true);
         }
     }
 
