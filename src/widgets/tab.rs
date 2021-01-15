@@ -49,8 +49,11 @@ impl TabButton {
         }
     }
 
-    pub fn select(&mut self, this: Id, ctx: &mut Context) {
+    fn select(&mut self, this: Id, ctx: &mut Context) {
         if let Some(selected) = self.tab_group.selected() {
+            if selected == this {
+                return;
+            }
             ctx.send_event_to(selected, Unselected);
         }
         ctx.active(self.page);
@@ -59,7 +62,7 @@ impl TabButton {
         ctx.set_graphic(this, self.style.selected.clone());
     }
 
-    pub fn unselect(&mut self, this: Id, ctx: &mut Context) {
+    fn unselect(&mut self, this: Id, ctx: &mut Context) {
         ctx.deactive(self.page);
         self.selected = false;
         ctx.set_graphic(this, self.style.unselected.clone());

@@ -337,7 +337,7 @@ impl GUI {
         for event in events.drain(..) {
             self.send_event(event);
         }
-        for (id, event) in events_to.drain(..).rev() {
+        for (id, event) in events_to.drain(..) {
             self.send_event_to(id, event);
         }
         for dirty in dirtys.drain(..) {
