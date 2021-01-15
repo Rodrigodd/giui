@@ -19,3 +19,5 @@ copypasta = "0.7"
 
 image = { version = "0.23", default-features = false, features=["png"] }
 sprite-render = { path = "../sprite-render-rs", features=["opengl"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

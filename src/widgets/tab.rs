@@ -1,23 +1,33 @@
 use crate::{style::TabStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
 
-use std::any::Any;
 use std::rc::Rc;
+use std::{any::Any, cell::RefCell};
 
 struct Unselected;
-struct Selected;
+pub struct Select;
 
-#[derive(Default, Clone)]
+struct ButtonGroupInner {
+    selected: Option<Id>,
+    on_change: Box<dyn Fn(Id, &mut Context)>,
+}
+
+#[derive(Clone)]
 /// It is basically a Rc<RefCell<Option<Id>>>.
-pub struct ButtonGroup(std::rc::Rc<std::cell::RefCell<Option<Id>>>);
+pub struct ButtonGroup(Rc<RefCell<ButtonGroupInner>>);
 impl ButtonGroup {
-    pub fn new() -> ButtonGroup {
-        ButtonGroup::default()
+    pub fn new<F: Fn(Id, &mut Context) + 'static>(on_change: F) -> Self {
+        Self(Rc::new(RefCell::new(ButtonGroupInner {
+            selected: None,
+            on_change: Box::new(on_change),
+        })))
     }
     pub fn selected(&self) -> Option<Id> {
-        *self.0.borrow()
+        self.0.borrow().selected
     }
-    pub fn set_selected(&mut self, selected: Option<Id>) {
-        *self.0.borrow_mut() = selected;
+    pub fn set_selected(&mut self, selected: Option<Id>, ctx: &mut Context) {
+        let mut this = self.0.borrow_mut();
+        this.selected = selected;
+        (this.on_change)(selected.expect("None selected is not implemented yet"), ctx);
     }
 }
 
@@ -45,7 +55,7 @@ impl TabButton {
         }
         ctx.active(self.page);
         self.selected = true;
-        self.tab_group.set_selected(Some(this));
+        self.tab_group.set_selected(Some(this), ctx);
         ctx.set_graphic(this, self.style.selected.clone());
     }
 
@@ -67,7 +77,7 @@ impl Behaviour for TabButton {
     fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
         if event.is::<Unselected>() {
             self.unselect(this, ctx)
-        } else if event.is::<Selected>() {
+        } else if event.is::<Select>() {
             self.select(this, ctx);
         }
     }

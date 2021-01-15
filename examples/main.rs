@@ -5,7 +5,6 @@ use std::rc::Rc;
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use ui_engine::{
-    event as ui_event,
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
     render::{GUIRender, GUIRenderer, Graphic, Panel, Text, Texture},
     style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
@@ -60,6 +59,7 @@ fn main() {
         window_size.height as f32 / 2.0,
     );
     let painel: Graphic = Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0).into();
+    let page_painel: Graphic = Panel::new(texture, [0.0, 0.1, 0.5, 0.4], 10.0).into();
 
     let button_style = Rc::new(ButtonStyle {
         normal: Graphic::from(Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0)),
@@ -119,43 +119,7 @@ fn main() {
 
         (hover, label)
     };
-    let float_menu = {
-        let blocker = gui.create_control().with_active(false).build();
-        let menu = gui
-            .create_control()
-            .with_active(false)
-            .with_graphic(button_style.normal.clone())
-            .with_behaviour(DropMenu::<String, _>::new(blocker, {
-                let menu_button_style = menu_button_style.clone();
-                move |data, this, ctx| {
-                    let id = ctx
-                        .create_control()
-                        .with_behaviour(MenuItem::new(this, menu_button_style.clone()))
-                        .with_layout(MarginLayout::new([4.0, 4.0, 4.0, 4.0]))
-                        .with_parent(this)
-                        // .with_min_size([10.0, 25.0])
-                        .build();
-                    let _text = ctx
-                        .create_control()
-                        .with_margins([10.0, 0.0, -10.0, 0.0])
-                        .with_graphic(
-                            Text::new([40, 40, 100, 255], data.to_string(), 16.0, (-1, 0)).into(),
-                        )
-                        .with_layout(FitText)
-                        .with_parent(id)
-                        .build();
-                    id
-                }
-            }))
-            .with_layout(VBoxLayout::new(0.0, [1.0, 1.0, 1.0, 1.0], -1))
-            .with_min_size([0.0, 80.0])
-            .build();
-        gui.set_behaviour(
-            blocker,
-            Blocker::new(move |_, ctx| ctx.send_event_to(menu, CloseMenu)),
-        );
-        menu
-    };
+
     let surface = gui
         .create_control()
         .with_layout(VBoxLayout::new(0.0, [0.0; 4], -1))
@@ -279,7 +243,7 @@ fn main() {
 
     let header = gui
         .create_control()
-        .with_layout(HBoxLayout::new(3.0, [10.0, 10.0, 10.0, 10.0], -1))
+        .with_layout(HBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
         .with_parent(surface)
         .build();
 
@@ -289,22 +253,20 @@ fn main() {
         .with_parent(surface)
         .with_expand_y(true)
         .build();
-    let (page_1, bottom_text, my_toggle) = {
+    let page_1 = {
         let page_1 = gui.create_control().with_parent(page_area).build();
-        let menu = {
-            let graphic = painel.clone();
-            gui.create_control()
-                .with_anchors([0.0, 0.0, 0.0, 1.0])
-                .with_margins([10.0, 0.0, 190.0, -10.0])
-                .with_graphic(graphic)
-                .with_layout(VBoxLayout::new(5.0, [5.0, 5.0, 5.0, 5.0], -1))
-                .with_parent(page_1)
-                .build()
-        };
+        let menu = gui
+            .create_control()
+            .with_anchors([0.0, 0.0, 0.0, 1.0])
+            .with_margins([0.0, 0.0, 200.0, 0.0])
+            .with_graphic(page_painel.clone())
+            .with_layout(VBoxLayout::new(5.0, [5.0, 5.0, 5.0, 5.0], -1))
+            .with_parent(page_1)
+            .build();
         let right_painel = gui
             .create_control()
-            .with_margins([200.0, 0.0, -10.0, -10.0])
-            .with_graphic(painel.clone())
+            .with_margins([200.0, 0.0, 0.0, 0.0])
+            .with_graphic(page_painel.clone())
             .with_parent(page_1)
             .build();
         let top_text = {
@@ -416,7 +378,7 @@ fn main() {
             );
             slider
         };
-        let my_toggle = {
+        let _toggle = {
             let toggle = gui
                 .create_control()
                 .with_min_size([0.0, 30.0])
@@ -473,6 +435,45 @@ fn main() {
             toggle
         };
         let _my_dropdown = {
+            let float_menu = {
+                let blocker = gui.create_control().with_active(false).build();
+                let menu = gui
+                    .create_control()
+                    .with_active(false)
+                    .with_graphic(button_style.normal.clone())
+                    .with_behaviour(DropMenu::<String, _>::new(blocker, {
+                        let menu_button_style = menu_button_style.clone();
+                        move |data, this, ctx| {
+                            let id = ctx
+                                .create_control()
+                                .with_behaviour(MenuItem::new(this, menu_button_style.clone()))
+                                .with_layout(MarginLayout::new([4.0, 4.0, 4.0, 4.0]))
+                                .with_parent(this)
+                                // .with_min_size([10.0, 25.0])
+                                .build();
+                            let _text = ctx
+                                .create_control()
+                                .with_margins([10.0, 0.0, -10.0, 0.0])
+                                .with_graphic(
+                                    Text::new([40, 40, 100, 255], data.to_string(), 16.0, (-1, 0))
+                                        .into(),
+                                )
+                                .with_layout(FitText)
+                                .with_parent(id)
+                                .build();
+                            id
+                        }
+                    }))
+                    .with_layout(VBoxLayout::new(0.0, [1.0, 1.0, 1.0, 1.0], -1))
+                    .with_min_size([0.0, 80.0])
+                    .build();
+                gui.set_behaviour(
+                    blocker,
+                    Blocker::new(move |_, ctx| ctx.send_event_to(menu, CloseMenu)),
+                );
+                menu
+            };
+
             let my_dropdown = gui
                 .create_control()
                 .with_min_size([0.0, 25.0])
@@ -502,9 +503,10 @@ fn main() {
                         "Item D".to_string(),
                         "Item E".to_string(),
                     ],
+                    None,
                     float_menu,
                     move |selected, _this, ctx| {
-                        ctx.get_graphic_mut(text).set_text(&selected);
+                        ctx.get_graphic_mut(text).set_text(&selected.1);
                     },
                     button_style.clone(),
                 ),
@@ -512,13 +514,12 @@ fn main() {
 
             my_dropdown
         };
-        (page_1, bottom_text, my_toggle)
+        page_1
     };
     let page_2 = {
         let page_2 = gui
             .create_control()
-            .with_margins([10.0, 0.0, -10.0, -10.0])
-            .with_graphic(painel.clone())
+            .with_graphic(page_painel.clone())
             .with_parent(page_area)
             .with_layout(GridLayout::new([10.0, 15.0], [10.0, 10.0, 10.0, 10.0], 3))
             .build();
@@ -729,7 +730,7 @@ fn main() {
     let page_3 = {
         let page_3 = gui
             .create_control()
-            .with_graphic(painel.clone())
+            .with_graphic(page_painel.clone())
             .with_parent(page_area)
             .with_layout(VBoxLayout::new(5.0, [10.0, 10.0, 10.0, 10.0], -1))
             .build();
@@ -836,7 +837,7 @@ fn main() {
             .build();
         gui.set_behaviour(
             h_scroll_bar,
-            ScrollBar::new(h_scroll_bar_handle, scroll_view, false),
+            ScrollBar::new(h_scroll_bar_handle, scroll_view, false, button_style.clone()),
         );
         let v_scroll_bar = gui
             .create_control()
@@ -861,7 +862,7 @@ fn main() {
             .build();
         gui.set_behaviour(
             v_scroll_bar,
-            ScrollBar::new(v_scroll_bar_handle, scroll_view, true),
+            ScrollBar::new(v_scroll_bar_handle, scroll_view, true, button_style.clone()),
         );
         let list = gui
             .create_control_reserved(list)
@@ -946,7 +947,7 @@ fn main() {
         page_na
     };
     let _tabs = {
-        let tab_group = ButtonGroup::new();
+        let tab_group = ButtonGroup::new(|_, _| {});
         let create_button = |gui: &mut GUI, page: Id, selected: bool, label: String| {
             let button = gui
                 .create_control()
@@ -1054,6 +1055,8 @@ fn main() {
     };
     drop(painel);
     drop(button_style);
+    drop(menu_button_style);
+    drop(page_painel);
 
     println!("Starting");
     gui.start();

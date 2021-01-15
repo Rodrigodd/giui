@@ -158,11 +158,7 @@ impl GUIRender {
             };
             let mut compute_sprite = true;
             if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
-                let is_text = if let Graphic::Text(_) = graphic {
-                    true
-                } else {
-                    false
-                };
+                let is_text = matches!(graphic, Graphic::Text(_));
 
                 let len = self.sprites.len();
                 if !(rect

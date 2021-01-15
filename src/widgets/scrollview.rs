@@ -1,9 +1,6 @@
-use crate::{
-    event, Behaviour, Context, Id, KeyboardEvent, Layout, LayoutContext, MinSizeContext,
-    MouseButton, MouseEvent,
-};
+use crate::{Behaviour, Context, Id, KeyboardEvent, Layout, LayoutContext, MinSizeContext, MouseButton, MouseEvent, event, style::ButtonStyle};
 
-use std::any::Any;
+use std::{any::Any, rc::Rc};
 use winit::event::VirtualKeyCode;
 
 struct SetScrollPosition {
@@ -19,9 +16,10 @@ pub struct ScrollBar {
     mouse_pos: f32,
     curr_value: f32,
     vertical: bool,
+    style: Rc<ButtonStyle>,
 }
 impl ScrollBar {
-    pub fn new(handle: Id, scroll_view: Id, vertical: bool) -> Self {
+    pub fn new(handle: Id, scroll_view: Id, vertical: bool, style: Rc<ButtonStyle>) -> Self {
         Self {
             handle,
             scroll_view,
@@ -30,22 +28,25 @@ impl ScrollBar {
             mouse_pos: 0.0,
             curr_value: 0.0,
             vertical,
+            style,
         }
     }
 }
 impl Behaviour for ScrollBar {
+    fn on_active(&mut self, _this: Id, ctx: &mut Context) {
+        ctx.set_graphic(self.handle, self.style.normal.clone());
+    }
+
     fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) -> bool {
         use MouseButton::*;
         match event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {
-                ctx.get_graphic_mut(self.handle)
-                    .set_color([220, 220, 220, 255]);
+                ctx.set_graphic(self.handle, self.style.normal.clone());
             }
             MouseEvent::Down(Left) => {
                 self.dragging = true;
-                ctx.get_graphic_mut(self.handle)
-                    .set_color([180, 180, 180, 255]);
+                ctx.set_graphic(self.handle, self.style.pressed.clone());
                 ctx.send_event(event::LockOver);
                 let handle_rect = *ctx.get_rect(self.handle);
                 let area = ctx
@@ -91,8 +92,7 @@ impl Behaviour for ScrollBar {
                 if self.dragging {
                     self.dragging = false;
                     ctx.send_event(event::UnlockOver);
-                    ctx.get_graphic_mut(self.handle)
-                        .set_color([200, 200, 200, 255]);
+                    ctx.set_graphic(self.handle, self.style.hover.clone());
                 }
             }
             MouseEvent::Moved { x, y } => {
@@ -130,11 +130,10 @@ impl Behaviour for ScrollBar {
                     )
                 } else {
                     let handle_rect = *ctx.get_rect(self.handle);
-                    let graphic = ctx.get_graphic_mut(self.handle);
                     if self.mouse_pos < handle_rect[1] || self.mouse_pos > handle_rect[3] {
-                        graphic.set_color([220, 220, 220, 255]);
+                        ctx.set_graphic(self.handle, self.style.normal.clone());
                     } else {
-                        graphic.set_color([200, 200, 200, 255]);
+                        ctx.set_graphic(self.handle, self.style.hover.clone());
                     }
                 }
             }

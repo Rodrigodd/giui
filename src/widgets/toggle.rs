@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, SetValue},
+    event::SetValue,
     style::{ButtonStyle, OnFocusStyle},
     Behaviour, Context, Id, MouseButton, MouseEvent,
 };

@@ -3,6 +3,7 @@ use crate::{event, style::ButtonStyle, Behaviour, Context, Id, MouseButton, Mous
 use std::any::Any;
 use std::rc::Rc;
 
+pub struct SetSelected(pub usize);
 struct SetIndex(usize);
 // struct SetOwner(Id);
 // struct SetItens<T: 'static + Clone>(Vec<T>);
@@ -180,7 +181,7 @@ where
 pub struct Dropdown<T, F>
 where
     T: 'static + Clone,
-    F: Fn(T, Id, &mut Context),
+    F: Fn((usize, T), Id, &mut Context),
 {
     itens: Vec<T>,
     selected: Option<usize>,
@@ -194,12 +195,18 @@ where
 impl<T, F> Dropdown<T, F>
 where
     T: 'static + Clone,
-    F: Fn(T, Id, &mut Context),
+    F: Fn((usize, T), Id, &mut Context),
 {
-    pub fn new(itens: Vec<T>, menu: Id, on_select: F, style: Rc<ButtonStyle>) -> Self {
+    pub fn new(
+        itens: Vec<T>,
+        intial_selected: Option<usize>,
+        menu: Id,
+        on_select: F,
+        style: Rc<ButtonStyle>,
+    ) -> Self {
         Self {
             itens,
-            selected: None,
+            selected: intial_selected,
             menu,
             state: 0,
             style,
@@ -212,7 +219,7 @@ where
 impl<T, F> Behaviour for Dropdown<T, F>
 where
     T: 'static + Clone,
-    F: Fn(T, Id, &mut Context),
+    F: Fn((usize, T), Id, &mut Context),
 {
     fn on_active(&mut self, this: Id, ctx: &mut Context) {
         ctx.set_graphic(this, self.style.normal.clone());
@@ -221,10 +228,13 @@ where
     fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
         if let Some(x) = event.downcast_ref::<ItemClicked>() {
             self.selected = Some(x.index);
-            (self.on_select)(self.itens[x.index].clone(), this, ctx);
+            (self.on_select)((x.index, self.itens[x.index].clone()), this, ctx);
             self.opened = false;
         } else if event.is::<MenuClosed>() {
             self.opened = false;
+        } else if let Some(SetSelected(index)) = event.downcast_ref() {
+            self.selected = Some(*index);
+            (self.on_select)((*index, self.itens[*index].clone()), this, ctx);
         }
     }
 
