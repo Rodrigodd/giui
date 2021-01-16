@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use ab_glyph::FontArc;
-use winit::event::ModifiersState;
+use winit::{event::ModifiersState, window::CursorIcon};
 
 use crate::{event, render::Graphic, Behaviour, ControlBuilder, Controls, Id, Layout, Rect, GUI};
 
@@ -85,6 +85,10 @@ impl<'a> Context<'a> {
     }
     pub fn send_event_to<T: 'static>(&mut self, id: Id, event: T) {
         self.events_to.push((id, Box::new(event)));
+    }
+
+    pub fn set_cursor(&mut self, cursor: CursorIcon) {
+        self.send_event(cursor);
     }
 
     pub fn get_layouting(&mut self, id: Id) -> &mut Rect {

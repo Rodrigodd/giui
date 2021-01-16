@@ -1079,10 +1079,13 @@ fn main() {
 
     event_loop.run(move |event, _, control| {
         *control = ControlFlow::Wait;
+        
         gui.handle_event(&event);
-
         if gui.render_is_dirty() {
             window.request_redraw();
+        }
+        if let Some(cursor) = gui.cursor_change() {
+            window.set_cursor_icon(cursor);
         }
 
         match event {

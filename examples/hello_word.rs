@@ -70,6 +70,9 @@ fn main() {
         if gui.render_is_dirty() {
             window.request_redraw();
         }
+        if let Some(cursor) = gui.cursor_change() {
+            window.set_cursor_icon(cursor);
+        }
 
         match event {
             Event::WindowEvent { event, .. } => match event {

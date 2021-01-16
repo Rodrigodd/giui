@@ -165,6 +165,9 @@ fn main() {
         if gui.render_is_dirty() {
             window.request_redraw();
         }
+        if let Some(cursor) = gui.cursor_change() {
+            window.set_cursor_icon(cursor);
+        }
 
         match event {
             Event::WindowEvent {
@@ -291,7 +294,7 @@ impl StyleSheet {
             scroll_handle: Rc::new(ButtonStyle {
                 normal: white.clone().with_color([80, 80, 80, 255]).into(),
                 hover: white.clone().with_color([100, 100, 100, 255]).into(),
-                pressed: white.clone().with_color([120, 120, 120, 255]).into(),
+                pressed: white.with_color([120, 120, 120, 255]).into(),
                 focus: Graphic::None,
             }),
         }

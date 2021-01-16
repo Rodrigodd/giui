@@ -9,7 +9,7 @@ use crate::{
 use copypasta::{ClipboardContext, ClipboardProvider};
 use std::any::Any;
 use std::rc::Rc;
-use winit::event::VirtualKeyCode;
+use winit::{event::VirtualKeyCode, window::CursorIcon};
 
 pub trait TextFieldCallback {
     fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool;
@@ -227,8 +227,12 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
         use MouseButton::*;
         match event {
-            MouseEvent::Enter => {}
-            MouseEvent::Exit => {}
+            MouseEvent::Enter => {
+                ctx.set_cursor(CursorIcon::Text);
+            }
+            MouseEvent::Exit => {
+                ctx.set_cursor(CursorIcon::Default);
+            }
             MouseEvent::Down(Left) => {
                 let left = ctx.get_rect(this)[0] - self.x_scroll;
                 let x = self.mouse_x - left;

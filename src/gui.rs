@@ -5,9 +5,9 @@ use crate::{
 };
 use ab_glyph::FontArc;
 use std::any::Any;
-use winit::event::{
+use winit::{event::{
     ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent,
-};
+}, window::CursorIcon};
 
 pub mod event {
     use super::Id;
@@ -104,6 +104,7 @@ pub struct GUI {
     pub(crate) fonts: Vec<FontArc>,
     pub(crate) modifiers: ModifiersState,
     redraw: bool,
+    change_cursor: Option<CursorIcon>,
     input: Input,
     current_over: Option<Id>,
     current_focus: Option<Id>,
@@ -131,12 +132,13 @@ impl GUI {
                 really_active: true,
             }]
             .into(),
+            redraw: true,
+            change_cursor: None,
             input: Input::default(),
             current_over: None,
             current_focus: None,
             over_is_locked: false,
             fonts,
-            redraw: true,
         }
     }
 
@@ -317,6 +319,10 @@ impl GUI {
         self.redraw
     }
 
+    pub fn cursor_change(&mut self) -> Option<CursorIcon> {
+        self.change_cursor.take()
+    }
+
     #[inline]
     pub fn get_context(&mut self) -> Context {
         //TODO: Context -> RenderContext
@@ -391,6 +397,8 @@ impl GUI {
         } else if event.is::<(Id, ControlBuild)>() {
             let (id, build) = *event.downcast::<(Id, ControlBuild)>().unwrap();
             self.add_control_reserved(build, id);
+        } else if let Some(cursor) = event.downcast_ref::<CursorIcon>() {
+            self.change_cursor = Some(*cursor);
         }
     }
 

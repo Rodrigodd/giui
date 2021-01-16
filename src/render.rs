@@ -117,7 +117,7 @@ impl GUIRender {
             Ok(CachedBy::Reordering) => {
                 font_texture_valid = false;
             }
-            Err(x) => {
+            Err(_) => {
                 let (width, height) = self.draw_cache.dimensions();
                 self.draw_cache = DrawCacheBuilder::default()
                     .dimensions(width * 2, height * 2)
