@@ -122,7 +122,6 @@ impl GUIRender {
                 self.draw_cache = DrawCacheBuilder::default()
                     .dimensions(width * 2, height * 2)
                     .build();
-                println!("{}: resizing to {}, {}", x, width * 2, height * 2);
                 renderer.resize_font_texture(font_texture, [width * 2, height * 2]);
                 return self.render(ctx, renderer);
             }
@@ -132,21 +131,25 @@ impl GUIRender {
         'tree: while let Some(parent) = parents.pop() {
             let (mask, mask_changed) = {
                 let rect = ctx.get_layouting(parent);
-                let mut mask = *rect.get_rect();
+                let mask = *rect.get_rect();
+                let mut mask = [
+                    mask[0].round(),
+                    mask[1].round(),
+                    mask[2].round(),
+                    mask[3].round(),
+                ];
                 let mut mask_changed = rect
                     .get_render_dirty_flags()
                     .contains(RenderDirtyFlags::RECT);
-                while let Some((i, m, changed)) = masks.last() {
-                    let upper_mask;
+                while let Some((i, upper_mask, changed)) = masks.last() {
                     if parents.len() < *i {
                         masks.pop();
                         continue;
-                    } else {
-                        upper_mask = *m;
-                        mask_changed |= *changed;
                     }
 
-                    if let Some(intersection) = intersection(&mask, &upper_mask) {
+                    mask_changed |= *changed;
+
+                    if let Some(intersection) = intersection(&mask, upper_mask) {
                         mask = intersection;
                     } else {
                         continue 'tree;
