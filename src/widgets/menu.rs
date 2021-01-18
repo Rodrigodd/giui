@@ -3,7 +3,7 @@ use crate::{
     render::Text,
     style::MenuStyle,
     widgets::CloseMenu,
-    Behaviour, Context, Id, MouseButton, MouseEvent, RectFill,
+    Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, RectFill,
 };
 
 use std::{any::Any, rc::Rc};
@@ -146,7 +146,11 @@ impl Behaviour for MenuBehaviour {
         self.close_menu(ctx);
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
         use MouseButton::*;
         match event {
             MouseEvent::Down(Left) => {
@@ -193,7 +197,6 @@ impl Behaviour for MenuBehaviour {
             }
             _ => {}
         }
-        true
     }
 }
 
@@ -270,7 +273,11 @@ impl Behaviour for MenuBar {
         }
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
         use MouseButton::*;
         match event {
             MouseEvent::Down(Left) => {
@@ -308,6 +315,5 @@ impl Behaviour for MenuBar {
             }
             _ => {}
         }
-        true
     }
 }

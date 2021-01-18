@@ -1,4 +1,4 @@
-use crate::{style::ButtonStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
+use crate::{style::ButtonStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent};
 
 use std::rc::Rc;
 
@@ -23,7 +23,11 @@ impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
         ctx.set_graphic(this, self.style.normal.clone());
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
         use MouseButton::*;
         match event {
             MouseEvent::Enter => {
@@ -51,7 +55,6 @@ impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
             }
             _ => {}
         }
-        true
     }
 
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {

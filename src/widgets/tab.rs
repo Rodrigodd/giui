@@ -1,4 +1,4 @@
-use crate::{style::TabStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
+use crate::{style::TabStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent};
 
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell};
@@ -85,7 +85,11 @@ impl Behaviour for TabButton {
         }
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
         use MouseButton::*;
         match event {
             MouseEvent::Enter => {
@@ -118,6 +122,5 @@ impl Behaviour for TabButton {
             MouseEvent::Down(_) => {}
             MouseEvent::Moved { .. } => {}
         }
-        true
     }
 }

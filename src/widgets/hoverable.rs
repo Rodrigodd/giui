@@ -1,4 +1,4 @@
-use crate::{Behaviour, Context, Id, MouseEvent};
+use crate::{Behaviour, Context, Id, InputFlags, MouseEvent};
 
 pub struct Hoverable {
     is_over: bool,
@@ -21,7 +21,11 @@ impl Behaviour for Hoverable {
         ctx.deactive(self.hover);
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) {
         match event {
             MouseEvent::Enter => {
                 ctx.active(self.hover);
@@ -45,6 +49,5 @@ impl Behaviour for Hoverable {
                 }
             }
         }
-        true
     }
 }

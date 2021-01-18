@@ -1,4 +1,7 @@
-use crate::{Behaviour, Context, Id, KeyboardEvent, Layout, LayoutContext, MinSizeContext, MouseButton, MouseEvent, event, style::ButtonStyle};
+use crate::{
+    event, style::ButtonStyle, Behaviour, Context, Id, InputFlags, KeyboardEvent, Layout,
+    LayoutContext, MinSizeContext, MouseButton, MouseEvent,
+};
 
 use std::{any::Any, rc::Rc};
 use winit::event::VirtualKeyCode;
@@ -37,7 +40,11 @@ impl Behaviour for ScrollBar {
         ctx.set_graphic(self.handle, self.style.normal.clone());
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) {
         use MouseButton::*;
         match event {
             MouseEvent::Enter => {}
@@ -140,7 +147,6 @@ impl Behaviour for ScrollBar {
             MouseEvent::Up(_) => {}
             MouseEvent::Down(_) => {}
         }
-        true
     }
 }
 
@@ -221,12 +227,15 @@ impl Behaviour for ScrollView {
         }
     }
 
-    fn on_scroll_event(&mut self, delta: [f32; 2], _: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE | InputFlags::SCROLL
+    }
+
+    fn on_scroll_event(&mut self, delta: [f32; 2], _: Id, ctx: &mut Context) {
         self.delta_x += delta[0];
         self.delta_y -= delta[1];
 
         ctx.dirty_layout(self.view);
-        true
     }
 
     fn on_keyboard_event(&mut self, event: KeyboardEvent, _this: Id, ctx: &mut Context) -> bool {
@@ -307,11 +316,15 @@ impl<T: Behaviour> Behaviour for std::rc::Rc<std::cell::RefCell<T>> {
         self.as_ref().borrow_mut().on_event(event, this, ctx)
     }
 
-    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        self.as_ref().borrow_mut().input_flags()
+    }
+
+    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {
         self.as_ref().borrow_mut().on_scroll_event(delta, this, ctx)
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
         self.as_ref().borrow_mut().on_mouse_event(event, this, ctx)
     }
 

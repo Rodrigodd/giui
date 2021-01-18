@@ -5,9 +5,10 @@ use crate::{
 };
 use ab_glyph::FontArc;
 use std::any::Any;
-use winit::{event::{
-    ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent,
-}, window::CursorIcon};
+use winit::{
+    event::{ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
+    window::CursorIcon,
+};
 
 pub mod event {
     use super::Id;
@@ -106,7 +107,8 @@ pub struct GUI {
     redraw: bool,
     change_cursor: Option<CursorIcon>,
     input: Input,
-    current_over: Option<Id>,
+    current_mouse: Option<Id>,
+    current_scroll: Option<Id>,
     current_focus: Option<Id>,
     over_is_locked: bool,
 }
@@ -135,7 +137,8 @@ impl GUI {
             redraw: true,
             change_cursor: None,
             input: Input::default(),
-            current_over: None,
+            current_mouse: None,
+            current_scroll: None,
             current_focus: None,
             over_is_locked: false,
             fonts,
@@ -255,10 +258,13 @@ impl GUI {
             let mut parents = vec![id];
             while let Some(id) = parents.pop() {
                 parents.extend(self.get_children(id).iter().rev());
-                if Some(id) == self.current_over {
+                if Some(id) == self.current_mouse {
                     self.send_mouse_event_to(id, MouseEvent::Exit);
-                    self.current_over = None;
+                    self.current_mouse = None;
                     self.input.mouse_invalid = true;
+                }
+                if Some(id) == self.current_scroll {
+                    self.current_scroll = None;
                 }
                 if Some(id) == self.current_focus {
                     self.set_focus(None);
@@ -290,10 +296,13 @@ impl GUI {
         while let Some(id) = parents.pop() {
             parents.extend(self.get_children(id).iter().rev());
 
-            if Some(id) == self.current_over {
+            if Some(id) == self.current_mouse {
                 self.send_mouse_event_to(id, MouseEvent::Exit);
-                self.current_over = None;
+                self.current_mouse = None;
                 self.input.mouse_invalid = true;
+            }
+            if Some(id) == self.current_scroll {
+                self.current_scroll = None;
             }
             if Some(id) == self.current_focus {
                 self.set_focus(None);
@@ -465,9 +474,9 @@ impl GUI {
                 }
                 WindowEvent::MouseInput { state, button, .. } => {
                     if let ElementState::Pressed = state {
-                        self.set_focus(self.current_over);
+                        self.set_focus(self.current_mouse);
                     }
-                    if let Some(curr) = self.current_over {
+                    if let Some(curr) = self.current_mouse {
                         match state {
                             ElementState::Pressed => {
                                 self.send_mouse_event_to(curr, MouseEvent::Down((*button).into()));
@@ -479,7 +488,7 @@ impl GUI {
                     }
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
-                    if let Some(curr) = self.current_over {
+                    if let Some(curr) = self.current_mouse {
                         //TODO: I should handle Line and Pixel Delta differences more wisely?
                         let delta = match delta {
                             winit::event::MouseScrollDelta::LineDelta(x, y) => {
@@ -489,14 +498,12 @@ impl GUI {
                                 [p.x as f32, p.y as f32]
                             }
                         };
-                        self.call_event_chain(curr, |this, id, ctx| {
-                            this.on_scroll_event(delta, id, ctx)
-                        });
+                        self.call_event(curr, |this, id, ctx| this.on_scroll_event(delta, id, ctx));
                     }
                 }
                 WindowEvent::CursorLeft { .. } => {
                     if !self.over_is_locked {
-                        if let Some(curr) = self.current_over.take() {
+                        if let Some(curr) = self.current_mouse.take() {
                             self.send_mouse_event_to(curr, MouseEvent::Exit);
                         }
                     }
@@ -580,9 +587,9 @@ impl GUI {
     }
 
     pub fn mouse_moved(&mut self, mouse_x: f32, mouse_y: f32) {
-        if self.current_over.is_some() && self.over_is_locked {
+        if self.current_mouse.is_some() && self.over_is_locked {
             self.send_mouse_event_to(
-                self.current_over.unwrap(),
+                self.current_mouse.unwrap(),
                 MouseEvent::Moved {
                     x: mouse_x,
                     y: mouse_y,
@@ -592,7 +599,20 @@ impl GUI {
         }
 
         let mut curr = ROOT_ID;
+        let mut curr_mouse = None;
         'l: loop {
+            if let Some(flags) = self.controls[curr]
+                .behaviour
+                .as_ref()
+                .map(|x| x.input_flags())
+            {
+                if flags.contains(InputFlags::MOUSE) {
+                    curr_mouse = Some(curr);
+                }
+                if flags.contains(InputFlags::SCROLL) {
+                    self.current_scroll = Some(curr);
+                }
+            }
             // the interator is reversed because the last child block the previous ones
             for child in self.get_children(curr).iter().rev() {
                 if self.controls[*child].rect.contains(mouse_x, mouse_y) {
@@ -603,34 +623,36 @@ impl GUI {
             break;
         }
 
-        if Some(curr) == self.current_over {
-            self.send_mouse_event_to(
-                curr,
-                MouseEvent::Moved {
-                    x: mouse_x,
-                    y: mouse_y,
-                },
-            );
-        } else {
-            if let Some(current_over) = self.current_over {
-                self.send_mouse_event_to(current_over, MouseEvent::Exit);
+        if curr_mouse == self.current_mouse {
+            if let Some(current_mouse) = self.current_mouse {
+                self.send_mouse_event_to(
+                    current_mouse,
+                    MouseEvent::Moved {
+                        x: mouse_x,
+                        y: mouse_y,
+                    },
+                );
             }
-            self.current_over = Some(curr);
-            self.send_mouse_event_to(curr, MouseEvent::Enter);
-            self.send_mouse_event_to(
-                curr,
-                MouseEvent::Moved {
-                    x: mouse_x,
-                    y: mouse_y,
-                },
-            );
+        } else {
+            if let Some(current_mouse) = self.current_mouse {
+                self.send_mouse_event_to(current_mouse, MouseEvent::Exit);
+            }
+            self.current_mouse = curr_mouse;
+            if let Some(current_mouse) = self.current_mouse {
+                self.send_mouse_event_to(current_mouse, MouseEvent::Enter);
+                self.send_mouse_event_to(
+                    current_mouse,
+                    MouseEvent::Moved {
+                        x: mouse_x,
+                        y: mouse_y,
+                    },
+                );
+            }
         }
     }
 
     pub fn send_mouse_event_to(&mut self, id: Id, event: MouseEvent) {
-        // TODO: This need more thought, because call_event_chain implys that a widget
-        // can receive MouseMoved withou receving MouseEnter!
-        self.call_event_chain(id, |this, id, ctx| this.on_mouse_event(event, id, ctx));
+        self.call_event(id, |this, id, ctx| this.on_mouse_event(event, id, ctx));
     }
 
     pub fn update_layout(&mut self, mut id: Id) {
@@ -750,21 +772,28 @@ impl GUI {
     }
 }
 
+bitflags! {
+    pub struct InputFlags: u8 {
+        const MOUSE = 0x1;
+        const SCROLL = 0x2;
+    }
+}
+
 #[allow(unused_variables)]
 pub trait Behaviour {
     fn on_start(&mut self, this: Id, ctx: &mut Context) {}
     fn on_active(&mut self, this: Id, ctx: &mut Context) {}
     fn on_deactive(&mut self, this: Id, ctx: &mut Context) {}
 
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::empty()
+    }
+
     fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {}
 
-    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) -> bool {
-        false
-    }
+    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {}
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
-        false
-    }
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {}
 
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {}
 

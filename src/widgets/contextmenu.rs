@@ -2,7 +2,7 @@ use crate::{
     layouts::VBoxLayout,
     style::MenuStyle,
     widgets::{Blocker, CloseMenu, ItemClicked, Menu, MenuBehaviour},
-    Behaviour, Context, Id, MouseButton, MouseEvent,
+    Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent,
 };
 
 use std::{any::Any, rc::Rc};
@@ -67,7 +67,11 @@ impl Behaviour for ContextMenu {
         }
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
         use MouseButton::*;
         match event {
             MouseEvent::Up(Right) => {
@@ -92,13 +96,11 @@ impl Behaviour for ContextMenu {
                     ctx.move_to_front(self.blocker.unwrap());
                     ctx.active(self.blocker.unwrap());
                 }
-                true
             }
             MouseEvent::Moved { x, y } => {
                 self.mouse_pos = [x, y];
-                false
             }
-            _ => false,
+            _ => {}
         }
     }
 }

@@ -1,6 +1,8 @@
 use event::SetValue;
 
-use crate::{event, style::OnFocusStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
+use crate::{
+    event, style::OnFocusStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent,
+};
 
 use std::{any::Any, rc::Rc};
 
@@ -106,7 +108,11 @@ impl<C: SliderCallback> Behaviour for Slider<C> {
         }
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
         use MouseButton::*;
         match event {
             MouseEvent::Enter => {}
@@ -138,6 +144,5 @@ impl<C: SliderCallback> Behaviour for Slider<C> {
             MouseEvent::Up(_) => {}
             MouseEvent::Down(_) => {}
         }
-        true
     }
 }

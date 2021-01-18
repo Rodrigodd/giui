@@ -3,7 +3,7 @@ use crate::{
     render::Graphic,
     style::OnFocusStyle,
     text::TextInfo,
-    Behaviour, Context, Id, KeyboardEvent, MouseButton, MouseEvent,
+    Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseButton, MouseEvent,
 };
 
 use copypasta::{ClipboardContext, ClipboardProvider};
@@ -212,7 +212,11 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
         }
     }
 
-    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE | InputFlags::SCROLL
+    }
+
+    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {
         let delta = if delta[0].abs() > delta[1].abs() {
             delta[0]
         } else {
@@ -220,11 +224,9 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
         };
         self.x_scroll -= delta;
         self.update_carret(this, ctx, false);
-
-        true
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
         use MouseButton::*;
         match event {
             MouseEvent::Enter => {
@@ -253,7 +255,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     let x = self.mouse_x - left;
                     let caret_index = self.text_info.get_caret_index_at_pos(0, x);
                     if caret_index == self.caret_index {
-                        return true;
+                        return;
                     }
                     if let Some(selection_index) = self.selection_index {
                         if caret_index == selection_index {
@@ -269,7 +271,6 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
             MouseEvent::Up(_) => {}
             MouseEvent::Down(_) => {}
         }
-        true
     }
 
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {

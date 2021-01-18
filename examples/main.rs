@@ -837,7 +837,12 @@ fn main() {
             .build();
         gui.set_behaviour(
             h_scroll_bar,
-            ScrollBar::new(h_scroll_bar_handle, scroll_view, false, button_style.clone()),
+            ScrollBar::new(
+                h_scroll_bar_handle,
+                scroll_view,
+                false,
+                button_style.clone(),
+            ),
         );
         let v_scroll_bar = gui
             .create_control()
@@ -1079,7 +1084,7 @@ fn main() {
 
     event_loop.run(move |event, _, control| {
         *control = ControlFlow::Wait;
-        
+
         gui.handle_event(&event);
         if gui.render_is_dirty() {
             window.request_redraw();

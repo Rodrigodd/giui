@@ -1,4 +1,6 @@
-use crate::{event, style::ButtonStyle, Behaviour, Context, Id, MouseButton, MouseEvent};
+use crate::{
+    event, style::ButtonStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent,
+};
 
 use std::any::Any;
 use std::rc::Rc;
@@ -45,7 +47,11 @@ impl Behaviour for MenuItem {
         }
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
         use MouseButton::*;
         match event {
             MouseEvent::Enter => {
@@ -73,7 +79,6 @@ impl Behaviour for MenuItem {
             }
             _ => {}
         }
-        true
     }
 
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
@@ -97,11 +102,14 @@ impl<F: Fn(Id, &mut Context)> Blocker<F> {
     }
 }
 impl<F: Fn(Id, &mut Context)> Behaviour for Blocker<F> {
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
         if let MouseEvent::Down(_) = event {
             (self.on_down)(this, ctx);
         }
-        true
     }
 }
 
@@ -238,7 +246,11 @@ where
         }
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) -> bool {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
         use MouseButton::*;
         match event {
             MouseEvent::Enter => {
@@ -286,7 +298,6 @@ where
             }
             _ => {}
         }
-        true
     }
 
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
