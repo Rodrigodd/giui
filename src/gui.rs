@@ -4,7 +4,7 @@ use crate::{
     Control, ControlBuild, ControlBuilder, Controls, LayoutDirtyFlags, Rect,
 };
 use ab_glyph::FontArc;
-use std::any::Any;
+use std::{any::Any, num::NonZeroU32};
 use winit::{
     event::{ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
     window::CursorIcon,
@@ -36,13 +36,13 @@ pub mod event {
 
 pub const ROOT_ID: Id = Id {
     index: 0,
-    generation: 0,
+    generation: unsafe { NonZeroU32::new_unchecked(1) },
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Id {
     pub(crate) index: u32,
-    pub(crate) generation: u32,
+    pub(crate) generation: NonZeroU32,
 }
 impl Id {
     /// Get the index of the control in the controls vector inside GUI<R>
@@ -51,7 +51,7 @@ impl Id {
     }
     /// Get the generation of the control it is refering
     pub fn generation(&self) -> u32 {
-        self.generation as u32
+        self.generation.get()
     }
 }
 
@@ -117,7 +117,7 @@ impl GUI {
         Self {
             modifiers: ModifiersState::empty(),
             controls: vec![Control {
-                generation: 0,
+                generation: NonZeroU32::new(1).unwrap(),
                 rect: Rect {
                     anchors: [0.0; 4],
                     margins: [0.0; 4],
@@ -125,13 +125,9 @@ impl GUI {
                     rect: [0.0, 0.0, width, height],
                     ..Default::default()
                 },
-                graphic: Graphic::None,
-                behaviour: None,
-                layout: Default::default(),
-                parent: None,
-                children: Vec::new(),
                 active: true,
                 really_active: true,
+                ..Default::default()
             }]
             .into(),
             redraw: true,
@@ -427,15 +423,18 @@ impl GUI {
         &mut self,
         id: Id,
         event: F,
-    ) {
+    ) -> bool {
         let mut handled = false;
         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
             handled = event(this, id, &mut ctx);
         }
-        if !handled {
-            if let Some(parent) = self.controls[id].parent {
-                self.call_event_chain(parent, event);
-            }
+        if handled {
+            return true;
+        }
+        if let Some(parent) = self.controls[id].parent {
+            self.call_event_chain(parent, event)
+        } else {
+            false
         }
     }
 
@@ -529,9 +528,58 @@ impl GUI {
                     ..
                 } => {
                     if let Some(curr) = self.current_focus {
-                        self.call_event_chain(curr, |this, id, ctx| {
+                        let handled = self.call_event_chain(curr, |this, id, ctx| {
                             this.on_keyboard_event(KeyboardEvent::Pressed(*keycode), id, ctx)
                         });
+                        if !handled {
+                            let shift = self.modifiers.shift();
+                            let next = match *keycode {
+                                VirtualKeyCode::Tab if !shift => {
+                                    let mut tree = self.controls.tree_starting_at(curr);
+                                    tree.pop(); // pop 'this'
+                                    loop {
+                                        let id = match tree.pop() {
+                                            Some(id) => id,
+                                            None => break None,
+                                        };
+                                        tree.extend(self.controls.get_children(id).iter().rev());
+                                        let is_focus = self.controls[id]
+                                            .behaviour
+                                            .as_ref()
+                                            .map_or(false, |x| {
+                                                x.input_flags().contains(InputFlags::FOCUS)
+                                            });
+                                        if is_focus {
+                                            break Some(id);
+                                        }
+                                    }
+                                }
+                                VirtualKeyCode::Tab => {
+                                    let mut tree = self.controls.rev_tree_starting_at(curr);
+                                    tree.pop(); // pop 'this'
+                                    loop {
+                                        let id = match tree.pop() {
+                                            Some(id) => id,
+                                            None => break None,
+                                        };
+                                        tree.extend(self.controls.get_children(id));
+                                        let is_focus = self.controls[id]
+                                            .behaviour
+                                            .as_ref()
+                                            .map_or(false, |x| {
+                                                x.input_flags().contains(InputFlags::FOCUS)
+                                            });
+                                        if is_focus {
+                                            break Some(id);
+                                        }
+                                    }
+                                }
+                                _ => None,
+                            };
+                            if next.is_some() {
+                                self.set_focus(next);
+                            }
+                        }
                     }
                 }
                 _ => {}
@@ -776,6 +824,7 @@ bitflags! {
     pub struct InputFlags: u8 {
         const MOUSE = 0x1;
         const SCROLL = 0x2;
+        const FOCUS = 0x4;
     }
 }
 

@@ -842,11 +842,7 @@ impl OptionsGUI {
         style: &StyleSheet,
         on_change: F,
     ) {
-        let toggle = gui
-            .create_control_reserved(id)
-            .with_min_size([0.0, 30.0])
-            .with_parent(parent)
-            .build();
+        let toggle = id;
 
         let background = {
             let graphic = style
@@ -869,17 +865,18 @@ impl OptionsGUI {
             .with_graphic(style.menu.button.normal.clone().with_color([0, 0, 0, 255]))
             .with_parent(background)
             .build();
-        gui.set_behaviour(
-            toggle,
-            Toggle::new(
+        gui.create_control_reserved(id)
+            .with_behaviour(Toggle::new(
                 background,
                 marker,
                 initial_value,
                 style.button.clone(),
                 style.text_field.clone(),
                 on_change,
-            ),
-        );
+            ))
+            .with_min_size([0.0, 30.0])
+            .with_parent(parent)
+            .build();
 
         let graphic = Text::new([40, 40, 100, 255], name, 16.0, (-1, 0)).into();
         gui.create_control()

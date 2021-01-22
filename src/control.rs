@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use crate::{render::Graphic, Behaviour, Id, Layout, Rect, RectFill};
 
 pub(crate) struct ControlBuild {
@@ -11,7 +13,7 @@ pub(crate) struct ControlBuild {
 impl Default for ControlBuild {
     fn default() -> Self {
         Self {
-            rect: Rect::default(),
+            rect: Default::default(),
             graphic: Graphic::None,
             layout: Default::default(),
             behaviour: None,
@@ -107,20 +109,22 @@ impl Controls {
             }
         } else {
             let control = Control {
-                generation: 0,
+                generation: NonZeroU32::new(1).unwrap(),
                 ..Control::default()
             };
             self.controls.push(control);
             Id {
-                generation: 0,
+                generation: NonZeroU32::new(1).unwrap(),
                 index: self.controls.len() as u32 - 1,
             }
         }
     }
 
+    #[allow(clippy::or_fun_call)]
     pub fn remove(&mut self, id: Id) {
         self[id] = Control {
-            generation: self[id].generation + 1,
+            generation: NonZeroU32::new(self[id].generation.get() + 1)
+                .unwrap_or(NonZeroU32::new(1).unwrap()),
             ..Control::default()
         };
         self.dead_controls.push(id.index);
@@ -181,6 +185,41 @@ impl Controls {
             .last()
             .map(|(a, _)| *a)
     }
+
+    pub fn tree_starting_at(&self, id: Id) -> Vec<Id> {
+        debug_assert!(self[id].active);
+        if let Some(parent) = self[id].parent {
+            let mut up = self.tree_starting_at(parent);
+            up.pop();
+            let children = self
+            .get_children(parent);
+            let i = children
+                .iter()
+                .position(|x| *x == id)
+                .expect("Parent/children desync");
+            up.extend(children[i..].iter().rev());
+            up
+        } else {
+            vec![id]
+        }
+    }
+
+    pub fn rev_tree_starting_at(&self, id: Id) -> Vec<Id> {
+        debug_assert!(self[id].active);
+        if let Some(parent) = self[id].parent {
+            let mut up = self.rev_tree_starting_at(parent);
+            up.pop();
+            let i = self
+                .get_children(parent)
+                .iter()
+                .position(|x| *x == id)
+                .expect("Parent/children desync");
+            up.extend(self[parent].children[..=i].iter());
+            up
+        } else {
+            vec![id]
+        }
+    }
 }
 impl std::ops::Index<Id> for Controls {
     type Output = Control;
@@ -204,9 +243,8 @@ impl From<Vec<Control>> for Controls {
     }
 }
 
-#[derive(Default)]
 pub(crate) struct Control {
-    pub(crate) generation: u32,
+    pub(crate) generation: NonZeroU32,
     pub(crate) rect: Rect,
     pub(crate) graphic: Graphic,
     pub(crate) behaviour: Option<Box<dyn Behaviour>>,
@@ -215,6 +253,21 @@ pub(crate) struct Control {
     pub(crate) children: Vec<Id>,
     pub(crate) active: bool,
     pub(crate) really_active: bool,
+}
+impl Default for Control {
+    fn default() -> Self {
+        Self {
+            generation: NonZeroU32::new(1).unwrap(),
+            rect: Default::default(),
+            graphic: Default::default(),
+            behaviour: Default::default(),
+            layout: Default::default(),
+            parent: Default::default(),
+            children: Default::default(),
+            active: Default::default(),
+            really_active: Default::default(),
+        }
+    }
 }
 impl Control {
     /// add one more behaviour to the control

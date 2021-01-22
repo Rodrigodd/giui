@@ -213,7 +213,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     }
 
     fn input_flags(&self) -> InputFlags {
-        InputFlags::MOUSE | InputFlags::SCROLL
+        InputFlags::MOUSE | InputFlags::SCROLL | InputFlags::FOCUS
     }
 
     fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {
@@ -302,6 +302,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 self.insert_char(ch, this, ctx);
             }
             KeyboardEvent::Pressed(key_code) => match key_code {
+                VirtualKeyCode::Tab => return false, // allow change focus with tab
                 VirtualKeyCode::C | VirtualKeyCode::X => {
                     if ctx.modifiers().ctrl() {
                         if let Some(selection_index) = self.selection_index {

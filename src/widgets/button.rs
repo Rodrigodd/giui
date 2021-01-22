@@ -24,7 +24,7 @@ impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
     }
 
     fn input_flags(&self) -> InputFlags {
-        InputFlags::MOUSE
+        InputFlags::MOUSE | InputFlags::FOCUS
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {

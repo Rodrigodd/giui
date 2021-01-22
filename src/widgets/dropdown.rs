@@ -48,7 +48,7 @@ impl Behaviour for MenuItem {
     }
 
     fn input_flags(&self) -> InputFlags {
-        InputFlags::MOUSE
+        InputFlags::MOUSE | InputFlags::FOCUS
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
@@ -247,7 +247,7 @@ where
     }
 
     fn input_flags(&self) -> InputFlags {
-        InputFlags::MOUSE
+        InputFlags::MOUSE | InputFlags::FOCUS
     }
 
     fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
