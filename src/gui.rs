@@ -6,7 +6,7 @@ use crate::{
 use ab_glyph::FontArc;
 use std::{any::Any, num::NonZeroU32};
 use winit::{
-    event::{ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
+    event::{ElementState, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
     window::CursorIcon,
 };
 
@@ -97,7 +97,8 @@ pub enum KeyboardEvent {
 struct Input {
     mouse_x: f32,
     mouse_y: f32,
-    mouse_invalid: bool,
+    // TODO: this was used when a control is deactive under the mouse. It is really necessary
+    // mouse_invalid: bool
 }
 
 pub struct GUI {
@@ -257,7 +258,6 @@ impl GUI {
                 if Some(id) == self.current_mouse {
                     self.send_mouse_event_to(id, MouseEvent::Exit);
                     self.current_mouse = None;
-                    self.input.mouse_invalid = true;
                 }
                 if Some(id) == self.current_scroll {
                     self.current_scroll = None;
@@ -295,7 +295,6 @@ impl GUI {
             if Some(id) == self.current_mouse {
                 self.send_mouse_event_to(id, MouseEvent::Exit);
                 self.current_mouse = None;
-                self.input.mouse_invalid = true;
             }
             if Some(id) == self.current_scroll {
                 self.current_scroll = None;
@@ -457,133 +456,116 @@ impl GUI {
         print_tree(0, ROOT_ID, self);
     }
 
-    pub fn handle_event<T>(&mut self, event: &Event<T>) {
+    pub fn handle_event(&mut self, event: &WindowEvent) {
         match event {
-            Event::MainEventsCleared => {
-                if self.input.mouse_invalid {
-                    self.input.mouse_invalid = false;
-                    self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
+            WindowEvent::CursorMoved { position, .. } => {
+                self.input.mouse_x = position.x as f32;
+                self.input.mouse_y = position.y as f32;
+                self.mouse_moved(position.x as f32, position.y as f32);
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                if let ElementState::Pressed = state {
+                    self.set_focus(self.current_mouse);
+                }
+                if let Some(curr) = self.current_mouse {
+                    match state {
+                        ElementState::Pressed => {
+                            self.send_mouse_event_to(curr, MouseEvent::Down((*button).into()));
+                        }
+                        ElementState::Released => {
+                            self.send_mouse_event_to(curr, MouseEvent::Up((*button).into()));
+                        }
+                    };
                 }
             }
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::CursorMoved { position, .. } => {
-                    self.input.mouse_x = position.x as f32;
-                    self.input.mouse_y = position.y as f32;
-                    self.mouse_moved(position.x as f32, position.y as f32);
+            WindowEvent::MouseWheel { delta, .. } => {
+                if let Some(curr) = self.current_mouse {
+                    //TODO: I should handle Line and Pixel Delta differences more wisely?
+                    let delta = match delta {
+                        winit::event::MouseScrollDelta::LineDelta(x, y) => [*x * 100.0, *y * 100.0],
+                        winit::event::MouseScrollDelta::PixelDelta(p) => [p.x as f32, p.y as f32],
+                    };
+                    self.call_event(curr, |this, id, ctx| this.on_scroll_event(delta, id, ctx));
                 }
-                WindowEvent::MouseInput { state, button, .. } => {
-                    if let ElementState::Pressed = state {
-                        self.set_focus(self.current_mouse);
-                    }
-                    if let Some(curr) = self.current_mouse {
-                        match state {
-                            ElementState::Pressed => {
-                                self.send_mouse_event_to(curr, MouseEvent::Down((*button).into()));
-                            }
-                            ElementState::Released => {
-                                self.send_mouse_event_to(curr, MouseEvent::Up((*button).into()));
-                            }
-                        };
+            }
+            WindowEvent::CursorLeft { .. } => {
+                if !self.over_is_locked {
+                    if let Some(curr) = self.current_mouse.take() {
+                        self.send_mouse_event_to(curr, MouseEvent::Exit);
                     }
                 }
-                WindowEvent::MouseWheel { delta, .. } => {
-                    if let Some(curr) = self.current_mouse {
-                        //TODO: I should handle Line and Pixel Delta differences more wisely?
-                        let delta = match delta {
-                            winit::event::MouseScrollDelta::LineDelta(x, y) => {
-                                [*x * 100.0, *y * 100.0]
-                            }
-                            winit::event::MouseScrollDelta::PixelDelta(p) => {
-                                [p.x as f32, p.y as f32]
-                            }
-                        };
-                        self.call_event(curr, |this, id, ctx| this.on_scroll_event(delta, id, ctx));
+            }
+            WindowEvent::ReceivedCharacter(ch) => {
+                if let Some(curr) = self.current_focus {
+                    if ch.is_control() {
+                        return;
                     }
+                    self.call_event_chain(curr, move |this, id, ctx| {
+                        this.on_keyboard_event(KeyboardEvent::Char(*ch), id, ctx)
+                    });
                 }
-                WindowEvent::CursorLeft { .. } => {
-                    if !self.over_is_locked {
-                        if let Some(curr) = self.current_mouse.take() {
-                            self.send_mouse_event_to(curr, MouseEvent::Exit);
-                        }
-                    }
-                }
-                WindowEvent::ReceivedCharacter(ch) => {
-                    if let Some(curr) = self.current_focus {
-                        if ch.is_control() {
-                            return;
-                        }
-                        self.call_event_chain(curr, move |this, id, ctx| {
-                            this.on_keyboard_event(KeyboardEvent::Char(*ch), id, ctx)
-                        });
-                    }
-                }
-                WindowEvent::ModifiersChanged(modifiers) => self.modifiers = *modifiers,
-                WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            state: ElementState::Pressed,
-                            virtual_keycode: Some(keycode),
-                            ..
-                        },
-                    ..
-                } => {
-                    if let Some(curr) = self.current_focus {
-                        let handled = self.call_event_chain(curr, |this, id, ctx| {
-                            this.on_keyboard_event(KeyboardEvent::Pressed(*keycode), id, ctx)
-                        });
-                        if !handled {
-                            let shift = self.modifiers.shift();
-                            let next = match *keycode {
-                                VirtualKeyCode::Tab if !shift => {
-                                    let mut tree = self.controls.tree_starting_at(curr);
-                                    tree.pop(); // pop 'this'
-                                    loop {
-                                        let id = match tree.pop() {
-                                            Some(id) => id,
-                                            None => break None,
-                                        };
-                                        tree.extend(self.controls.get_children(id).iter().rev());
-                                        let is_focus = self.controls[id]
-                                            .behaviour
-                                            .as_ref()
-                                            .map_or(false, |x| {
-                                                x.input_flags().contains(InputFlags::FOCUS)
-                                            });
-                                        if is_focus {
-                                            break Some(id);
-                                        }
+            }
+            WindowEvent::ModifiersChanged(modifiers) => self.modifiers = *modifiers,
+            WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        state: ElementState::Pressed,
+                        virtual_keycode: Some(keycode),
+                        ..
+                    },
+                ..
+            } => {
+                if let Some(curr) = self.current_focus {
+                    let handled = self.call_event_chain(curr, |this, id, ctx| {
+                        this.on_keyboard_event(KeyboardEvent::Pressed(*keycode), id, ctx)
+                    });
+                    if !handled {
+                        let shift = self.modifiers.shift();
+                        let next = match *keycode {
+                            VirtualKeyCode::Tab if !shift => {
+                                let mut tree = self.controls.tree_starting_at(curr);
+                                tree.pop(); // pop 'this'
+                                loop {
+                                    let id = match tree.pop() {
+                                        Some(id) => id,
+                                        None => break None,
+                                    };
+                                    tree.extend(self.controls.get_children(id).iter().rev());
+                                    let is_focus =
+                                        self.controls[id].behaviour.as_ref().map_or(false, |x| {
+                                            x.input_flags().contains(InputFlags::FOCUS)
+                                        });
+                                    if is_focus {
+                                        break Some(id);
                                     }
                                 }
-                                VirtualKeyCode::Tab => {
-                                    let mut tree = self.controls.rev_tree_starting_at(curr);
-                                    tree.pop(); // pop 'this'
-                                    loop {
-                                        let id = match tree.pop() {
-                                            Some(id) => id,
-                                            None => break None,
-                                        };
-                                        tree.extend(self.controls.get_children(id));
-                                        let is_focus = self.controls[id]
-                                            .behaviour
-                                            .as_ref()
-                                            .map_or(false, |x| {
-                                                x.input_flags().contains(InputFlags::FOCUS)
-                                            });
-                                        if is_focus {
-                                            break Some(id);
-                                        }
+                            }
+                            VirtualKeyCode::Tab => {
+                                let mut tree = self.controls.rev_tree_starting_at(curr);
+                                tree.pop(); // pop 'this'
+                                loop {
+                                    let id = match tree.pop() {
+                                        Some(id) => id,
+                                        None => break None,
+                                    };
+                                    tree.extend(self.controls.get_children(id));
+                                    let is_focus =
+                                        self.controls[id].behaviour.as_ref().map_or(false, |x| {
+                                            x.input_flags().contains(InputFlags::FOCUS)
+                                        });
+                                    if is_focus {
+                                        break Some(id);
                                     }
                                 }
-                                _ => None,
-                            };
-                            if next.is_some() {
-                                self.set_focus(next);
                             }
+                            _ => None,
+                        };
+                        if next.is_some() {
+                            self.set_focus(next);
                         }
                     }
                 }
-                _ => {}
-            },
+            }
             _ => {}
         }
     }

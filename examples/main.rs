@@ -19,8 +19,25 @@ use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
+    window::{WindowBuilder, WindowId},
 };
+
+fn resize(
+    gui: &mut GUI,
+    render: &mut GLSpriteRender,
+    camera: &mut Camera,
+    size: PhysicalSize<u32>,
+    window: WindowId,
+) {
+    render.resize(window, size.width, size.height);
+    camera.resize(size.width, size.height);
+    let width = size.width as f32;
+    let height = size.height as f32;
+    gui.resize(width, height);
+    camera.set_width(width);
+    camera.set_height(height);
+    camera.set_position(width / 2.0, height / 2.0);
+}
 
 fn main() {
     let event_loop = EventLoop::new();
@@ -49,12 +66,12 @@ fn main() {
         let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
-    let mut screen_camera = sprite_render::Camera::new(
+    let mut camera = sprite_render::Camera::new(
         window_size.width,
         window_size.height,
         window_size.height as f32,
     );
-    screen_camera.set_position(
+    camera.set_position(
         window_size.width as f32 / 2.0,
         window_size.height as f32 / 2.0,
     );
@@ -1067,40 +1084,35 @@ fn main() {
     gui.start();
     println!("Started");
 
-    fn resize(
-        size: PhysicalSize<u32>,
-        ui: &mut GUI,
-        render: &mut GLSpriteRender,
-        screen_camera: &mut Camera,
-    ) {
-        ui.resize(size.width as f32, size.height as f32);
-        render.resize(size.width, size.height);
-        screen_camera.resize(size.width, size.height);
-        screen_camera.set_height(size.height as f32);
-        screen_camera.set_position(size.width as f32 / 2.0, size.height as f32 / 2.0);
-    };
-
-    resize(window_size, &mut gui, &mut render, &mut screen_camera);
+    // resize everthing to the screen size
+    resize(
+        &mut gui,
+        &mut render,
+        &mut camera,
+        window.inner_size(),
+        window.id(),
+    );
 
     event_loop.run(move |event, _, control| {
         *control = ControlFlow::Wait;
-
-        gui.handle_event(&event);
-        if gui.render_is_dirty() {
-            window.request_redraw();
-        }
-        if let Some(cursor) = gui.cursor_change() {
-            window.set_cursor_icon(cursor);
-        }
-
         match event {
-            Event::WindowEvent { event, window_id } if window_id == window.id() => match event {
-                WindowEvent::CloseRequested => *control = ControlFlow::Exit,
-                WindowEvent::Resized(size) => {
-                    resize(size, &mut gui, &mut render, &mut screen_camera);
+            Event::WindowEvent { event, window_id } if window_id == window.id() => {
+                // gui receive events
+                gui.handle_event(&event);
+                if gui.render_is_dirty() {
+                    window.request_redraw();
                 }
-                _ => {}
-            },
+                if let Some(cursor) = gui.cursor_change() {
+                    window.set_cursor_icon(cursor);
+                }
+                match event {
+                    WindowEvent::CloseRequested => *control = ControlFlow::Exit,
+                    WindowEvent::Resized(size) => {
+                        resize(&mut gui, &mut render, &mut camera, size, window_id);
+                    }
+                    _ => {}
+                }
+            }
             Event::UserEvent(()) => *control = ControlFlow::Exit,
             Event::RedrawRequested(window_id) if window_id == window.id() => {
                 struct Render<'a>(&'a mut GLSpriteRender);
@@ -1128,10 +1140,10 @@ fn main() {
                 }
                 let mut ctx = gui.get_context();
                 let sprites = gui_render.render(&mut ctx, Render(&mut render));
-                let mut renderer = render.render();
+                let mut renderer = render.render(window_id);
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
                 renderer.draw_sprites(
-                    &mut screen_camera,
+                    &mut camera,
                     &sprites
                         .iter()
                         .map(|x| {

@@ -63,16 +63,17 @@ use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopProxy},
-    window::WindowBuilder,
+    window::{WindowBuilder, WindowId},
 };
 
 fn resize(
     gui: &mut GUI,
     render: &mut GLSpriteRender,
     camera: &mut Camera,
-    size: &PhysicalSize<u32>,
+    size: PhysicalSize<u32>,
+    window: WindowId,
 ) {
-    render.resize(size.width, size.height);
+    render.resize(window, size.width, size.height);
     camera.resize(size.width, size.height);
     let width = size.width as f32;
     let height = size.height as f32;
@@ -154,20 +155,17 @@ fn main() {
     }
 
     // resize everthing to the screen size
-    resize(&mut gui, &mut render, &mut camera, &window.inner_size());
+    resize(
+        &mut gui,
+        &mut render,
+        &mut camera,
+        window.inner_size(),
+        window.id(),
+    );
 
     // winit event loop
     event_loop.run(move |event, _, control| {
         *control = ControlFlow::Wait;
-
-        // gui receive events
-        gui.handle_event(&event);
-        if gui.render_is_dirty() {
-            window.request_redraw();
-        }
-        if let Some(cursor) = gui.cursor_change() {
-            window.set_cursor_icon(cursor);
-        }
 
         match event {
             Event::WindowEvent {
@@ -178,12 +176,23 @@ fn main() {
                 options.borrow().save();
                 *control = ControlFlow::Exit;
             }
-            Event::WindowEvent { event, .. } => {
+            Event::WindowEvent {
+                event, window_id, ..
+            } => {
+                // gui receive events
+                gui.handle_event(&event);
+                if gui.render_is_dirty() {
+                    window.request_redraw();
+                }
+                if let Some(cursor) = gui.cursor_change() {
+                    window.set_cursor_icon(cursor);
+                }
+
                 if let WindowEvent::Resized(size) = event {
-                    resize(&mut gui, &mut render, &mut camera, &size);
+                    resize(&mut gui, &mut render, &mut camera, size, window_id);
                 }
             }
-            Event::RedrawRequested(_) => {
+            Event::RedrawRequested(window_id) => {
                 // render the gui
                 struct Render<'a>(&'a mut GLSpriteRender);
                 impl<'a> GUIRenderer for Render<'a> {
@@ -210,7 +219,7 @@ fn main() {
                 }
                 let mut ctx = gui.get_context();
                 let sprites = gui_render.render(&mut ctx, Render(&mut render));
-                let mut renderer = render.render();
+                let mut renderer = render.render(window_id);
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
                 renderer.draw_sprites(
                     &mut camera,
