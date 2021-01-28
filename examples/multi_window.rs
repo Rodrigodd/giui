@@ -96,7 +96,6 @@ fn main() {
     );
 
     let main_window = window.id();
-    let mut requesting_focus = None;
 
     let mut windows: HashMap<WindowId, Instance> = HashMap::new();
     windows.insert(
@@ -134,8 +133,6 @@ fn main() {
                     window.inner_size(),
                     window.id(),
                 );
-
-                requesting_focus = Some(window.id());
 
                 (build)(&mut gui);
 

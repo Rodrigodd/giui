@@ -10,8 +10,8 @@ edition = "2018"
 
 glyph_brush_draw_cache = "0.1"
 ab_glyph = "0.2"
-xi-unicode = "0.2"
-winit = "0.22"
+xi-unicode = "0.3"
+winit = "0.24"
 bitflags = "1"
 copypasta = "0.7"
 
