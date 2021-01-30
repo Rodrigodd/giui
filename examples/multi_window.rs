@@ -3,30 +3,28 @@ use std::{collections::HashMap, rc::Rc};
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use ui_engine::{
-    layouts::{FitText, MarginLayout},
+    layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
     render::{GUIRender, GUIRenderer, Panel, Text},
     style::ButtonStyle,
     widgets::Button,
     GUI,
 };
-use winit::{
-    dpi::PhysicalSize,
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
-    window::{Window, WindowBuilder, WindowId},
-};
+use winit::{dpi::{PhysicalPosition, PhysicalSize}, event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoop, EventLoopProxy}, platform::windows::WindowExtWindows, window::{Window, WindowBuilder, WindowId}};
 
 struct Instance {
     gui: GUI,
     gui_render: GUIRender,
     camera: Camera,
-    window: Window,
+    window: Rc<Window>,
+    modal: Option<WindowId>,
 }
 
 enum UserEvent {
     CreateNewWindow {
+        owner: Option<WindowId>,
+        modal: bool,
         window_builder: WindowBuilder,
-        build: Box<dyn Fn(&mut GUI)>,
+        build: Box<dyn FnOnce(&mut GUI, Rc<Window>) + 'static>,
     },
 }
 
@@ -50,10 +48,10 @@ fn resize(
 fn main() {
     // create winit's window and event_loop
     let event_loop = EventLoop::with_user_event();
-    let window = WindowBuilder::new().with_inner_size(PhysicalSize::new(400, 200));
+    let window = WindowBuilder::new().with_inner_size(PhysicalSize::new(200, 200));
 
     // create the render and camera, and a texture for the glyphs rendering
-    let (window, mut render) = GLSpriteRender::new(window, &event_loop, true);
+    let (mut window, mut render) = GLSpriteRender::new(window, &event_loop, true);
     let mut camera = {
         let size = window.inner_size();
         let width = size.width;
@@ -84,7 +82,15 @@ fn main() {
         pressed: Panel::new(texture, [0.0, 0.5, 0.5, 0.5], 10.0).into(),
         focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], 10.0).into(),
     });
-    create_main_gui(&mut gui, event_loop.create_proxy(), button_style);
+
+    let window = Rc::new(window);
+
+    create_gui(
+        &mut gui,
+        event_loop.create_proxy(),
+        button_style,
+        window.clone(),
+    );
 
     // resize everthing to the screen size
     resize(
@@ -105,6 +111,7 @@ fn main() {
             gui_render,
             camera,
             window,
+            modal: None,
         },
     );
 
@@ -114,11 +121,22 @@ fn main() {
 
         match event {
             Event::UserEvent(UserEvent::CreateNewWindow {
-                window_builder: wb,
+                owner,
+                modal,
+                mut window_builder,
                 build,
             }) => {
+                if let Some(parent) = owner {
+                    #[cfg(target_os = "windows")]
+                    {
+                        use winit::platform::windows::{WindowBuilderExtWindows, WindowExtWindows};
+                        let hwnd = windows.get(&parent).unwrap().window.hwnd();
+                        window_builder = window_builder.with_owner_window(hwnd as _)
+                    };
+                }
+
                 let font_texture = render.new_texture(128, 128, &[], false);
-                let window = render.add_window(wb, event_loop);
+                let window = render.add_window(window_builder, event_loop);
                 let size = window.inner_size();
                 let width = size.width;
                 let height = size.height;
@@ -134,7 +152,9 @@ fn main() {
                     window.id(),
                 );
 
-                (build)(&mut gui);
+                let window = Rc::new(window);
+
+                (build)(&mut gui, window.clone());
 
                 windows.insert(
                     window.id(),
@@ -143,8 +163,14 @@ fn main() {
                         gui_render,
                         camera,
                         window,
+                        modal: if modal { owner } else { None },
                     },
                 );
+                if modal {
+                    if let Some(id) = owner {
+                        windows.get_mut(&id).unwrap().window.set_enable(false);
+                    }
+                }
             }
             Event::WindowEvent {
                 event, window_id, ..
@@ -174,10 +200,14 @@ fn main() {
                             }
                             *control = ControlFlow::Exit;
                         } else {
-                            let Instance { window, .. } = windows.remove(&window_id).unwrap();
+                            let Instance { window, modal, .. } =
+                            windows.remove(&window_id).unwrap();
                             render.remove_window(&window);
                             if windows.is_empty() {
                                 *control = ControlFlow::Exit;
+                            }
+                            if let Some(id) = modal {
+                                windows.get_mut(&id).unwrap().window.set_enable(true);
                             }
                         }
                     }
@@ -248,36 +278,116 @@ fn main() {
     });
 }
 
-fn create_main_gui(gui: &mut GUI, proxy: EventLoopProxy<UserEvent>, button_style: Rc<ButtonStyle>) {
+fn create_gui(
+    gui: &mut GUI,
+    proxy: EventLoopProxy<UserEvent>,
+    button_style: Rc<ButtonStyle>,
+    owner: Rc<Window>,
+) {
     let surface = gui
         .create_control()
-        .with_layout(MarginLayout::new([10.0; 4]))
+        .with_layout(VBoxLayout::new(10.0, [10.0; 4], -1))
         .build();
+
     let button = gui
         .create_control()
-        .with_behaviour(Button::new(button_style, move |_, _| {
+        .with_behaviour(Button::new(button_style.clone(), {
+            let proxy = proxy.clone();
+            let button_style = button_style.clone();
+            let owner = owner.clone();
+            move |_, _| {
+                let window_builder =
+                    WindowBuilder::new().with_inner_size(PhysicalSize::new(200, 200));
+
+                let _ = proxy.send_event(UserEvent::CreateNewWindow {
+                    owner: Some(owner.id()),
+                    window_builder,
+                    modal: true,
+                    build: {
+                        let proxy = proxy.clone();
+                        let button_style = button_style.clone();
+                        let owner = owner.clone();
+                        Box::new(move |gui, window| {
+                            let owner_rect = {
+                                let pos = owner.outer_position().unwrap_or((0,0).into());
+                                let size = owner.outer_size();
+                                [pos.x, pos.y, size.width as i32, size.height as i32]
+                            };
+
+                            let size = window.outer_size();
+                            let mut x = owner_rect[0] + (owner_rect[2] - size.width as i32) / 2;
+                            let mut y = owner_rect[1] + (owner_rect[3] - size.height as i32) / 2;
+                            x = x.max(owner_rect[0] + 20);
+                            y = y.max(owner_rect[1] + 20);
+                            window.set_outer_position(PhysicalPosition::new(x,y));
+                            create_gui(gui, proxy, button_style, window);
+                        })
+                    },
+                });
+            }
+        }))
+        .with_parent(surface)
+        .with_layout(MarginLayout::new([5.0; 4]))
+        .with_fill_x(ui_engine::RectFill::ShrinkCenter)
+        .with_fill_y(ui_engine::RectFill::ShrinkEnd)
+        .with_expand_y(true)
+        .build();
+    let _text = gui
+        .create_control()
+        .with_graphic(Text::new([0, 0, 0, 255], "Open A Modal Window!".into(), 16.0, (0, 0)).into())
+        .with_layout(FitText)
+        .with_parent(button)
+        .build();
+
+    let button = gui
+        .create_control()
+        .with_behaviour(Button::new(button_style.clone(), move |_, _| {
             let window_builder = WindowBuilder::new().with_inner_size(PhysicalSize::new(200, 200));
+
             let _ = proxy.send_event(UserEvent::CreateNewWindow {
+                owner: Some(owner.id()),
+                modal: false,
                 window_builder,
-                build: Box::new(create_second_gui),
+                build: {
+                    let proxy = proxy.clone();
+                    let button_style = button_style.clone();
+                    let owner = owner.clone();
+                    Box::new(move |gui, window| {
+                        let owner_rect = {
+                            let pos = owner.outer_position().unwrap_or((0,0).into());
+                            let size = owner.outer_size();
+                            [pos.x, pos.y, size.width as i32, size.height as i32]
+                        };
+
+                        let size = window.outer_size();
+                        let mut x = owner_rect[0] + (owner_rect[2] - size.width as i32) / 2;
+                        let mut y = owner_rect[1] + (owner_rect[3] - size.height as i32) / 2;
+                        x = x.max(owner_rect[0] + 20);
+                        y = y.max(owner_rect[1] + 20);
+                        window.set_outer_position(PhysicalPosition::new(x,y));
+                        create_gui(gui, proxy, button_style, window);
+                    })
+                },
             });
         }))
         .with_parent(surface)
         .with_layout(MarginLayout::new([5.0; 4]))
         .with_fill_x(ui_engine::RectFill::ShrinkCenter)
-        .with_fill_y(ui_engine::RectFill::ShrinkCenter)
+        .with_fill_y(ui_engine::RectFill::ShrinkStart)
+        .with_expand_y(true)
         .build();
     let _text = gui
         .create_control()
-        .with_graphic(Text::new([0, 0, 0, 255], "Open Second Window!".into(), 16.0, (0, 0)).into())
+        .with_graphic(
+            Text::new(
+                [0, 0, 0, 255],
+                "Open A Non-Modal Window!".into(),
+                16.0,
+                (0, 0),
+            )
+            .into(),
+        )
         .with_layout(FitText)
         .with_parent(button)
-        .build();
-}
-
-fn create_second_gui(gui: &mut GUI) {
-    let _text = gui
-        .create_control()
-        .with_graphic(Text::new([0, 255, 0, 255], "Hello Word!!".into(), 48.0, (0, 0)).into())
         .build();
 }

@@ -15,6 +15,9 @@ winit = "0.24"
 bitflags = "1"
 copypasta = "0.7"
 
+[patch.crates-io]
+winit = { path = "../winit" }
+
 [dev-dependencies]
 
 image = { version = "0.23", default-features = false, features=["png"] }
