@@ -54,8 +54,8 @@ use ui_engine::{
     style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
     widgets::{
         Blocker, Button, ButtonGroup, CloseMenu, DropMenu, Dropdown, Item, Menu, MenuBar, MenuItem,
-        NoneLayout, ScrollBar, ScrollView, Select, SetMaxValue, SetMinValue, SetSelected, Slider,
-        SliderCallback, TabButton, TextField, TextFieldCallback, Toggle,
+        ScrollBar, ScrollView, Select, SetMaxValue, SetMinValue, SetSelected, Slider,
+        SliderCallback, TabButton, TextField, TextFieldCallback, Toggle, ViewLayout,
     },
     Context, ControlBuilder, Id, RectFill, GUI,
 };
@@ -86,7 +86,9 @@ fn resize(
 fn main() {
     // create winit's window and event_loop
     let event_loop = EventLoop::with_user_event();
-    let window = WindowBuilder::new().with_inner_size(PhysicalSize::new(250, 300));
+    let window = WindowBuilder::new()
+        .with_inner_size(PhysicalSize::new(250, 300))
+        .with_resizable(false);
 
     // create the render and camera, and a texture for the glyphs rendering
     let (window, mut render) = GLSpriteRender::new(window, &event_loop, true);
@@ -386,6 +388,7 @@ impl Default for Options {
 #[derive(Clone)]
 struct OptionsGUI {
     options: Rc<RefCell<Options>>,
+    surface: Id,
     field_a: Id,
     field_b: Id,
     min: Id,
@@ -449,6 +452,7 @@ impl OptionsGUI {
     ) -> Self {
         let this = Self {
             options,
+            surface: gui.reserve_id(),
             field_a: gui.reserve_id(),
             field_b: gui.reserve_id(),
             min: gui.reserve_id(),
@@ -466,7 +470,7 @@ impl OptionsGUI {
         };
 
         let surface = gui
-            .create_control()
+            .create_control_reserved(this.surface)
             .with_layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
             .build();
 
@@ -1199,24 +1203,8 @@ fn scroll_view<'a>(
         .create_control()
         .with_graphic(Graphic::None)
         .with_parent(scroll_view)
-        .with_layout(NoneLayout)
+        .with_layout(ViewLayout::new(false, true))
         .build();
-    let h_scroll_bar = gui
-        .create_control()
-        .with_min_size([5.0, 5.0])
-        .with_graphic(style.scroll_background.clone())
-        .with_parent(scroll_view)
-        .build();
-    let h_scroll_bar_handle = gui.create_control().with_parent(h_scroll_bar).build();
-    gui.set_behaviour(
-        h_scroll_bar,
-        ScrollBar::new(
-            h_scroll_bar_handle,
-            scroll_view,
-            false,
-            style.scroll_handle.clone(),
-        ),
-    );
     let v_scroll_bar = gui
         .create_control()
         .with_min_size([5.0, 5.0])
@@ -1239,10 +1227,8 @@ fn scroll_view<'a>(
     let behaviour = ScrollView::new(
         view,
         content,
-        h_scroll_bar,
-        h_scroll_bar_handle,
-        v_scroll_bar,
-        v_scroll_bar_handle,
+        None,
+        Some((v_scroll_bar, v_scroll_bar_handle)),
     );
     let behaviour_layout = Rc::new(RefCell::new(behaviour));
 

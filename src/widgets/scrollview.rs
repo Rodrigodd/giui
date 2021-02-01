@@ -1,6 +1,6 @@
 use crate::{
     event, style::ButtonStyle, Behaviour, Context, Id, InputFlags, KeyboardEvent, Layout,
-    LayoutContext, MinSizeContext, MouseButton, MouseEvent,
+    LayoutContext, MinSizeContext, MouseButton, MouseEvent, ROOT_ID,
 };
 
 use std::{any::Any, rc::Rc};
@@ -150,9 +150,34 @@ impl Behaviour for ScrollBar {
     }
 }
 
-pub struct NoneLayout;
-impl Layout for NoneLayout {
-    fn update_layouts(&mut self, _: Id, _: &mut LayoutContext) {}
+#[derive(Default)]
+pub struct ViewLayout {
+    h: bool,
+    v: bool,
+}
+impl ViewLayout {
+    pub fn new(h: bool, v: bool) -> Self {
+        Self { h, v }
+    }
+}
+impl Layout for ViewLayout {
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
+        let content = match ctx.get_children(this).get(0) {
+            Some(x) => *x,
+            None => return,
+        };
+        let mut min_size = [0.0, 0.0];
+        let content_min_size = ctx.get_min_size(content);
+        if !self.h {
+            min_size[0] = content_min_size[0];
+        }
+        if !self.v {
+            min_size[1] = content_min_size[1];
+        }
+        ctx.set_this_min_size(min_size);
+    }
+
+    fn update_layouts(&mut self, _this: Id, _ctx: &mut LayoutContext) {}
 }
 
 pub struct ScrollView {
@@ -160,37 +185,35 @@ pub struct ScrollView {
     pub delta_y: f32,
     view: Id,
     content: Id,
-    h_scroll_bar: Id,
-    h_scroll_bar_handle: Id,
-    v_scroll_bar: Id,
-    v_scroll_bar_handle: Id,
+    h_scroll_bar_and_handle: Option<(Id, Id)>,
+    v_scroll_bar_and_handle: Option<(Id, Id)>,
 }
 impl ScrollView {
     /// v_scroll must be a descendant of this
     pub fn new(
         view: Id,
         content: Id,
-        h_scroll_bar: Id,
-        h_scroll_bar_handle: Id,
-        v_scroll_bar: Id,
-        v_scroll_bar_handle: Id,
+        h_scroll_bar_and_handle: Option<(Id, Id)>,
+        v_scroll_bar_and_handle: Option<(Id, Id)>,
     ) -> Self {
         Self {
             delta_x: 0.0,
             delta_y: 0.0,
             view,
             content,
-            h_scroll_bar,
-            h_scroll_bar_handle,
-            v_scroll_bar,
-            v_scroll_bar_handle,
+            h_scroll_bar_and_handle,
+            v_scroll_bar_and_handle,
         }
     }
 }
 impl Behaviour for ScrollView {
     fn on_start(&mut self, _this: Id, ctx: &mut Context) {
-        ctx.move_to_front(self.v_scroll_bar);
-        ctx.move_to_front(self.h_scroll_bar);
+        if let Some((h_scroll_bar, _)) = self.h_scroll_bar_and_handle {
+            ctx.move_to_front(h_scroll_bar);
+        }
+        if let Some((v_scroll_bar, _)) = self.v_scroll_bar_and_handle {
+            ctx.move_to_front(v_scroll_bar);
+        }
     }
 
     fn on_active(&mut self, _: Id, ctx: &mut Context) {
@@ -201,17 +224,21 @@ impl Behaviour for ScrollView {
         let view_width = view_rect[2] - view_rect[0];
         let view_height = view_rect[3] - view_rect[1];
 
-        ctx.set_anchor_left(self.h_scroll_bar_handle, self.delta_x / content_size[0]);
-        ctx.set_anchor_right(
-            self.h_scroll_bar_handle,
-            ((self.delta_x + view_width) / content_size[0]).min(1.0),
-        );
+        if let Some((_, h_scroll_bar_handle)) = self.h_scroll_bar_and_handle {
+            ctx.set_anchor_left(h_scroll_bar_handle, self.delta_x / content_size[0]);
+            ctx.set_anchor_right(
+                h_scroll_bar_handle,
+                ((self.delta_x + view_width) / content_size[0]).min(1.0),
+            );
+        }
 
-        ctx.set_anchor_top(self.v_scroll_bar_handle, self.delta_y / content_size[1]);
-        ctx.set_anchor_bottom(
-            self.v_scroll_bar_handle,
-            ((self.delta_y + view_height) / content_size[1]).min(1.0),
-        );
+        if let Some((_, v_scroll_bar_handle)) = self.v_scroll_bar_and_handle {
+            ctx.set_anchor_top(v_scroll_bar_handle, self.delta_y / content_size[1]);
+            ctx.set_anchor_bottom(
+                v_scroll_bar_handle,
+                ((self.delta_y + view_height) / content_size[1]).min(1.0),
+            );
+        }
     }
 
     fn on_event(&mut self, event: &dyn Any, _: Id, ctx: &mut Context) {
@@ -289,62 +316,23 @@ impl Behaviour for ScrollView {
         }
     }
 }
-
-impl<T: Layout> Layout for std::rc::Rc<std::cell::RefCell<T>> {
-    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
-        self.as_ref().borrow_mut().compute_min_size(this, ctx)
-    }
-
-    fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
-        self.as_ref().borrow_mut().update_layouts(this, ctx)
-    }
-}
-impl<T: Behaviour> Behaviour for std::rc::Rc<std::cell::RefCell<T>> {
-    fn on_start(&mut self, this: Id, ctx: &mut Context) {
-        self.as_ref().borrow_mut().on_start(this, ctx)
-    }
-
-    fn on_active(&mut self, this: Id, ctx: &mut Context) {
-        self.as_ref().borrow_mut().on_active(this, ctx)
-    }
-
-    fn on_deactive(&mut self, this: Id, ctx: &mut Context) {
-        self.as_ref().borrow_mut().on_deactive(this, ctx)
-    }
-
-    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
-        self.as_ref().borrow_mut().on_event(event, this, ctx)
-    }
-
-    fn input_flags(&self) -> InputFlags {
-        self.as_ref().borrow_mut().input_flags()
-    }
-
-    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {
-        self.as_ref().borrow_mut().on_scroll_event(delta, this, ctx)
-    }
-
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
-        self.as_ref().borrow_mut().on_mouse_event(event, this, ctx)
-    }
-
-    fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
-        self.as_ref().borrow_mut().on_focus_change(focus, this, ctx)
-    }
-
-    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
-        self.as_ref()
-            .borrow_mut()
-            .on_keyboard_event(event, this, ctx)
-    }
-}
-
 impl Layout for ScrollView {
     fn compute_min_size(&mut self, _this: Id, ctx: &mut MinSizeContext) {
         let mut min_size = ctx.get_min_size(self.view);
+        let content_min_size = ctx.get_min_size(self.content);
 
-        let h_scroll_bar_size = ctx.get_min_size(self.v_scroll_bar);
-        let v_scroll_bar_size = ctx.get_min_size(self.v_scroll_bar);
+        let h_scroll_bar_size = if let Some((h_scroll_bar, _)) = self.h_scroll_bar_and_handle {
+            ctx.get_min_size(h_scroll_bar)
+        } else {
+            min_size[0] = content_min_size[0];
+            [0.0, 0.0]
+        };
+        let v_scroll_bar_size = if let Some((v_scroll_bar, _)) = self.v_scroll_bar_and_handle {
+            ctx.get_min_size(v_scroll_bar)
+        } else {
+            min_size[1] = content_min_size[1];
+            [0.0, 0.0]
+        };
 
         min_size[0] = min_size[0].max(h_scroll_bar_size[0]);
         min_size[1] = min_size[1].max(v_scroll_bar_size[1]);
@@ -353,53 +341,81 @@ impl Layout for ScrollView {
         min_size[1] += h_scroll_bar_size[1];
 
         ctx.set_this_min_size(min_size);
+        println!("min_size is {:?}", min_size);
+        println!("content_min_size is {:?}", content_min_size);
     }
 
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
         let this_rect = *ctx.get_rect(this);
-        let content = ctx.get_children(self.view)[0];
-        let content_size = ctx.get_min_size(content);
+        let content_size = ctx.get_min_size(self.content);
         let this_width = this_rect[2] - this_rect[0];
         let this_height = this_rect[3] - this_rect[1];
 
-        let mut h_active = this_width < content_size[0];
-        let mut h_scroll_bar_size = if h_active {
-            ctx.get_min_size(self.h_scroll_bar)[1]
+        let mut h_active;
+        let mut h_scroll_bar_size;
+        let mut h_scroll_bar;
+        if let Some((_h_scroll_bar, _)) = self.h_scroll_bar_and_handle {
+            h_scroll_bar = _h_scroll_bar;
+            h_active = this_width < content_size[0];
+            h_scroll_bar_size = if h_active {
+                ctx.get_min_size(h_scroll_bar)[1]
+            } else {
+                0.0
+            };
         } else {
-            0.0
-        };
-
-        let v_active = this_height - h_scroll_bar_size < content_size[1];
-        let v_scroll_bar_size = if v_active {
-            ctx.get_min_size(self.v_scroll_bar)[0]
-        } else {
-            0.0
-        };
-
-        if !h_active && this_width - v_scroll_bar_size < content_size[0] {
-            h_active = true;
-            h_scroll_bar_size = ctx.get_min_size(self.h_scroll_bar)[1];
+            h_active = false;
+            h_scroll_bar_size = 0.0;
+            h_scroll_bar = ROOT_ID; // dumb value
         }
 
-        if ctx.is_active(self.h_scroll_bar) {
-            if !h_active {
-                ctx.deactive(self.h_scroll_bar);
-            }
-        } else if h_active {
-            ctx.active(self.h_scroll_bar);
+        let v_active;
+        let v_scroll_bar_size;
+        let v_scroll_bar;
+        if let Some((_v_scroll_bar, _)) = self.v_scroll_bar_and_handle {
+            v_scroll_bar = _v_scroll_bar;
+            v_active = this_height - h_scroll_bar_size < content_size[1];
+            v_scroll_bar_size = if v_active {
+                ctx.get_min_size(v_scroll_bar)[0]
+            } else {
+                0.0
+            };
+        } else {
+            v_active = false;
+            v_scroll_bar_size = 0.0;
+            v_scroll_bar = ROOT_ID; // dumb value
         }
 
-        if ctx.is_active(self.v_scroll_bar) {
-            if !v_active {
-                ctx.deactive(self.v_scroll_bar);
+        if let Some((_h_scroll_bar, _)) = self.h_scroll_bar_and_handle {
+            if !h_active && this_width - v_scroll_bar_size < content_size[0] {
+                h_active = true;
+                h_scroll_bar = _h_scroll_bar;
+                h_scroll_bar_size = ctx.get_min_size(h_scroll_bar)[1];
             }
-        } else if v_active {
-            ctx.active(self.v_scroll_bar);
+        }
+
+        if let Some((h_scroll_bar, _)) = self.h_scroll_bar_and_handle {
+            if ctx.is_active(h_scroll_bar) {
+                if !h_active {
+                    ctx.deactive(h_scroll_bar);
+                }
+            } else if h_active {
+                ctx.active(h_scroll_bar);
+            }
+        }
+
+        if let Some((v_scroll_bar, _)) = self.v_scroll_bar_and_handle {
+            if ctx.is_active(v_scroll_bar) {
+                if !v_active {
+                    ctx.deactive(v_scroll_bar);
+                }
+            } else if v_active {
+                ctx.active(v_scroll_bar);
+            }
         }
 
         if h_active {
             ctx.set_designed_rect(
-                self.h_scroll_bar,
+                h_scroll_bar,
                 [
                     this_rect[0],
                     this_rect[3] - h_scroll_bar_size,
@@ -408,9 +424,10 @@ impl Layout for ScrollView {
                 ],
             );
         }
+
         if v_active {
             ctx.set_designed_rect(
-                self.v_scroll_bar,
+                v_scroll_bar,
                 [
                     this_rect[2] - v_scroll_bar_size,
                     this_rect[1],
@@ -462,18 +479,26 @@ impl Layout for ScrollView {
             content_rect[3] = this_rect[1] - self.delta_y + content_size[1];
         }
 
-        ctx.set_anchor_left(self.h_scroll_bar_handle, self.delta_x / content_size[0]);
-        ctx.set_anchor_right(
-            self.h_scroll_bar_handle,
-            ((self.delta_x + this_width) / content_size[0]).min(1.0),
-        );
+        if h_active {
+            if let Some((_, h_scroll_bar_handle)) = self.h_scroll_bar_and_handle {
+                ctx.set_anchor_left(h_scroll_bar_handle, self.delta_x / content_size[0]);
+                ctx.set_anchor_right(
+                    h_scroll_bar_handle,
+                    ((self.delta_x + this_width) / content_size[0]).min(1.0),
+                );
+            }
+        }
 
-        ctx.set_anchor_top(self.v_scroll_bar_handle, self.delta_y / content_size[1]);
-        ctx.set_anchor_bottom(
-            self.v_scroll_bar_handle,
-            ((self.delta_y + this_height) / content_size[1]).min(1.0),
-        );
+        if v_active {
+            if let Some((_, v_scroll_bar_handle)) = self.v_scroll_bar_and_handle {
+                ctx.set_anchor_top(v_scroll_bar_handle, self.delta_y / content_size[1]);
+                ctx.set_anchor_bottom(
+                    v_scroll_bar_handle,
+                    ((self.delta_y + this_height) / content_size[1]).min(1.0),
+                );
+            }
+        }
 
-        ctx.set_designed_rect(content, content_rect);
+        ctx.set_designed_rect(self.content, content_rect);
     }
 }

@@ -865,3 +865,52 @@ impl Default for Box<dyn Layout> {
         Box::new(())
     }
 }
+
+impl<T: Layout> Layout for std::rc::Rc<std::cell::RefCell<T>> {
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
+        self.as_ref().borrow_mut().compute_min_size(this, ctx)
+    }
+
+    fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
+        self.as_ref().borrow_mut().update_layouts(this, ctx)
+    }
+}
+impl<T: Behaviour> Behaviour for std::rc::Rc<std::cell::RefCell<T>> {
+    fn on_start(&mut self, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_start(this, ctx)
+    }
+
+    fn on_active(&mut self, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_active(this, ctx)
+    }
+
+    fn on_deactive(&mut self, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_deactive(this, ctx)
+    }
+
+    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_event(event, this, ctx)
+    }
+
+    fn input_flags(&self) -> InputFlags {
+        self.as_ref().borrow_mut().input_flags()
+    }
+
+    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_scroll_event(delta, this, ctx)
+    }
+
+    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_mouse_event(event, this, ctx)
+    }
+
+    fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_focus_change(focus, this, ctx)
+    }
+
+    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
+        self.as_ref()
+            .borrow_mut()
+            .on_keyboard_event(event, this, ctx)
+    }
+}

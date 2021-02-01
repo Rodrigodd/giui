@@ -3,13 +3,19 @@ use std::{collections::HashMap, rc::Rc};
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use ui_engine::{
-    layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
+    layouts::{FitText, MarginLayout, VBoxLayout},
     render::{GUIRender, GUIRenderer, Panel, Text},
     style::ButtonStyle,
     widgets::Button,
     GUI,
 };
-use winit::{dpi::{PhysicalPosition, PhysicalSize}, event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoop, EventLoopProxy}, platform::windows::WindowExtWindows, window::{Window, WindowBuilder, WindowId}};
+use winit::{
+    dpi::{PhysicalPosition, PhysicalSize},
+    event::{Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
+    platform::windows::WindowExtWindows,
+    window::{Window, WindowBuilder, WindowId},
+};
 
 struct Instance {
     gui: GUI,
@@ -51,7 +57,7 @@ fn main() {
     let window = WindowBuilder::new().with_inner_size(PhysicalSize::new(200, 200));
 
     // create the render and camera, and a texture for the glyphs rendering
-    let (mut window, mut render) = GLSpriteRender::new(window, &event_loop, true);
+    let (window, mut render) = GLSpriteRender::new(window, &event_loop, true);
     let mut camera = {
         let size = window.inner_size();
         let width = size.width;
@@ -129,7 +135,7 @@ fn main() {
                 if let Some(parent) = owner {
                     #[cfg(target_os = "windows")]
                     {
-                        use winit::platform::windows::{WindowBuilderExtWindows, WindowExtWindows};
+                        use winit::platform::windows::WindowBuilderExtWindows;
                         let hwnd = windows.get(&parent).unwrap().window.hwnd();
                         window_builder = window_builder.with_owner_window(hwnd as _)
                     };
@@ -201,7 +207,7 @@ fn main() {
                             *control = ControlFlow::Exit;
                         } else {
                             let Instance { window, modal, .. } =
-                            windows.remove(&window_id).unwrap();
+                                windows.remove(&window_id).unwrap();
                             render.remove_window(&window);
                             if windows.is_empty() {
                                 *control = ControlFlow::Exit;
@@ -309,7 +315,9 @@ fn create_gui(
                         let owner = owner.clone();
                         Box::new(move |gui, window| {
                             let owner_rect = {
-                                let pos = owner.outer_position().unwrap_or((0,0).into());
+                                let pos = owner
+                                    .outer_position()
+                                    .unwrap_or_else(|_| PhysicalPosition::new(0, 0));
                                 let size = owner.outer_size();
                                 [pos.x, pos.y, size.width as i32, size.height as i32]
                             };
@@ -319,7 +327,7 @@ fn create_gui(
                             let mut y = owner_rect[1] + (owner_rect[3] - size.height as i32) / 2;
                             x = x.max(owner_rect[0] + 20);
                             y = y.max(owner_rect[1] + 20);
-                            window.set_outer_position(PhysicalPosition::new(x,y));
+                            window.set_outer_position(PhysicalPosition::new(x, y));
                             create_gui(gui, proxy, button_style, window);
                         })
                     },
@@ -354,7 +362,9 @@ fn create_gui(
                     let owner = owner.clone();
                     Box::new(move |gui, window| {
                         let owner_rect = {
-                            let pos = owner.outer_position().unwrap_or((0,0).into());
+                            let pos = owner
+                                .outer_position()
+                                .unwrap_or_else(|_| PhysicalPosition::new(0, 0));
                             let size = owner.outer_size();
                             [pos.x, pos.y, size.width as i32, size.height as i32]
                         };
@@ -364,7 +374,7 @@ fn create_gui(
                         let mut y = owner_rect[1] + (owner_rect[3] - size.height as i32) / 2;
                         x = x.max(owner_rect[0] + 20);
                         y = y.max(owner_rect[1] + 20);
-                        window.set_outer_position(PhysicalPosition::new(x,y));
+                        window.set_outer_position(PhysicalPosition::new(x, y));
                         create_gui(gui, proxy, button_style, window);
                     })
                 },

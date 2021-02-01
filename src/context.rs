@@ -370,6 +370,7 @@ impl<'a> LayoutContext<'a> {
         }
     }
 
+    // TODO: Return a reference?
     pub fn get_rect(&self, id: Id) -> &[f32; 4] {
         &self.controls[id].rect.rect
     }

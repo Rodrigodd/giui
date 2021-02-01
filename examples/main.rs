@@ -10,8 +10,8 @@ use ui_engine::{
     style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
     widgets::{
         self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, DropMenu, Dropdown, Hoverable,
-        Item, Menu, MenuBar, MenuItem, NoneLayout, ScrollBar, ScrollView, Slider, TabButton,
-        TextField, Toggle,
+        Item, Menu, MenuBar, MenuItem, ScrollBar, ScrollView, Slider, TabButton, TextField, Toggle,
+        ViewLayout,
     },
     Context, ControlBuilder, Id, RectFill, GUI,
 };
@@ -829,7 +829,7 @@ fn main() {
             .create_control()
             .with_graphic(Graphic::None)
             .with_parent(scroll_view)
-            .with_layout(NoneLayout)
+            .with_layout(ViewLayout::new(true, true))
             .build();
         let h_scroll_bar = gui
             .create_control()
@@ -895,10 +895,8 @@ fn main() {
         let behaviour = ScrollView::new(
             view,
             list,
-            h_scroll_bar,
-            h_scroll_bar_handle,
-            v_scroll_bar,
-            v_scroll_bar_handle,
+            Some((h_scroll_bar, h_scroll_bar_handle)),
+            Some((v_scroll_bar, v_scroll_bar_handle)),
         );
         let behaviour = Rc::new(RefCell::new(behaviour));
         gui.set_behaviour(scroll_view, behaviour.clone());
