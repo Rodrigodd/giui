@@ -341,8 +341,6 @@ impl Layout for ScrollView {
         min_size[1] += h_scroll_bar_size[1];
 
         ctx.set_this_min_size(min_size);
-        println!("min_size is {:?}", min_size);
-        println!("content_min_size is {:?}", content_min_size);
     }
 
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
