@@ -406,6 +406,8 @@ impl GUI {
         }
     }
 
+    // TODO: there should not be a public function which receive Box<...>
+    // (specially when there is identical funtcion that is generic)
     pub fn send_event_to(&mut self, id: Id, event: Box<dyn Any>) {
         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
             this.on_event(event.as_ref(), id, &mut ctx);

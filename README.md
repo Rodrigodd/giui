@@ -1,19 +1,18 @@
-# fix
 
-- The events being a ```Box<dyn Any>``` and the functions receiving a ```<T: 'static>``` which is converted to 
-  ```Box<dyn Any>``` is confusing... Sometimes I try pass a Box<dyn Any> to the function, and any error happen
-
-# Todo
+# Todo list
 
 - Add animation support
+- Add keyboard navigation
+- Add multi-font text rendering
+  - font fallback
+  - richtext
 - Implement more widgets:
   - ~~Button~~
   - ~~Slider~~
   - ~~Toggle~~
   - ~~Dropdown~~
   - ~~Hover~~
-  - Fold
-  - Text Field
+  - ~~Text Field~~
   - ~~Scrollbar~~
-- Add some richtext support?
-- Replace each 'aling: i8' with a enum
+  - Fold
+  - List

@@ -3,6 +3,8 @@ use crate::{
     Id, Layout,
 };
 
+// TODO: replace every alignment from i8 to a enum.
+
 pub struct FitText;
 impl Layout for FitText {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
