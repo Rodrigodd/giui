@@ -205,9 +205,11 @@ impl GUI {
 
         if active {
             self.active_control(this);
+            // TODO: update the layout uncessary after each control added,
+            // make layout resolution be O(n^2). update_layout must be called lazily.
+            self.update_layout(this);
         }
-
-        self.update_layout(this);
+        
         this
     }
 
@@ -694,7 +696,11 @@ impl GUI {
 
         {
             let (layout, mut ctx) = MinSizeContext::new(id, &mut self.controls, &self.fonts);
-            layout.compute_min_size(id, &mut ctx);
+            let mut min_size = layout.compute_min_size(id, &mut ctx);
+            let user_min_size = self.controls[id].rect.user_min_size;
+            min_size[0] = min_size[0].max(user_min_size[0]);
+            min_size[1] = min_size[1].max(user_min_size[1]);
+            self.controls[id].rect.min_size = min_size;
         }
         while let Some(parent) = self.get_parent(id) {
             self.controls[id]
@@ -709,7 +715,11 @@ impl GUI {
                 {
                     let (layout, mut ctx) =
                         MinSizeContext::new(parent, &mut self.controls, &self.fonts);
-                    layout.compute_min_size(parent, &mut ctx);
+                    let mut min_size = layout.compute_min_size(id, &mut ctx);
+                    let user_min_size = self.controls[id].rect.user_min_size;
+                    min_size[0] = min_size[0].max(user_min_size[0]);
+                    min_size[1] = min_size[1].max(user_min_size[1]);
+                    self.controls[id].rect.min_size = min_size;
                 }
                 id = parent;
             } else {
@@ -776,7 +786,11 @@ impl GUI {
             {
                 let (layout, mut ctx) =
                     MinSizeContext::new(parent, &mut self.controls, &self.fonts);
-                layout.compute_min_size(parent, &mut ctx);
+                let mut min_size = layout.compute_min_size(parent, &mut ctx);
+                let user_min_size = self.controls[parent].rect.user_min_size;
+                min_size[0] = min_size[0].max(user_min_size[0]);
+                min_size[1] = min_size[1].max(user_min_size[1]);
+                self.controls[parent].rect.min_size = min_size;
             }
         }
 
@@ -839,7 +853,9 @@ impl Behaviour for () {}
 #[allow(unused_variables)]
 pub trait Layout {
     /// Compute its own min size, based on the min size of its children.
-    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {}
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
+        [0.0; 2]
+    }
     /// Update the position and size of its children.
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
         let rect = ctx.get_rect(this);
@@ -869,7 +885,7 @@ impl Default for Box<dyn Layout> {
 }
 
 impl<T: Layout> Layout for std::rc::Rc<std::cell::RefCell<T>> {
-    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         self.as_ref().borrow_mut().compute_min_size(this, ctx)
     }
 

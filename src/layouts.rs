@@ -7,13 +7,13 @@ use crate::{
 
 pub struct FitText;
 impl Layout for FitText {
-    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let fonts = ctx.get_fonts();
         let min_size = ctx
             .get_graphic(this)
             .compute_min_size(fonts)
             .unwrap_or([0.0, 0.0]);
-        ctx.set_this_min_size(min_size);
+        min_size
     }
     fn update_layouts(&mut self, _: Id, _: &mut LayoutContext) {}
 }
@@ -27,17 +27,19 @@ impl MarginLayout {
     }
 }
 impl Layout for MarginLayout {
-    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let mut min_size = [0.0f32, 0.0];
         for child in ctx.get_children(this) {
             let c_min_size = ctx.get_layouting(child).get_min_size();
             min_size[0] = min_size[0].max(c_min_size[0]);
             min_size[1] = min_size[1].max(c_min_size[1]);
         }
-        ctx.set_this_min_size([
+        [
             self.margins[0] + self.margins[2] + min_size[0],
             self.margins[1] + self.margins[3] + min_size[1],
-        ]);
+        ]
+
+        
     }
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
         let rect = ctx.get_layouting(this).get_rect();
@@ -63,7 +65,7 @@ impl RatioLayout {
     }
 }
 impl Layout for RatioLayout {
-    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let mut min_size = [0.0f32, 0.0];
         for child in ctx.get_children(this) {
             let c_min_size = ctx.get_layouting(child).get_min_size();
@@ -71,9 +73,9 @@ impl Layout for RatioLayout {
             min_size[1] = min_size[1].max(c_min_size[1]);
         }
         if min_size[0] > min_size[1] * self.ratio {
-            ctx.set_this_min_size([min_size[0], min_size[0] / self.ratio]);
+            [min_size[0], min_size[0] / self.ratio]
         } else {
-            ctx.set_this_min_size([min_size[1] * self.ratio, min_size[1]]);
+            [min_size[1] * self.ratio, min_size[1]]
         }
     }
 
@@ -129,13 +131,13 @@ impl HBoxLayout {
     }
 }
 impl Layout for HBoxLayout {
-    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let children = ctx.get_children(this);
         if children.is_empty() {
-            ctx.set_this_min_size([
+            [
                 self.margins[0] + self.margins[2],
                 self.margins[1] + self.margins[3],
-            ]);
+            ]
         } else {
             let mut min_width: f32 =
                 self.margins[0] + self.margins[2] + (children.len() - 1) as f32 * self.spacing;
@@ -145,7 +147,7 @@ impl Layout for HBoxLayout {
                 min_width += width;
                 min_height = min_height.max(height);
             }
-            ctx.set_this_min_size([min_width, min_height + self.margins[1] + self.margins[3]]);
+            [min_width, min_height + self.margins[1] + self.margins[3]]
         }
     }
 
@@ -215,13 +217,13 @@ impl VBoxLayout {
     }
 }
 impl Layout for VBoxLayout {
-    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let children = ctx.get_children(this);
         if children.is_empty() {
-            ctx.set_this_min_size([
+            [
                 self.margins[0] + self.margins[2],
                 self.margins[1] + self.margins[3],
-            ]);
+            ]
         } else {
             let mut min_width: f32 = 0.0;
             let mut min_height: f32 =
@@ -231,7 +233,7 @@ impl Layout for VBoxLayout {
                 min_width = min_width.max(width);
                 min_height += height;
             }
-            ctx.set_this_min_size([min_width + self.margins[0] + self.margins[2], min_height]);
+            [min_width + self.margins[0] + self.margins[2], min_height]
         }
     }
 
@@ -309,15 +311,15 @@ impl GridLayout {
     }
 }
 impl Layout for GridLayout {
-    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let children = ctx.get_children(this);
         if children.is_empty() {
             self.rows = 0;
             self.min_sizes.clear();
-            ctx.set_this_min_size([
+            [
                 self.margins[0] + self.margins[2],
                 self.margins[1] + self.margins[3],
-            ]);
+            ]
         } else {
             let len = children.len();
             self.rows = 1 + (len as u32 - 1) / self.columns;
@@ -338,12 +340,12 @@ impl Layout for GridLayout {
                 self.expand[row] |= rect.is_expand_y();
                 self.weights[row] = rect.ratio_y;
             }
-            ctx.set_this_min_size([
+            [
                 self.min_sizes[0..columns].iter().sum::<f32>()
                     + self.spacing[0] * self.columns.min(len as u32) as f32,
                 self.min_sizes[columns..].iter().sum::<f32>()
                     + self.spacing[1] * (self.rows as usize - 1) as f32,
-            ]);
+            ]
         }
     }
 

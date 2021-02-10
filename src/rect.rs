@@ -61,6 +61,7 @@ impl Default for LayoutDirtyFlags {
 pub struct Rect {
     pub anchors: [f32; 4],
     pub margins: [f32; 4],
+    pub(crate) user_min_size: [f32; 2],
     pub(crate) min_size: [f32; 2],
     pub(crate) rect: [f32; 4],
     pub(crate) expand_x: bool,
@@ -77,6 +78,7 @@ impl Default for Rect {
         Self {
             anchors: [0.0, 0.0, 1.0, 1.0],
             margins: [0.0, 0.0, 0.0, 0.0],
+            user_min_size: [0.0; 2],
             min_size: [0.0; 2],
             rect: [0.0; 4],
             expand_x: false,

@@ -161,10 +161,10 @@ impl ViewLayout {
     }
 }
 impl Layout for ViewLayout {
-    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) {
+    fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let content = match ctx.get_children(this).get(0) {
             Some(x) => *x,
-            None => return,
+            None => return [0.0; 2],
         };
         let mut min_size = [0.0, 0.0];
         let content_min_size = ctx.get_min_size(content);
@@ -174,7 +174,8 @@ impl Layout for ViewLayout {
         if !self.v {
             min_size[1] = content_min_size[1];
         }
-        ctx.set_this_min_size(min_size);
+
+        min_size
     }
 
     fn update_layouts(&mut self, _this: Id, _ctx: &mut LayoutContext) {}
@@ -317,7 +318,7 @@ impl Behaviour for ScrollView {
     }
 }
 impl Layout for ScrollView {
-    fn compute_min_size(&mut self, _this: Id, ctx: &mut MinSizeContext) {
+    fn compute_min_size(&mut self, _this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let mut min_size = ctx.get_min_size(self.view);
         let content_min_size = ctx.get_min_size(self.content);
 
@@ -340,7 +341,7 @@ impl Layout for ScrollView {
         min_size[0] += v_scroll_bar_size[0];
         min_size[1] += h_scroll_bar_size[1];
 
-        ctx.set_this_min_size(min_size);
+        min_size
     }
 
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {

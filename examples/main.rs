@@ -1182,12 +1182,6 @@ fn create_item(
         .with_parent(list)
         .with_layout(HBoxLayout::new(0.0, [5.0, 0.0, 5.0, 0.0], 0))
         .build();
-    // TODO: there must be a better way of set the minsize of the control above,
-    // instead of relying in a child.
-    ctx.create_control()
-        .with_min_height(35.0)
-        .with_parent(item)
-        .build();
     let _text = ctx
         .create_control()
         .with_parent(item)

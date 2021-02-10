@@ -42,6 +42,7 @@ impl<'a> ControlBuilder<'a> {
         self
     }
     pub fn with_min_size(mut self, min_size: [f32; 2]) -> Self {
+        self.build.rect.user_min_size = min_size;
         self.build.rect.min_size = min_size;
         self
     }
