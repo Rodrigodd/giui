@@ -39,7 +39,7 @@ impl Behaviour for ContextMenu {
         self.blocker = Some(blocker);
     }
 
-    fn on_event(&mut self, event: &dyn Any, _this: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, _this: Id, ctx: &mut Context) {
         if event.is::<ItemClicked>() || event.is::<CloseMenu>() {
             if let Some(menu) = self.open.take() {
                 ctx.remove(menu);

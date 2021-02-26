@@ -1,7 +1,7 @@
 use crate::{
     context::Context,
     text::{FontGlyph, TextInfo},
-    Id, Rect, RenderDirtyFlags, ROOT_ID,
+    Id, Rect, RenderDirtyFlags,
 };
 use ab_glyph::{Font, FontArc};
 use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
@@ -46,7 +46,7 @@ impl GUIRender {
     pub fn clear_cache(&mut self, ctx: &mut Context) {
         self.last_sprites.clear();
         self.last_sprites_map.clear();
-        let mut parents = vec![crate::ROOT_ID];
+        let mut parents = vec![crate::Id::ROOT_ID];
         while let Some(parent) = parents.pop() {
             if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
                 match graphic {
@@ -91,16 +91,14 @@ impl GUIRender {
         let fonts = ctx.get_fonts();
 
         // queue all glyphs for cache
-        let mut parents = vec![ROOT_ID];
+        let mut parents = vec![Id::ROOT_ID];
         while let Some(parent) = parents.pop() {
             parents.extend(ctx.get_children(parent).iter());
-            if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
-                if let Graphic::Text(text) = graphic {
-                    let glyphs = text.get_glyphs(rect, fonts);
-                    for glyph in glyphs {
-                        self.draw_cache
-                            .queue_glyph(glyph.font_id.0, glyph.glyph.clone());
-                    }
+            if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(parent) {
+                let glyphs = text.get_glyphs(rect, fonts);
+                for glyph in glyphs {
+                    self.draw_cache
+                        .queue_glyph(glyph.font_id.0, glyph.glyph.clone());
                 }
             }
         }
@@ -127,7 +125,7 @@ impl GUIRender {
             }
         }
 
-        let mut parents = vec![ROOT_ID];
+        let mut parents = vec![Id::ROOT_ID];
         'tree: while let Some(parent) = parents.pop() {
             let (mask, mask_changed) = {
                 let rect = ctx.get_layouting(parent);

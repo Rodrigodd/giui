@@ -1,5 +1,5 @@
 #![allow(clippy::useless_vec)]
-use std::cell::RefCell;
+
 use std::rc::Rc;
 
 use ab_glyph::FontArc;
@@ -358,28 +358,13 @@ fn main() {
         //     button
         // };
         let _slider = {
+            let slide_area = gui.reserve_id();
+            let handle = gui.reserve_id();
             let slider = gui
                 .create_control()
                 .with_min_size([0.0, 30.0])
                 .with_parent(menu)
-                .build();
-            let slide_area = gui
-                .create_control()
-                .with_anchors([0.0, 0.5, 1.0, 0.5])
-                .with_margins([10.0, -3.0, -10.0, 3.0])
-                .with_graphic(painel.clone().with_color([170, 170, 170, 255]))
-                .with_parent(slider)
-                .build();
-            let handle = gui
-                .create_control()
-                .with_anchors([0.5, 0.5, 0.5, 0.5])
-                .with_margins([-3.0, -14.0, 3.0, 14.0])
-                .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
-                .with_parent(slider)
-                .build();
-            gui.set_behaviour(
-                slider,
-                Slider::new(
+                .with_behaviour(Slider::new(
                     handle,
                     slide_area,
                     100,
@@ -391,39 +376,33 @@ fn main() {
                             text.set_font_size(value as f32 / 10.0);
                         }
                     },
-                ),
-            );
+                ))
+                .build();
+            let _slide_area = gui
+                .create_control_reserved(slide_area)
+                .with_anchors([0.0, 0.5, 1.0, 0.5])
+                .with_margins([10.0, -3.0, -10.0, 3.0])
+                .with_graphic(painel.clone().with_color([170, 170, 170, 255]))
+                .with_parent(slider)
+                .build();
+            let _handle = gui
+                .create_control_reserved(handle)
+                .with_anchors([0.5, 0.5, 0.5, 0.5])
+                .with_margins([-3.0, -14.0, 3.0, 14.0])
+                .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
+                .with_parent(slider)
+                .build();
+            
             slider
         };
         let _toggle = {
+            let background = gui.reserve_id();
+            let marker = gui.reserve_id();
             let toggle = gui
                 .create_control()
                 .with_min_size([0.0, 30.0])
                 .with_parent(menu)
-                .build();
-
-            let background = {
-                let graphic = painel
-                    .clone()
-                    .with_color([200, 200, 200, 255])
-                    .with_border(0.0);
-                gui.create_control()
-                    .with_anchors([0.0, 0.5, 0.0, 0.5])
-                    .with_margins([5.0, -10.0, 25.0, 10.0])
-                    .with_graphic(graphic)
-                    .with_parent(toggle)
-                    .build()
-            };
-            let marker = gui
-                .create_control()
-                .with_anchors([0.5, 0.5, 0.5, 0.5])
-                .with_margins([-6.0, -6.0, 6.0, 6.0])
-                .with_graphic(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0))
-                .with_parent(background)
-                .build();
-            gui.set_behaviour(
-                toggle,
-                Toggle::new(
+                .with_behaviour(Toggle::new(
                     background,
                     marker,
                     false,
@@ -437,8 +416,28 @@ fn main() {
                             ctx.deactive(bottom_text);
                         }
                     },
-                ),
-            );
+                ))
+                .build();
+
+            let background = {
+                let graphic = painel
+                    .clone()
+                    .with_color([200, 200, 200, 255])
+                    .with_border(0.0);
+                gui.create_control_reserved(background)
+                    .with_anchors([0.0, 0.5, 0.0, 0.5])
+                    .with_margins([5.0, -10.0, 25.0, 10.0])
+                    .with_graphic(graphic)
+                    .with_parent(toggle)
+                    .build()
+            };
+            let _marker = gui
+                .create_control_reserved(marker)
+                .with_anchors([0.5, 0.5, 0.5, 0.5])
+                .with_margins([-6.0, -6.0, 6.0, 6.0])
+                .with_graphic(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0))
+                .with_parent(background)
+                .build();
 
             let graphic =
                 Text::new([40, 40, 100, 255], "Bottom Text".to_owned(), 16.0, (-1, 0)).into();
@@ -453,9 +452,16 @@ fn main() {
         };
         let _my_dropdown = {
             let float_menu = {
-                let blocker = gui.create_control().with_active(false).build();
-                let menu = gui
+                let menu = gui.reserve_id();
+                let blocker = gui
                     .create_control()
+                    .with_active(false)
+                    .with_behaviour(Blocker::new(move |_, ctx| {
+                        ctx.send_event_to(menu, CloseMenu)
+                    }))
+                    .build();
+                let menu = gui
+                    .create_control_reserved(menu)
                     .with_active(false)
                     .with_graphic(button_style.normal.clone())
                     .with_behaviour(DropMenu::<String, _>::new(blocker, {
@@ -484,35 +490,15 @@ fn main() {
                     .with_layout(VBoxLayout::new(0.0, [1.0, 1.0, 1.0, 1.0], -1))
                     .with_min_size([0.0, 80.0])
                     .build();
-                gui.set_behaviour(
-                    blocker,
-                    Blocker::new(move |_, ctx| ctx.send_event_to(menu, CloseMenu)),
-                );
                 menu
             };
 
+            let text = gui.reserve_id();
             let my_dropdown = gui
                 .create_control()
                 .with_min_size([0.0, 25.0])
                 .with_parent(menu)
-                .build();
-            let text = gui
-                .create_control()
-                .with_margins([10.0, 0.0, -10.0, 0.0])
-                .with_graphic(
-                    Text::new(
-                        [40, 40, 100, 255],
-                        "Select one, please".to_owned(),
-                        16.0,
-                        (-1, 0),
-                    )
-                    .into(),
-                )
-                .with_parent(my_dropdown)
-                .build();
-            gui.set_behaviour(
-                my_dropdown,
-                Dropdown::new(
+                .with_behaviour(Dropdown::new(
                     vec![
                         "Item A".to_string(),
                         "Item B".to_string(),
@@ -526,8 +512,22 @@ fn main() {
                         ctx.get_graphic_mut(text).set_text(&selected.1);
                     },
                     button_style.clone(),
-                ),
-            );
+                ))
+                .build();
+            let _text = gui
+                .create_control_reserved(text)
+                .with_margins([10.0, 0.0, -10.0, 0.0])
+                .with_graphic(
+                    Text::new(
+                        [40, 40, 100, 255],
+                        "Select one, please".to_owned(),
+                        16.0,
+                        (-1, 0),
+                    )
+                    .into(),
+                )
+                .with_parent(my_dropdown)
+                .build();
 
             my_dropdown
         };
@@ -766,26 +766,14 @@ fn main() {
                 .with_layout(FitText)
                 .with_parent(hbox)
                 .build();
+            let caret = gui.reserve_id();
+            let input_text = gui.reserve_id();
             let input_box = gui
                 .create_control()
                 .with_min_size([0.0, 24.0])
                 .with_parent(hbox)
                 .with_expand_x(true)
-                .build();
-            let caret = gui
-                .create_control()
-                .with_anchors([0.0, 0.0, 0.0, 0.0])
-                .with_graphic(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0))
-                .with_parent(input_box)
-                .build();
-            let input_text = gui
-                .create_control()
-                .with_graphic(Text::new([0, 0, 0, 255], String::new(), 16.0, (-1, 0)).into())
-                .with_parent(input_box)
-                .build();
-            gui.set_behaviour(
-                input_box,
-                TextField::new(
+                .with_behaviour(TextField::new(
                     "".into(),
                     caret,
                     input_text,
@@ -810,27 +798,29 @@ fn main() {
                             true
                         }
                     },
-                ),
-            );
+                ))
+                .build();
+            let _caret = gui
+                .create_control_reserved(caret)
+                .with_anchors([0.0, 0.0, 0.0, 0.0])
+                .with_graphic(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0))
+                .with_parent(input_box)
+                .build();
+            let _input_text = gui
+                .create_control_reserved(input_text)
+                .with_graphic(Text::new([0, 0, 0, 255], String::new(), 16.0, (-1, 0)).into())
+                .with_parent(input_box)
+                .build();
             input_box
         };
-        let scroll_view = gui
-            .create_control()
-            .with_graphic(
-                painel
-                    .clone()
-                    .with_color([100, 100, 100, 255])
-                    .with_border(0.0),
-            )
-            .with_expand_y(true)
-            .with_parent(page_3)
-            .build();
+        let scroll_view = gui.reserve_id();
         let view = gui
             .create_control()
             .with_graphic(Graphic::None)
             .with_parent(scroll_view)
             .with_layout(ViewLayout::new(true, true))
             .build();
+        let h_scroll_bar_handle = gui.reserve_id();
         let h_scroll_bar = gui
             .create_control()
             .with_min_size([20.0, 20.0])
@@ -840,10 +830,16 @@ fn main() {
                     .with_color([150, 150, 150, 255])
                     .with_border(0.0),
             )
+            .with_behaviour(ScrollBar::new(
+                h_scroll_bar_handle,
+                scroll_view,
+                false,
+                button_style.clone(),
+            ))
             .with_parent(scroll_view)
             .build();
         let h_scroll_bar_handle = gui
-            .create_control()
+            .create_control_reserved(h_scroll_bar_handle)
             .with_graphic(
                 painel
                     .clone()
@@ -852,15 +848,7 @@ fn main() {
             )
             .with_parent(h_scroll_bar)
             .build();
-        gui.set_behaviour(
-            h_scroll_bar,
-            ScrollBar::new(
-                h_scroll_bar_handle,
-                scroll_view,
-                false,
-                button_style.clone(),
-            ),
-        );
+        let v_scroll_bar_handle = gui.reserve_id();
         let v_scroll_bar = gui
             .create_control()
             .with_min_size([20.0, 20.0])
@@ -871,9 +859,15 @@ fn main() {
                     .with_border(0.0),
             )
             .with_parent(scroll_view)
+            .with_behaviour(ScrollBar::new(
+                v_scroll_bar_handle,
+                scroll_view,
+                true,
+                button_style.clone(),
+            ))
             .build();
         let v_scroll_bar_handle = gui
-            .create_control()
+            .create_control_reserved(v_scroll_bar_handle)
             .with_graphic(
                 painel
                     .clone()
@@ -882,25 +876,29 @@ fn main() {
             )
             .with_parent(v_scroll_bar)
             .build();
-        gui.set_behaviour(
-            v_scroll_bar,
-            ScrollBar::new(v_scroll_bar_handle, scroll_view, true, button_style.clone()),
-        );
         let list = gui
             .create_control_reserved(list)
             .with_layout(VBoxLayout::new(3.0, [5.0, 5.0, 5.0, 5.0], -1))
             .with_parent(view)
             .build();
 
-        let behaviour = ScrollView::new(
-            view,
-            list,
-            Some((h_scroll_bar, h_scroll_bar_handle)),
-            Some((v_scroll_bar, v_scroll_bar_handle)),
-        );
-        let behaviour = Rc::new(RefCell::new(behaviour));
-        gui.set_behaviour(scroll_view, behaviour.clone());
-        gui.set_layout(scroll_view, behaviour);
+        let _scroll_view = gui
+            .create_control_reserved(scroll_view)
+            .with_graphic(
+                painel
+                    .clone()
+                    .with_color([100, 100, 100, 255])
+                    .with_border(0.0),
+            )
+            .with_expand_y(true)
+            .with_parent(page_3)
+            .with_behaviour_and_layout(ScrollView::new(
+                view,
+                list,
+                Some((h_scroll_bar, h_scroll_bar_handle)),
+                Some((v_scroll_bar, v_scroll_bar_handle)),
+            ))
+            .build();
 
         let mut seed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1209,13 +1207,12 @@ fn create_button<F: Fn(Id, &mut Context) + 'static>(
     on_click: F,
 ) -> ControlBuilder {
     let button_id: Id = gui.reserve_id();
-    let _text = gui
-        .create_control()
-        .with_parent(button_id)
-        .with_graphic(Text::new([40, 40, 100, 255], text, 16.0, (0, 0)).into())
-        .with_layout(FitText)
-        .build();
     gui.create_control_reserved(button_id)
+        .with_child(|x| {
+            // text
+            x.with_graphic(Text::new([40, 40, 100, 255], text, 16.0, (0, 0)).into())
+                .with_layout(FitText)
+        })
         .with_behaviour(Button::new(button_style, on_click))
     // .with_layout(Box::new(MarginLayout::new([7.0, 7.0, 7.0, 7.0])))
 }

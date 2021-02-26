@@ -40,6 +40,8 @@ impl<F: Fn(Id, &mut Context, bool)> Behaviour for Toggle<F> {
         (self.on_change)(this, ctx, self.enable);
         ctx.set_graphic(this, self.background_style.normal.clone());
         ctx.set_graphic(self.button, self.button_style.normal.clone());
+        let graphic = ctx.get_graphic_mut(self.button);
+        graphic.set_color([200, 200, 200, 255]);
         if self.enable {
             ctx.get_graphic_mut(self.marker).set_alpha(255)
         } else {
@@ -47,7 +49,7 @@ impl<F: Fn(Id, &mut Context, bool)> Behaviour for Toggle<F> {
         }
     }
 
-    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
         if let Some(SetValue(x)) = event.downcast_ref() {
             self.enable = *x;
             (self.on_change)(this, ctx, self.enable);

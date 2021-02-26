@@ -1,10 +1,6 @@
-use crate::{
-    context::{Context, LayoutContext, MinSizeContext},
-    render::Graphic,
-    Control, ControlBuild, ControlBuilder, Controls, LayoutDirtyFlags, Rect,
-};
+use crate::{Control, ControlBuilder, ControlState, Controls, LayoutDirtyFlags, Rect, context::{Context, LayoutContext, MinSizeContext}, control::ControlBuilderInner, render::Graphic};
 use ab_glyph::FontArc;
-use std::{any::Any, num::NonZeroU32};
+use std::{any::Any, mem, num::NonZeroU32};
 use winit::{
     event::{ElementState, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
     window::CursorIcon,
@@ -26,6 +22,9 @@ pub mod event {
     pub struct RemoveControl {
         pub id: Id,
     }
+    pub struct CreateControl {
+        pub id: Id,
+    }
     pub struct SetValue<T>(pub T);
 
     pub struct ToggleChanged {
@@ -34,17 +33,16 @@ pub mod event {
     }
 }
 
-pub const ROOT_ID: Id = Id {
-    index: 0,
-    generation: unsafe { NonZeroU32::new_unchecked(1) },
-};
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Id {
     pub(crate) index: u32,
     pub(crate) generation: NonZeroU32,
 }
 impl Id {
+    pub const ROOT_ID: Id = Id {
+        index: 0,
+        generation: unsafe { NonZeroU32::new_unchecked(1) },
+    };
     /// Get the index of the control in the controls vector inside GUI<R>
     pub fn index(&self) -> usize {
         self.index as usize
@@ -53,6 +51,19 @@ impl Id {
     pub fn generation(&self) -> u32 {
         self.generation.get()
     }
+}
+impl std::fmt::Display for Id {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.generation, self.index)
+    }
+}
+
+#[allow(clippy::clippy::enum_variant_names)]
+enum LazyEvent {
+    OnStart(Id),
+    OnRemove(Id),
+    OnActive(Id),
+    OnDeactive(Id),
 }
 
 // pub struct Mouse {
@@ -97,7 +108,7 @@ pub enum KeyboardEvent {
 struct Input {
     mouse_x: f32,
     mouse_y: f32,
-    // TODO: this was used when a control is deactive under the mouse. It is really necessary
+    // TODO: this was used when a control is deactive under the mouse. It is really necessary?
     // mouse_invalid: bool
 }
 
@@ -106,6 +117,10 @@ pub struct GUI {
     pub(crate) fonts: Vec<FontArc>,
     pub(crate) modifiers: ModifiersState,
     redraw: bool,
+    // controls that need to update the layout
+    dirty_layouts: Vec<Id>,
+    // controls that 'on_start' need be called
+    lazy_events: Vec<LazyEvent>,
     change_cursor: Option<CursorIcon>,
     input: Input,
     current_mouse: Option<Id>,
@@ -132,6 +147,8 @@ impl GUI {
             }]
             .into(),
             redraw: true,
+            dirty_layouts: Vec::new(),
+            lazy_events: Vec::new(),
             change_cursor: None,
             input: Input::default(),
             current_mouse: None,
@@ -155,62 +172,53 @@ impl GUI {
     }
 
     pub fn create_control(&mut self) -> ControlBuilder {
-        ControlBuilder::new(Box::new(move |build| self.add_control(build)))
+        let id = self.reserve_id();
+        self.create_control_reserved(id)
     }
 
     /// Create a control with a predetermined id, id that can be obtained by the method reserve_id().
     pub fn create_control_reserved(&mut self, reserved_id: Id) -> ControlBuilder {
-        ControlBuilder::new(Box::new(move |build| {
-            self.add_control_reserved(build, reserved_id)
-        }))
+        struct Builder<'a>(&'a mut GUI);
+        impl ControlBuilderInner for Builder<'_> {
+            fn controls(&mut self) -> &mut Controls {
+                &mut self.0.controls
+            }
+            fn build(&mut self, id: Id) {
+                self.0.add_control(id);
+            }
+        }
+
+        ControlBuilder::new(
+            reserved_id,
+            Builder(self)
+        )
     }
 
-    fn add_control(&mut self, build: ControlBuild) -> Id {
-        let reserve = self.controls.reserve();
-        self.add_control_reserved(build, reserve)
-    }
+    fn add_control(&mut self, id: Id) -> Id {
+        if self.controls[id].state == ControlState::Building {
+            println!("add control {}", id);
+            self.dirty_layout(id);
+            self.controls[id].state = ControlState::Started;
+            assert_eq!(self.controls[id].generation, id.generation);
+            let has_behaviour = self.controls[id].behaviour.is_some();
+            let active = self.controls[id].really_active;
+            if has_behaviour {
+                self.lazy_events.push(LazyEvent::OnStart(id));
+            }
 
-    fn add_control_reserved(&mut self, build: ControlBuild, reserve: Id) -> Id {
-        let ControlBuild {
-            rect,
-            graphic,
-            behaviour,
-            layout,
-            parent,
-            active,
-        } = build;
-        let this = reserve;
-        let has_behaviour = behaviour.is_some();
-
-        let mut control = &mut self.controls[this];
-        control.rect = rect;
-        control.graphic = graphic;
-        control.behaviour = behaviour;
-        control.layout = layout;
-        control.parent = parent;
-        // control.active = active;
-
-        assert_eq!(control.generation, this.generation);
-
-        if let Some(parent) = control.parent {
-            self.controls[parent].add_child(this);
+            if active {
+                self.lazy_events.push(LazyEvent::OnActive(id));
+            }
+    
+            for child in self.controls[id].children.clone() {
+                println!("add child {}", child);
+                self.add_control(child);
+            }
         } else {
-            control.parent = Some(ROOT_ID);
-            self.controls[ROOT_ID].add_child(this);
+            println!("double add {}", id);
         }
 
-        if has_behaviour {
-            self.call_event(this, |this, id, ctx| this.on_start(id, ctx));
-        }
-
-        if active {
-            self.active_control(this);
-            // TODO: update the layout uncessary after each control added,
-            // make layout resolution be O(n^2). update_layout must be called lazily.
-            self.update_layout(this);
-        }
-        
-        this
+        id
     }
 
     pub fn active_control(&mut self, id: Id) {
@@ -220,8 +228,9 @@ impl GUI {
         self.controls[id].active = true;
 
         if let Some(parent) = self.get_parent(id) {
-            self.update_layout(parent);
+            self.dirty_layout(parent);
         }
+
         if self
             .get_parent(id)
             .map(|x| self.controls[x].really_active)
@@ -232,10 +241,10 @@ impl GUI {
             while let Some(id) = parents.pop() {
                 parents.extend(self.get_children(id).iter().rev());
                 self.controls[id].really_active = true;
-                self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
+                self.lazy_events.push(LazyEvent::OnActive(id));
             }
         }
-        // uncommenting the line below allow infinity recursion to happen
+        // TODO: uncommenting the line below allow infinity recursion to happen
         // self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
     }
 
@@ -246,7 +255,7 @@ impl GUI {
         self.controls[id].active = false;
 
         if let Some(parent) = self.get_parent(id) {
-            self.update_layout(parent);
+            self.dirty_layout(parent);
         }
         if self
             .get_parent(id)
@@ -258,7 +267,10 @@ impl GUI {
             while let Some(id) = parents.pop() {
                 parents.extend(self.get_children(id).iter().rev());
                 if Some(id) == self.current_mouse {
-                    self.send_mouse_event_to(id, MouseEvent::Exit);
+                    self.update_layout();
+                    if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
+                        this.on_mouse_event(MouseEvent::Exit, id, &mut ctx);
+                    }
                     self.current_mouse = None;
                 }
                 if Some(id) == self.current_scroll {
@@ -268,7 +280,7 @@ impl GUI {
                     self.set_focus(None);
                 }
                 self.controls[id].really_active = false;
-                self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
+                self.lazy_events.push(LazyEvent::OnDeactive(id));
             }
         }
         // uncommenting the line below allow infinity recursion to happen
@@ -277,44 +289,7 @@ impl GUI {
 
     /// Remove a control and all of its children
     pub fn remove_control(&mut self, id: Id) {
-        if self.controls[id].active {
-            self.controls[id].active = false;
-            if let Some(parent) = self.get_parent(id) {
-                self.update_layout(parent);
-            }
-        }
-        if let Some(parent) = self.controls[id].parent {
-            let children = &mut self.controls[parent].children;
-            if let Some(pos) = children.iter().position(|x| *x == id) {
-                children.remove(pos);
-            }
-        }
-
-        let mut parents = vec![id];
-        while let Some(id) = parents.pop() {
-            parents.extend(self.get_children(id).iter().rev());
-
-            if Some(id) == self.current_mouse {
-                self.send_mouse_event_to(id, MouseEvent::Exit);
-                self.current_mouse = None;
-            }
-            if Some(id) == self.current_scroll {
-                self.current_scroll = None;
-            }
-            if Some(id) == self.current_focus {
-                self.set_focus(None);
-            }
-            if self.controls[id].really_active {
-                self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
-            }
-        }
-        let mut parents = vec![id];
-        while let Some(id) = parents.pop() {
-            parents.extend(self.get_children(id).iter().rev());
-            self.controls.remove(id);
-        }
-        // uncommenting the line below allow infinity recursion to happen
-        // self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
+        self.lazy_events.push(LazyEvent::OnRemove(id));
     }
 
     pub fn get_fonts(&mut self) -> Vec<FontArc> {
@@ -331,6 +306,7 @@ impl GUI {
 
     #[inline]
     pub fn get_context(&mut self) -> Context {
+        self.lazy_update();
         //TODO: Context -> RenderContext
         self.redraw = false;
         Context::new(self)
@@ -353,18 +329,7 @@ impl GUI {
             self.send_event_to(id, event);
         }
         for dirty in dirtys.drain(..) {
-            self.update_layout(dirty);
-        }
-    }
-
-    pub fn set_behaviour<T: Behaviour + 'static>(&mut self, id: Id, behaviour: T) {
-        if self.controls[id].really_active {
-            self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
-        }
-        self.controls[id].set_behaviour(Box::new(behaviour));
-        self.call_event(id, |this, id, ctx| this.on_start(id, ctx));
-        if self.controls[id].really_active {
-            self.call_event(id, |this, id, ctx| this.on_active(id, ctx));
+            self.dirty_layout(dirty);
         }
     }
 
@@ -381,10 +346,10 @@ impl GUI {
     }
 
     pub fn resize(&mut self, width: f32, height: f32) {
-        self.controls[ROOT_ID]
+        self.controls[Id::ROOT_ID]
             .rect
             .set_rect([0.0, 0.0, width, height]);
-        self.update_layout(ROOT_ID);
+        self.dirty_layout(Id::ROOT_ID);
     }
 
     pub fn send_event(&mut self, event: Box<dyn Any>) {
@@ -400,9 +365,8 @@ impl GUI {
             self.over_is_locked = false;
         } else if let Some(event::RequestFocus { id }) = event.downcast_ref() {
             self.set_focus(Some(*id));
-        } else if event.is::<(Id, ControlBuild)>() {
-            let (id, build) = *event.downcast::<(Id, ControlBuild)>().unwrap();
-            self.add_control_reserved(build, id);
+        } else if let Some(event::CreateControl { id }) = event.downcast_ref() {
+            self.add_control(*id);
         } else if let Some(cursor) = event.downcast_ref::<CursorIcon>() {
             self.change_cursor = Some(*cursor);
         }
@@ -411,12 +375,14 @@ impl GUI {
     // TODO: there should not be a public function which receive Box<...>
     // (specially when there is identical funtcion that is generic)
     pub fn send_event_to(&mut self, id: Id, event: Box<dyn Any>) {
+        self.lazy_update();
         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
-            this.on_event(event.as_ref(), id, &mut ctx);
+            this.on_event(event, id, &mut ctx);
         }
     }
 
     pub fn call_event<F: Fn(&mut dyn Behaviour, Id, &mut Context)>(&mut self, id: Id, event: F) {
+        self.lazy_update();
         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
             event(this, id, &mut ctx);
         }
@@ -427,6 +393,7 @@ impl GUI {
         id: Id,
         event: F,
     ) -> bool {
+        self.lazy_update();
         let mut handled = false;
         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
             handled = event(this, id, &mut ctx);
@@ -448,7 +415,7 @@ impl GUI {
             let len = childs.len();
             for (i, child) in childs.iter().enumerate() {
                 println!(
-                    "{}{}━━{:?}",
+                    "{}{}━━{}",
                     "┃  ".repeat(deep),
                     if i + 1 == len { "┗" } else { "┣" },
                     child
@@ -456,11 +423,12 @@ impl GUI {
                 print_tree(deep + 1, *child, gui)
             }
         }
-        println!("{:?}", ROOT_ID);
-        print_tree(0, ROOT_ID, self);
+        println!("{:?}", Id::ROOT_ID);
+        print_tree(0, Id::ROOT_ID, self);
     }
 
     pub fn handle_event(&mut self, event: &WindowEvent) {
+        self.lazy_update();
         match event {
             WindowEvent::CursorMoved { position, .. } => {
                 self.input.mouse_x = position.x as f32;
@@ -582,10 +550,12 @@ impl GUI {
         if let (Some(prev), Some(next)) = (self.current_focus, id) {
             let lca = self.controls.lowest_common_ancestor(prev, next);
 
+            // call on_focus_change(false, ...) only for the controls that lost focus
             let mut curr = Some(prev);
             if curr != lca {
                 while let Some(id) = curr {
                     self.call_event(id, |this, id, ctx| this.on_focus_change(false, id, ctx));
+                    self.controls[id].focus = false;
                     curr = self.get_parent(id);
                     if curr == lca {
                         break;
@@ -595,28 +565,28 @@ impl GUI {
 
             self.current_focus = Some(next);
 
+            // call on_focus_change(true, ...) for all control with focus
             let mut curr = Some(next);
-            if curr != lca {
-                while let Some(id) = curr {
-                    self.call_event(id, |this, id, ctx| this.on_focus_change(true, id, ctx));
-                    curr = self.get_parent(id);
-                    if curr == lca {
-                        break;
-                    }
-                }
+            while let Some(id) = curr {
+                self.call_event(id, |this, id, ctx| this.on_focus_change(true, id, ctx));
+                self.controls[id].focus = true;
+                curr = self.get_parent(id);
             }
-        } else if let Some(current_keyboard) = self.current_focus {
-            self.current_focus = None;
-            self.call_event_chain(current_keyboard, |this, id, ctx| {
-                this.on_focus_change(false, id, ctx);
-                true
-            });
-        } else if let Some(current_keyboard) = id {
-            self.current_focus = Some(current_keyboard);
-            self.call_event_chain(current_keyboard, |this, id, ctx| {
-                this.on_focus_change(true, id, ctx);
-                true
-            });
+        } else if let Some(current_focus) = self.current_focus {
+            let mut curr = Some(current_focus);
+            while let Some(id) = curr {
+                self.call_event(id, |this, id, ctx| this.on_focus_change(false, id, ctx));
+                self.controls[id].focus = false;
+                curr = self.get_parent(id);
+            }
+        } else if let Some(current_focus) = id {
+            self.current_focus = Some(current_focus);
+            let mut curr = Some(current_focus);
+            while let Some(id) = curr {
+                self.call_event(id, |this, id, ctx| this.on_focus_change(true, id, ctx));
+                self.controls[id].focus = true;
+                curr = self.get_parent(id);
+            }
         }
     }
 
@@ -632,7 +602,7 @@ impl GUI {
             return;
         }
 
-        let mut curr = ROOT_ID;
+        let mut curr = Id::ROOT_ID;
         let mut curr_mouse = None;
         'l: loop {
             if let Some(flags) = self.controls[curr]
@@ -685,12 +655,127 @@ impl GUI {
         }
     }
 
+    // TODO: think more carefully in what functions must be public
     pub fn send_mouse_event_to(&mut self, id: Id, event: MouseEvent) {
         self.call_event(id, |this, id, ctx| this.on_mouse_event(event, id, ctx));
     }
 
-    pub fn update_layout(&mut self, mut id: Id) {
+    pub fn dirty_layout(&mut self, id: Id) {
+        self.dirty_layouts.push(id);
         self.redraw = true;
+    }
+
+    fn lazy_update(&mut self) {
+        println!("lazy update");
+        loop {
+            for event in mem::replace(&mut self.lazy_events, Vec::new()) {
+                match event {
+                    LazyEvent::OnStart(id) => {
+                        // TODO: on_start must receive a context that do not exposure the broke layout
+                        println!("starting {}", id.index());
+                        if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
+                            this.on_start(id, &mut ctx);
+                        }
+                    }
+                    LazyEvent::OnRemove(id) => {
+                        if self.controls.get(id).is_none() {
+                            println!("removing a already removed");
+                            continue;
+                        }
+                        if self.controls[id].active {
+                            self.controls[id].active = false;
+                            if let Some(parent) = self.get_parent(id) {
+                                self.dirty_layout(parent);
+                            }
+                        }
+                        if let Some(parent) = self.controls[id].parent {
+                            let children = &mut self.controls[parent].children;
+                            if let Some(pos) = children.iter().position(|x| *x == id) {
+                                children.remove(pos);
+                            }
+                        }
+
+                        let mut parents = vec![id];
+                        while let Some(id) = parents.pop() {
+                            parents.extend(self.get_children(id).iter().rev());
+
+                            if Some(id) == self.current_mouse {
+                                self.update_layout();
+                                if let Some((this, mut ctx)) =
+                                    Context::new_with_mut_behaviour(id, self)
+                                {
+                                    this.on_mouse_event(MouseEvent::Exit, id, &mut ctx);
+                                }
+                                self.current_mouse = None;
+                            }
+                            if Some(id) == self.current_scroll {
+                                self.current_scroll = None;
+                            }
+                            if Some(id) == self.current_focus {
+                                self.set_focus(None);
+                            }
+
+                            println!("removing {}", id.index());
+                            if self.controls[id].really_active {
+                                self.update_layout();
+                                if let Some((this, mut ctx)) =
+                                    Context::new_with_mut_behaviour(id, self)
+                                {
+                                    this.on_deactive(id, &mut ctx);
+                                }
+                            }
+                        }
+                        let mut parents = vec![id];
+                        while let Some(id) = parents.pop() {
+                            parents.extend(self.get_children(id).iter().rev());
+                            self.controls.remove(id);
+                        }
+                        // uncommenting the line below allow infinity recursion to happen
+                        // self.mouse_moved(self.input.mouse_x, self.input.mouse_y);
+                    }
+                    LazyEvent::OnActive(id) => {
+                        if self.controls.get(id).is_none() {
+                            println!("activing a already removed");
+                            continue;
+                        }
+                        self.update_layout();
+                        println!("activing {}", id.index());
+                        if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
+                            this.on_active(id, &mut ctx);
+                        }
+                    }
+                    LazyEvent::OnDeactive(id) => {
+                        if self.controls.get(id).is_none() {
+                            println!("deactiving a already removed");
+                            continue;
+                        }
+                        self.update_layout();
+                        println!("deactiving {}", id.index());
+                        if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
+                            this.on_deactive(id, &mut ctx);
+                        }
+                    }
+                }
+            }
+
+            self.update_layout();
+
+            if self.lazy_events.is_empty() {
+                break;
+            }
+            println!("lopping!");
+        }
+    }
+
+    pub fn update_layout(&mut self) {
+        if !self.dirty_layouts.is_empty() {
+            println!("updating layout for {}", self.dirty_layouts.len());
+            self.dirty_layouts.clear();
+            self.update_all_layouts();
+        }
+    }
+
+    pub fn update_one_layout(&mut self, mut id: Id) {
         // if min_size is dirty and parent has layout, update parent min_size, and recurse it
         // from the highter parent, update layout of its children. For each dirty chldren, update them, recursivily
 
@@ -732,7 +817,7 @@ impl GUI {
         let mut parents = vec![id];
         while let Some(id) = parents.pop() {
             {
-                let (layout, mut ctx) = LayoutContext::new(id, &mut self.controls);
+                let (layout, mut ctx) = LayoutContext::new(id, &mut self.controls, &self.fonts);
                 layout.update_layouts(id, &mut ctx);
                 let LayoutContext { events, dirtys, .. } = ctx;
                 for event in events {
@@ -743,6 +828,43 @@ impl GUI {
                     } else if let Some(event::ActiveControl { id }) = event.downcast_ref() {
                         // self.active_control(*id)
                         self.controls[*id].active = true;
+                    } else if let Some(event::RemoveControl { id }) = event.downcast_ref() {
+                        // TODO: this need more thinking
+                        let id = *id;
+                        self.controls[id].active = false;
+                        if let Some(parent) = self.controls[id].parent {
+                            let children = &mut self.controls[parent].children;
+                            if let Some(pos) = children.iter().position(|x| *x == id) {
+                                children.remove(pos);
+                            }
+                        }
+
+                        let mut parents = vec![id];
+                        while let Some(id) = parents.pop() {
+                            parents.extend(self.get_children(id).iter().rev());
+
+                            // TODO: this comment-out's are probaly buggy
+                            if Some(id) == self.current_mouse {
+                                // self.send_mouse_event_to(id, MouseEvent::Exit);
+                                self.current_mouse = None;
+                            }
+                            if Some(id) == self.current_scroll {
+                                self.current_scroll = None;
+                            }
+                            if Some(id) == self.current_focus {
+                                // self.set_focus(None);
+                            }
+                            if self.controls[id].really_active {
+                                // self.call_event(id, |this, id, ctx| this.on_deactive(id, ctx));
+                            }
+                        }
+                        let mut parents = vec![id];
+                        while let Some(id) = parents.pop() {
+                            parents.extend(self.get_children(id).iter().rev());
+                            self.controls.remove(id);
+                        }
+                    } else if let Some(event::CreateControl { id }) = event.downcast_ref() {
+                        self.add_control(*id);
                     }
                 }
                 for dirty in dirtys {
@@ -773,8 +895,7 @@ impl GUI {
     }
 
     pub fn update_all_layouts(&mut self) {
-        self.redraw = true;
-        let mut parents = vec![ROOT_ID];
+        let mut parents = vec![Id::ROOT_ID];
 
         // post order traversal
         let mut i = 0;
@@ -783,33 +904,33 @@ impl GUI {
             i += 1;
         }
         while let Some(parent) = parents.pop() {
-            {
-                let (layout, mut ctx) =
-                    MinSizeContext::new(parent, &mut self.controls, &self.fonts);
-                let mut min_size = layout.compute_min_size(parent, &mut ctx);
-                let user_min_size = self.controls[parent].rect.user_min_size;
-                min_size[0] = min_size[0].max(user_min_size[0]);
-                min_size[1] = min_size[1].max(user_min_size[1]);
-                self.controls[parent].rect.min_size = min_size;
-            }
+            let (layout, mut ctx) =
+                MinSizeContext::new(parent, &mut self.controls, &self.fonts);
+            let mut min_size = layout.compute_min_size(parent, &mut ctx);
+            let user_min_size = self.controls[parent].rect.user_min_size;
+            min_size[0] = min_size[0].max(user_min_size[0]);
+            min_size[1] = min_size[1].max(user_min_size[1]);
+            self.controls[parent].rect.min_size = min_size;
         }
 
         // parents is empty now
 
         // inorder traversal
-        parents.push(ROOT_ID);
+        parents.push(Id::ROOT_ID);
         while let Some(parent) = parents.pop() {
             {
-                let (layout, mut ctx) = LayoutContext::new(parent, &mut self.controls);
+                let (layout, mut ctx) = LayoutContext::new(parent, &mut self.controls, &self.fonts);
                 layout.update_layouts(parent, &mut ctx);
                 for event in ctx.events {
                     //TODO: think carefully about this deactives
                     if let Some(event::DeactiveControl { id }) = event.downcast_ref() {
-                        // self.deactive_control(*id)
-                        self.controls[*id].active = false;
+                        self.deactive_control(*id)
                     } else if let Some(event::ActiveControl { id }) = event.downcast_ref() {
-                        // self.active_control(*id)
-                        self.controls[*id].active = true;
+                        self.active_control(*id)
+                    } else if let Some(event::RemoveControl { id }) = event.downcast_ref() {
+                        self.remove_control(*id);
+                    } else if let Some(event::CreateControl { id }) = event.downcast_ref() {
+                        self.add_control(*id);
                     }
                 }
             }
@@ -836,7 +957,7 @@ pub trait Behaviour {
         InputFlags::empty()
     }
 
-    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {}
+    fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {}
 
     fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {}
 
@@ -858,7 +979,7 @@ pub trait Layout {
     }
     /// Update the position and size of its children.
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
-        let rect = ctx.get_rect(this);
+        let rect = *ctx.get_rect(this);
         let size = [rect[2] - rect[0], rect[3] - rect[1]];
         let pos: [f32; 2] = [rect[0], rect[1]];
         for child in ctx.get_children(this) {
@@ -906,7 +1027,7 @@ impl<T: Behaviour> Behaviour for std::rc::Rc<std::cell::RefCell<T>> {
         self.as_ref().borrow_mut().on_deactive(this, ctx)
     }
 
-    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
         self.as_ref().borrow_mut().on_event(event, this, ctx)
     }
 

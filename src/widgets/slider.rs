@@ -86,7 +86,7 @@ impl<C: SliderCallback> Behaviour for Slider<C> {
         ctx.set_graphic(this, self.style.normal.clone());
     }
 
-    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
         if let Some(SetMaxValue(x)) = event.downcast_ref::<SetMaxValue>() {
             self.max = *x;
             self.set_handle_pos(this, ctx);

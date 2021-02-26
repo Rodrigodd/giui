@@ -3,7 +3,10 @@ use std::any::Any;
 use ab_glyph::FontArc;
 use winit::{event::ModifiersState, window::CursorIcon};
 
-use crate::{event, render::Graphic, Behaviour, ControlBuilder, Controls, Id, Layout, Rect, GUI};
+use crate::{
+    control::ControlBuilderInner, event, render::Graphic, Behaviour, ControlBuilder, Controls, Id,
+    Layout, Rect, GUI,
+};
 
 // contains a reference to all the controls, except the behaviour of one control
 pub struct Context<'a> {
@@ -37,7 +40,6 @@ impl<'a> Context<'a> {
             fonts,
             events: Vec::new(),
             events_to: Vec::new(),
-
             dirtys: Vec::new(),
             render_dirty: false,
         }
@@ -50,26 +52,23 @@ impl<'a> Context<'a> {
         let this_one = unsafe {
             &mut *(gui.controls[this].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
         };
-        let fonts = unsafe { std::mem::transmute(gui.fonts.as_slice()) };
-        Some((
-            this_one,
-            Self {
-                gui,
-                fonts,
-                events: Vec::new(),
-                events_to: Vec::new(),
-                dirtys: Vec::new(),
-                render_dirty: false,
-            },
-        ))
+        Some((this_one, Self::new(gui)))
     }
 
     pub fn create_control(&mut self) -> ControlBuilder {
         let id = self.gui.controls.reserve();
-        ControlBuilder::new(Box::new(move |build| {
-            self.send_event((id, build));
-            id
-        }))
+
+        struct Builder<'a, 'b>(&'b mut Context<'a>);
+        impl ControlBuilderInner for Builder<'_, '_> {
+            fn controls(&mut self) -> &mut Controls {
+                &mut self.0.gui.controls
+            }
+            fn build(&mut self, id: Id) {
+                self.0.send_event(event::CreateControl { id });
+            }
+        }
+
+        ControlBuilder::new(id, Builder(self))
     }
 
     pub fn modifiers(&self) -> ModifiersState {
@@ -201,6 +200,10 @@ impl<'a> Context<'a> {
         self.gui.controls[id].active
     }
 
+    pub fn is_focus(&self, id: Id) -> bool {
+        self.gui.controls[id].focus
+    }
+
     /// This only took effect when Controls is dropped
     pub fn active(&mut self, id: Id) {
         self.events.push(Box::new(event::ActiveControl { id }));
@@ -274,14 +277,6 @@ impl<'a> MinSizeContext<'a> {
         &self.controls[id].rect
     }
 
-    pub fn get_rect(&self, id: Id) -> &[f32; 4] {
-        &self.controls[id].rect.rect
-    }
-
-    pub fn get_size(&mut self, id: Id) -> [f32; 2] {
-        self.controls[id].rect.get_size()
-    }
-
     pub fn get_margins(&self, id: Id) -> &[f32; 4] {
         &self.controls[id].rect.margins
     }
@@ -302,22 +297,22 @@ impl<'a> MinSizeContext<'a> {
         &mut self.controls[id].graphic
     }
 
-    pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
-        let control = &mut self.controls[id];
-        if let Graphic::None = control.graphic {
-            None
-        } else {
-            Some((&mut control.rect, &mut control.graphic))
-        }
-    }
+    // pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
+    //     let control = &mut self.controls[id];
+    //     if let Graphic::None = control.graphic {
+    //         None
+    //     } else {
+    //         Some((&mut control.rect, &mut control.graphic))
+    //     }
+    // }
 
     pub fn is_active(&self, id: Id) -> bool {
         self.controls[id].active
     }
 
-    pub fn get_parent(&self, id: Id) -> Option<Id> {
-        self.controls[id].parent
-    }
+    // pub fn get_parent(&self, id: Id) -> Option<Id> {
+    //     self.controls[id].parent
+    // }
 
     pub fn get_children(&self, id: Id) -> Vec<Id> {
         self.controls.get_children(id)
@@ -327,21 +322,60 @@ impl<'a> MinSizeContext<'a> {
 pub struct LayoutContext<'a> {
     this: Id,
     controls: &'a mut Controls,
+    fonts: &'a [FontArc],
     pub(crate) dirtys: Vec<Id>,
     pub(crate) events: Vec<Box<dyn Any>>,
 }
 impl<'a> LayoutContext<'a> {
-    pub(crate) fn new(this: Id, controls: &'a mut Controls) -> (&'a mut dyn Layout, Self) {
+    pub(crate) fn new(
+        this: Id,
+        controls: &'a mut Controls,
+        fonts: &'a [FontArc],
+    ) -> (&'a mut dyn Layout, Self) {
         let this_one = unsafe { &mut *(controls[this].layout.as_mut() as *mut dyn Layout) };
         (
             this_one,
             Self {
                 this,
                 controls,
+                fonts,
                 dirtys: Vec::new(),
                 events: Vec::new(),
             },
         )
+    }
+
+    pub fn create_control(&mut self) -> ControlBuilder {
+        let id = self.controls.reserve();
+
+        struct Builder<'a, 'b>(&'b mut LayoutContext<'a>);
+        impl ControlBuilderInner for Builder<'_, '_> {
+            fn controls(&mut self) -> &mut Controls {
+                &mut self.0.controls
+            }
+            fn build(&mut self, id: Id) {
+                self.0.events.push(Box::new(event::CreateControl { id }));
+
+                let mut parents = vec![id];
+                // post order traversal
+                let mut i = 0;
+                while i != parents.len() {
+                    parents.extend(self.0.get_children(parents[i]).iter().rev());
+                    i += 1;
+                }
+                while let Some(parent) = parents.pop() {
+                    let (layout, mut ctx) =
+                        MinSizeContext::new(parent, &mut self.0.controls, &self.0.fonts);
+                    let mut min_size = layout.compute_min_size(parent, &mut ctx);
+                    let user_min_size = self.0.controls[parent].rect.user_min_size;
+                    min_size[0] = min_size[0].max(user_min_size[0]);
+                    min_size[1] = min_size[1].max(user_min_size[1]);
+                    self.0.controls[parent].rect.min_size = min_size;
+                }
+            }
+        }
+
+        ControlBuilder::new(id, Builder(self))
     }
 
     pub fn set_rect(&mut self, id: Id, rect: [f32; 4]) {
@@ -458,6 +492,10 @@ impl<'a> LayoutContext<'a> {
     /// This only took effect when Controls is dropped
     pub fn deactive(&mut self, id: Id) {
         self.events.push(Box::new(event::DeactiveControl { id }));
+    }
+
+    pub fn remove(&mut self, id: Id) {
+        self.events.push(Box::new(event::RemoveControl { id }));
     }
 
     pub fn move_to_front(&mut self, id: Id) {

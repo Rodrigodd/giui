@@ -3,7 +3,7 @@ use core::f32;
 use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
 use ui_engine::{
     layouts::{GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    Behaviour, Context, Id, InputFlags, MouseEvent, GUI, ROOT_ID,
+    Behaviour, Context, Id, InputFlags, MouseEvent, GUI
 };
 
 #[derive(Default)]
@@ -83,7 +83,7 @@ fn build_random_gui(gui: &mut GUI, rng: &mut SmallRng) -> Vec<Id> {
                 rexp(rng, 100.0) as f32,
             ])
             .with_behaviour(AssertInvariant::default())
-            .with_parent(*ids.choose(rng).unwrap_or(&ROOT_ID));
+            .with_parent(*ids.choose(rng).unwrap_or(&Id::ROOT_ID));
         let builder = match rng.gen_range(0..=5) {
             0 => builder,
             1 => builder.with_layout(VBoxLayout::new(

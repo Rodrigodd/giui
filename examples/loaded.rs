@@ -336,7 +336,7 @@ impl<F: Fn(&mut Context, i32)> TextFieldCallback for NumberField<F> {
         }
     }
 
-    fn on_change(&mut self, _: Id, _: &mut Context, _: &mut String) {}
+    fn on_change(&mut self, _: Id, _: &mut Context, _: &String) {}
 
     fn on_unfocus(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool {
         self.on_submit(this, ctx, text)
@@ -476,7 +476,7 @@ impl OptionsGUI {
 
         this.create_menu_bar(surface, gui, proxy, style);
         let tab_selected = this.options.borrow().tab_selected;
-        this.create_tabs(surface, gui, tab_selected, style);
+        this.create_tabs(surface, gui, style);
         let page0_cont = gui
             .create_control()
             .with_graphic(
@@ -513,6 +513,8 @@ impl OptionsGUI {
 
         this.create_page1(gui, page1, style);
         this.create_popup(gui, style);
+
+        gui.send_event_to(this.tabs[tab_selected], Box::new(Select));
 
         this
     }
@@ -697,7 +699,6 @@ impl OptionsGUI {
         &self,
         surface: Id,
         gui: &mut GUI,
-        tab_selected: usize,
         style: &StyleSheet,
     ) -> Id {
         let line = gui
@@ -735,7 +736,6 @@ impl OptionsGUI {
         )
         .with_parent(line)
         .build();
-        gui.send_event_to(self.tabs[tab_selected], Box::new(Select));
         drop(tab_group);
         line
     }
@@ -1080,9 +1080,16 @@ impl OptionsGUI {
         callback: F,
     ) -> ControlBuilder<'a> {
         let float_menu = {
-            let blocker = gui.create_control().with_active(false).build();
-            let menu = gui
+            let menu = gui.reserve_id();
+            let blocker = gui
                 .create_control()
+                .with_active(false)
+                .with_behaviour(Blocker::new(move |_, ctx| {
+                    ctx.send_event_to(menu, CloseMenu)
+                }))
+                .build();
+            let menu = gui
+                .create_control_reserved(menu)
                 .with_active(false)
                 .with_graphic(style.button.normal.clone())
                 .with_behaviour(DropMenu::<String, _>::new(blocker, {
@@ -1111,10 +1118,6 @@ impl OptionsGUI {
                 .with_layout(VBoxLayout::new(0.0, [1.0, 1.0, 1.0, 1.0], -1))
                 .with_min_size([0.0, 80.0])
                 .build();
-            gui.set_behaviour(
-                blocker,
-                Blocker::new(move |_, ctx| ctx.send_event_to(menu, CloseMenu)),
-            );
             menu
         };
         let text = gui
@@ -1205,22 +1208,23 @@ fn scroll_view<'a>(
         .with_parent(scroll_view)
         .with_layout(ViewLayout::new(false, true))
         .build();
+    let v_scroll_bar_handle = gui.reserve_id();
     let v_scroll_bar = gui
         .create_control()
         .with_min_size([5.0, 5.0])
         .with_graphic(style.scroll_background.clone())
         .with_parent(scroll_view)
-        .build();
-    let v_scroll_bar_handle = gui.create_control().with_parent(v_scroll_bar).build();
-    gui.set_behaviour(
-        v_scroll_bar,
-        ScrollBar::new(
+        .with_behaviour(ScrollBar::new(
             v_scroll_bar_handle,
             scroll_view,
             true,
             style.scroll_handle.clone(),
-        ),
-    );
+        ))
+        .build();
+    let v_scroll_bar_handle = gui
+        .create_control_reserved(v_scroll_bar_handle)
+        .with_parent(v_scroll_bar)
+        .build();
 
     gui.get_context().set_parent(content, view);
 

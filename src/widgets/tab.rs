@@ -56,7 +56,6 @@ impl TabButton {
             }
             ctx.send_event_to(selected, Unselected);
         }
-        ctx.active(self.page);
         self.selected = true;
         self.tab_group.set_selected(Some(this), ctx);
         ctx.set_graphic(this, self.style.selected.clone());
@@ -77,7 +76,7 @@ impl Behaviour for TabButton {
         }
     }
 
-    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
         if event.is::<Unselected>() {
             self.unselect(this, ctx)
         } else if event.is::<Select>() {

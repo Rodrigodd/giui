@@ -135,7 +135,7 @@ impl Behaviour for MenuBehaviour {
         }
     }
 
-    fn on_event(&mut self, event: &dyn Any, _: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, _: Id, ctx: &mut Context) {
         if event.is::<ItemClicked>() {
             self.close_menu(ctx);
             ctx.send_event_to(self.owner, ItemClicked);
@@ -267,7 +267,7 @@ impl Behaviour for MenuBar {
         }
     }
 
-    fn on_event(&mut self, event: &dyn Any, _: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, _: Id, ctx: &mut Context) {
         if event.is::<ItemClicked>() || event.is::<CloseMenu>() {
             self.close_menu(ctx);
         }

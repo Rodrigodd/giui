@@ -1,14 +1,14 @@
 use crate::{
     event, style::ButtonStyle, Behaviour, Context, Id, InputFlags, KeyboardEvent, Layout,
-    LayoutContext, MinSizeContext, MouseButton, MouseEvent, ROOT_ID,
+    LayoutContext, MinSizeContext, MouseButton, MouseEvent,
 };
 
 use std::{any::Any, rc::Rc};
 use winit::event::VirtualKeyCode;
 
-struct SetScrollPosition {
-    vertical: bool,
-    value: f32,
+pub struct SetScrollPosition {
+    pub vertical: bool,
+    pub value: f32,
 }
 
 pub struct ScrollBar {
@@ -242,7 +242,7 @@ impl Behaviour for ScrollView {
         }
     }
 
-    fn on_event(&mut self, event: &dyn Any, _: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, _: Id, ctx: &mut Context) {
         if let Some(event) = event.downcast_ref::<SetScrollPosition>() {
             if !event.vertical {
                 let total_size = ctx.get_size(self.content)[0] - ctx.get_size(self.view)[0];
@@ -364,7 +364,7 @@ impl Layout for ScrollView {
         } else {
             h_active = false;
             h_scroll_bar_size = 0.0;
-            h_scroll_bar = ROOT_ID; // dumb value
+            h_scroll_bar = Id::ROOT_ID; // dumb value
         }
 
         let v_active;
@@ -381,7 +381,7 @@ impl Layout for ScrollView {
         } else {
             v_active = false;
             v_scroll_bar_size = 0.0;
-            v_scroll_bar = ROOT_ID; // dumb value
+            v_scroll_bar = Id::ROOT_ID; // dumb value
         }
 
         if let Some((_h_scroll_bar, _)) = self.h_scroll_bar_and_handle {

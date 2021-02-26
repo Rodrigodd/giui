@@ -13,14 +13,14 @@ use winit::{event::VirtualKeyCode, window::CursorIcon};
 
 pub trait TextFieldCallback {
     fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool;
-    fn on_change(&mut self, this: Id, ctx: &mut Context, text: &mut String);
+    fn on_change(&mut self, this: Id, ctx: &mut Context, text: &String);
     fn on_unfocus(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool;
 }
 impl<F: FnMut(Id, &mut Context, &mut String) -> bool + 'static> TextFieldCallback for F {
     fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool {
         self(this, ctx, text)
     }
-    fn on_change(&mut self, _: Id, _: &mut Context, _: &mut String) {}
+    fn on_change(&mut self, _: Id, _: &mut Context, _: &String) {}
     fn on_unfocus(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
         true
     }
@@ -29,7 +29,7 @@ impl TextFieldCallback for () {
     fn on_submit(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
         true
     }
-    fn on_change(&mut self, _: Id, _: &mut Context, _: &mut String) {}
+    fn on_change(&mut self, _: Id, _: &mut Context, _: &String) {}
     fn on_unfocus(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
         true
     }
@@ -184,6 +184,7 @@ impl<C: TextFieldCallback> TextField<C> {
         self.selection_index = None;
         self.text.replace_range(range, "");
         self.update_text(this, ctx);
+        self.callback.on_change(this, ctx, &self.text)
     }
 
     fn insert_char(&mut self, ch: char, this: Id, ctx: &mut Context) {
@@ -191,6 +192,7 @@ impl<C: TextFieldCallback> TextField<C> {
             .insert(self.text_info.get_indice(self.caret_index), ch);
         self.caret_index += 1;
         self.update_text(this, ctx);
+        self.callback.on_change(this, ctx, &self.text)
     }
 }
 impl<C: TextFieldCallback> Behaviour for TextField<C> {
@@ -200,7 +202,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
         ctx.set_graphic(this, self.style.normal.clone());
     }
 
-    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
         if let Some(SetValue(text)) = event.downcast_ref::<SetValue<String>>() {
             let x = self.text_info.get_caret_pos(self.caret_index)[0];
             self.text.clone_from(text);
@@ -332,11 +334,13 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                                 self.update_text(this, ctx); // TODO: is is not working?
                                 self.caret_index =
                                     self.text_info.get_caret_index(range.start + text.len());
+                                self.callback.on_change(this, ctx, &self.text)
                             } else {
                                 self.text.insert_str(indice, &text);
                                 self.update_text(this, ctx);
                                 self.caret_index =
                                     self.text_info.get_caret_index(indice + text.len());
+                                self.callback.on_change(this, ctx, &self.text)
                             }
                             self.update_carret(this, ctx, true);
                         }
@@ -377,6 +381,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     self.text
                         .remove(self.text_info.get_indice(self.caret_index));
                     self.update_text(this, ctx);
+                    self.callback.on_change(this, ctx, &self.text);
                 }
                 VirtualKeyCode::Delete => {
                     if self.caret_index + 1 < self.text_info.len() {

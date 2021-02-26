@@ -41,7 +41,7 @@ impl Behaviour for MenuItem {
         ctx.set_graphic(this, self.style.normal.clone());
     }
 
-    fn on_event(&mut self, event: &dyn Any, _this: Id, _ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, _this: Id, _ctx: &mut Context) {
         if let Some(SetIndex(index)) = event.downcast_ref() {
             self.index = *index;
         }
@@ -133,7 +133,7 @@ where
             blocker,
             list: Vec::new(),
             create_item,
-            owner: crate::ROOT_ID,
+            owner: crate::Id::ROOT_ID,
         }
     }
 
@@ -148,7 +148,7 @@ where
     T: 'static + Clone + std::fmt::Debug,
     F: Fn(&T, Id, &mut Context) -> Id,
 {
-    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
         if let Some(ShowMenu(owner, selected, itens)) = event.downcast_ref() {
             // set owner
             self.owner = *owner;
@@ -233,7 +233,7 @@ where
         ctx.set_graphic(this, self.style.normal.clone());
     }
 
-    fn on_event(&mut self, event: &dyn Any, this: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
         if let Some(x) = event.downcast_ref::<ItemClicked>() {
             self.selected = Some(x.index);
             (self.on_select)((x.index, self.itens[x.index].clone()), this, ctx);

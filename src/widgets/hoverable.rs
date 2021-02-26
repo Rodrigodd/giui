@@ -42,7 +42,7 @@ impl Behaviour for Hoverable {
             MouseEvent::Up(_) => {}
             MouseEvent::Moved { x, y } => {
                 if self.is_over {
-                    let [width, heigth] = ctx.get_size(crate::ROOT_ID);
+                    let [width, heigth] = ctx.get_size(crate::Id::ROOT_ID);
                     let x = x / width;
                     let y = y / heigth;
                     ctx.set_anchors(self.hover, [x, y, x, y]);
