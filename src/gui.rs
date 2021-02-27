@@ -666,7 +666,6 @@ impl GUI {
     }
 
     fn lazy_update(&mut self) {
-        println!("lazy update");
         loop {
             for event in mem::replace(&mut self.lazy_events, Vec::new()) {
                 match event {

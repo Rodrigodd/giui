@@ -503,6 +503,11 @@ impl<'a> LayoutContext<'a> {
         self.dirty_layout(id);
     }
 
+    pub fn move_to_back(&mut self, id: Id) {
+        self.controls.move_to_back(id);
+        self.dirty_layout(id);
+    }
+
     pub fn get_parent(&self, id: Id) -> Option<Id> {
         self.controls[id].parent
     }

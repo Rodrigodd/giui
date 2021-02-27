@@ -221,6 +221,15 @@ impl Controls {
         }
     }
 
+    pub fn move_to_back(&mut self, id: Id) {
+        if let Some(parent) = self[id].parent {
+            let children = &mut self[parent].children;
+            let i = children.iter().position(|x| *x == id).unwrap();
+            children.remove(i);
+            children.insert(0, id);
+        }
+    }
+
     pub fn is_child(&mut self, parent: Id, child: Id) -> bool {
         Some(parent) == self[child].parent
     }
