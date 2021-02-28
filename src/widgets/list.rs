@@ -211,6 +211,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             x.height = height;
             y += height;
             self.created_items.insert(i, x.clone());
+            self.last_created_items.remove(&i);
             return y;
         }
         
@@ -284,6 +285,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             x.y = y - height - view_rect[1];
             x.height = height;
             self.created_items.insert(i, x.clone());
+            self.last_created_items.remove(&i);
             return height;
         }
 
