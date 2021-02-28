@@ -90,39 +90,45 @@ impl GUIRender {
 
         let fonts = ctx.get_fonts();
 
-        // queue all glyphs for cache
-        let mut parents = vec![Id::ROOT_ID];
-        while let Some(parent) = parents.pop() {
-            parents.extend(ctx.get_children(parent).iter());
-            if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(parent) {
-                let glyphs = text.get_glyphs(rect, fonts);
-                for glyph in glyphs {
-                    self.draw_cache
-                        .queue_glyph(glyph.font_id.0, glyph.glyph.clone());
+        let mut font_texture_valid = true;
+        loop {
+            // queue all glyphs for cache
+            let mut parents = vec![Id::ROOT_ID];
+            while let Some(parent) = parents.pop() {
+                parents.extend(ctx.get_children(parent).iter());
+                if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(parent) {
+                    let glyphs = text.get_glyphs(rect, fonts);
+                    for glyph in glyphs {
+                        self.draw_cache
+                            .queue_glyph(glyph.font_id.0, glyph.glyph.clone());
+                    }
                 }
             }
-        }
 
-        // update the font_texture
-        let font_texture = self.font_texture;
-        let font_texture_valid;
-        match self.draw_cache.cache_queued(fonts, |r, d| {
-            renderer.update_font_texure(font_texture, [r.min[0], r.min[1], r.max[0], r.max[1]], d)
-        }) {
-            Ok(CachedBy::Adding) => {
-                font_texture_valid = true;
+            // update the font_texture
+            let font_texture = self.font_texture;
+            match self.draw_cache.cache_queued(fonts, |r, d| {
+                renderer.update_font_texure(
+                    font_texture,
+                    [r.min[0], r.min[1], r.max[0], r.max[1]],
+                    d,
+                )
+            }) {
+                Ok(CachedBy::Adding) => {}
+                Ok(CachedBy::Reordering) => {
+                    font_texture_valid = false;
+                }
+                Err(_) => {
+                    let (width, height) = self.draw_cache.dimensions();
+                    self.draw_cache = DrawCacheBuilder::default()
+                        .dimensions(width * 2, height * 2)
+                        .build();
+                    renderer.resize_font_texture(font_texture, [width * 2, height * 2]);
+                    font_texture_valid = false;
+                    continue;
+                }
             }
-            Ok(CachedBy::Reordering) => {
-                font_texture_valid = false;
-            }
-            Err(_) => {
-                let (width, height) = self.draw_cache.dimensions();
-                self.draw_cache = DrawCacheBuilder::default()
-                    .dimensions(width * 2, height * 2)
-                    .build();
-                renderer.resize_font_texture(font_texture, [width * 2, height * 2]);
-                return self.render(ctx, renderer);
-            }
+            break;
         }
 
         let mut parents = vec![Id::ROOT_ID];
@@ -157,18 +163,18 @@ impl GUIRender {
                 masks.push((parents.len(), mask, mask_changed));
                 (mask, mask_changed)
             };
-            let mut compute_sprite = true;
             if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
+                let mut compute_sprite = true;
                 let is_text = matches!(graphic, Graphic::Text(_));
-
-                let len = self.sprites.len();
-                if !(rect
+                let graphic_is_dirty = rect
                     .get_render_dirty_flags()
                     .contains(RenderDirtyFlags::RECT)
                     || mask_changed
                     || graphic.need_rebuild()
-                    || (is_text && !font_texture_valid))
-                {
+                    || (is_text && !font_texture_valid);
+
+                let len = self.sprites.len();
+                if !graphic_is_dirty {
                     if let Some(range) = self
                         .last_sprites_map
                         .get(self.sprites_map.len())
