@@ -27,6 +27,16 @@ impl<'a> ControlBuilder<'a> {
             id,
         }
     }
+
+    pub fn reserve(&mut self) -> Id {
+        self.inner.controls().reserve()
+    }
+
+    /// Return the Id of the control that this ControlBuilder is building
+    pub fn id(&self) -> Id {
+        self.id
+    }
+
     pub fn with_anchors(mut self, anchors: [f32; 4]) -> Self {
         self.inner.controls()[self.id].rect.anchors = anchors;
         self
@@ -92,10 +102,6 @@ impl<'a> ControlBuilder<'a> {
     pub fn with_active(mut self, active: bool) -> Self {
         self.inner.controls()[self.id].active = active;
         self
-    }
-
-    pub fn reserve(&mut self) -> Id {
-        self.inner.controls().reserve()
     }
 
     pub fn with_child<F>(mut self, create_child: F) -> Self
