@@ -1,4 +1,9 @@
-use crate::{Control, ControlBuilder, ControlState, Controls, LayoutDirtyFlags, Rect, context::{Context, LayoutContext, MinSizeContext}, control::ControlBuilderInner, render::Graphic};
+use crate::{
+    context::{Context, LayoutContext, MinSizeContext},
+    control::ControlBuilderInner,
+    graphics::Graphic,
+    Control, ControlBuilder, ControlState, Controls, LayoutDirtyFlags, Rect,
+};
 use ab_glyph::FontArc;
 use std::{any::Any, mem, num::NonZeroU32};
 use winit::{
@@ -188,10 +193,7 @@ impl GUI {
             }
         }
 
-        ControlBuilder::new(
-            reserved_id,
-            Builder(self)
-        )
+        ControlBuilder::new(reserved_id, Builder(self))
     }
 
     fn add_control(&mut self, id: Id) -> Id {
@@ -209,7 +211,7 @@ impl GUI {
             if active {
                 self.lazy_events.push(LazyEvent::OnActive(id));
             }
-    
+
             for child in self.controls[id].children.clone() {
                 println!("add child {}", child);
                 self.add_control(child);
@@ -903,8 +905,7 @@ impl GUI {
             i += 1;
         }
         while let Some(parent) = parents.pop() {
-            let (layout, mut ctx) =
-                MinSizeContext::new(parent, &mut self.controls, &self.fonts);
+            let (layout, mut ctx) = MinSizeContext::new(parent, &mut self.controls, &self.fonts);
             let mut min_size = layout.compute_min_size(parent, &mut ctx);
             let user_min_size = self.controls[parent].rect.user_min_size;
             min_size[0] = min_size[0].max(user_min_size[0]);

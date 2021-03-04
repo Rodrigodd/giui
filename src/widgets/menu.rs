@@ -1,6 +1,6 @@
 use crate::{
+    graphics::Text,
     layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
-    render::Text,
     style::MenuStyle,
     widgets::CloseMenu,
     Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, RectFill,

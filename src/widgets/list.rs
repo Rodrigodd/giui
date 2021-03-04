@@ -214,7 +214,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             self.last_created_items.remove(&i);
             return y;
         }
-        
+
         match self.last_created_items.remove(&i) {
             Some(mut x) => {
                 let id = x.id;
@@ -341,7 +341,6 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
         self.start_y = 0.0;
         self.delta_y = 0.0;
 
-        let mut stop = usize::max_value();
         let mut height = 0.0;
         let mut y = view_rect[1];
 
@@ -395,8 +394,6 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             let y = start_control.y + view_rect[1];
 
             self.start_y = (i as f32) + (view_rect[1] - y) / (height + self.spacing);
-            dbg!(self.start_y);
-            dbg!(i);
             println!("start_y: {}", self.start_y);
         }
     }
@@ -487,9 +484,6 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 let start_control = match self.last_created_items.get(&i) {
                     Some(x) => x,
                     None => {
-                        dbg!(self.start_y);
-                        dbg!(i);
-                        dbg!(&self.last_created_items);
                         panic!("ahhhhh!!");
                     }
                 };
@@ -568,7 +562,6 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
         } else {
             self.focused = None;
         }
-        dbg!(&self.focused);
     }
 
     fn on_active(&mut self, _this: Id, ctx: &mut Context) {

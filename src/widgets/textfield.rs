@@ -1,6 +1,6 @@
 use crate::{
     event::{self, SetValue},
-    render::Graphic,
+    graphics::Graphic,
     style::OnFocusStyle,
     text::TextInfo,
     Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseButton, MouseEvent,

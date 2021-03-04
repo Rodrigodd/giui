@@ -1,6 +1,6 @@
 use std::{cell::RefCell, num::NonZeroU32, rc::Rc};
 
-use crate::{render::Graphic, Behaviour, Id, Layout, Rect, RectFill};
+use crate::{graphics::Graphic, Behaviour, Id, Layout, Rect, RectFill};
 
 pub(crate) trait ControlBuilderInner {
     fn controls(&mut self) -> &mut Controls;
@@ -394,7 +394,6 @@ impl Default for Control {
     }
 }
 impl Control {
-
     pub fn set_layout(&mut self, layout: Box<dyn Layout>) {
         self.layout = layout;
     }

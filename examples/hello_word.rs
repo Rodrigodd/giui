@@ -1,7 +1,8 @@
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use ui_engine::{
-    render::{GUIRender, GUIRenderer, Text},
+    graphics::Text,
+    render::{GUIRender, GUIRenderer},
     GUI,
 };
 use winit::{

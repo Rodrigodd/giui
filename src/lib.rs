@@ -6,6 +6,7 @@ mod util;
 
 mod context;
 mod control;
+pub mod graphics;
 mod gui;
 pub mod layouts;
 mod rect;

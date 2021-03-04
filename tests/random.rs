@@ -3,7 +3,7 @@ use core::f32;
 use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
 use ui_engine::{
     layouts::{GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    Behaviour, Context, Id, InputFlags, MouseEvent, GUI
+    Behaviour, Context, Id, InputFlags, MouseEvent, GUI,
 };
 
 #[derive(Default)]

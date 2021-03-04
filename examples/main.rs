@@ -5,8 +5,9 @@ use std::rc::Rc;
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use ui_engine::{
+    graphics::{Graphic, Icon, Panel, Text, Texture},
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    render::{GUIRender, GUIRenderer, Graphic, Panel, Text, Texture},
+    render::{GUIRender, GUIRenderer},
     style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
     widgets::{
         self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, DropMenu, Dropdown, Hoverable,
@@ -66,6 +67,11 @@ fn main() {
         let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
+    let marker_texture = {
+        let data = image::open("D:/repos/rust/ui_engine/examples/check.png").unwrap();
+        let data = data.to_rgba8();
+        render.new_texture(data.width(), data.height(), data.as_ref(), true)
+    };
     let mut camera = sprite_render::Camera::new(
         window_size.width,
         window_size.height,
@@ -76,7 +82,10 @@ fn main() {
         window_size.height as f32 / 2.0,
     );
     let painel: Graphic = Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0).into();
+    let white: Graphic = Texture::new(texture, [0.2, 0.2, 0.3, 0.3]).into();
     let page_painel: Graphic = Panel::new(texture, [0.0, 0.1, 0.5, 0.4], 10.0).into();
+    let marker_icon: Graphic = Icon::new(marker_texture, [0.0, 0.0, 1.0, 1.0], [18.0; 2]).into();
+    // let marker_icon: Graphic = Texture::new(marker_texture, [0.0, 0.0, 1.0, 1.0]).into();
 
     let button_style = Rc::new(ButtonStyle {
         normal: Graphic::from(Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0)),
@@ -109,10 +118,7 @@ fn main() {
     });
 
     let (hover, hover_label) = {
-        let graphic = painel
-            .clone()
-            .with_color([50, 50, 50, 255])
-            .with_border(0.0);
+        let graphic = white.clone().with_color([50, 50, 50, 255]);
         let hover = gui
             .create_control()
             .with_anchors([0.0, 0.0, 0.0, 0.0])
@@ -392,7 +398,7 @@ fn main() {
                 .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
                 .with_parent(slider)
                 .build();
-            
+
             slider
         };
         let _toggle = {
@@ -409,7 +415,7 @@ fn main() {
                     button_style.clone(),
                     focus_style,
                     move |_, ctx, value| {
-                        println!("Toogle changed to {}!", value);
+                        println!("Toggle changed to {}!", value);
                         if value {
                             ctx.active(bottom_text);
                         } else {
@@ -420,10 +426,7 @@ fn main() {
                 .build();
 
             let background = {
-                let graphic = painel
-                    .clone()
-                    .with_color([200, 200, 200, 255])
-                    .with_border(0.0);
+                let graphic = white.clone().with_color([200, 200, 200, 255]);
                 gui.create_control_reserved(background)
                     .with_anchors([0.0, 0.5, 0.0, 0.5])
                     .with_margins([5.0, -10.0, 25.0, 10.0])
@@ -433,9 +436,9 @@ fn main() {
             };
             let _marker = gui
                 .create_control_reserved(marker)
-                .with_anchors([0.5, 0.5, 0.5, 0.5])
-                .with_margins([-6.0, -6.0, 6.0, 6.0])
-                .with_graphic(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0))
+                // .with_anchors([0.5, 0.5, 0.5, 0.5])
+                // .with_margins([-9.0, -9.0, 9.0, 9.0])
+                .with_graphic(marker_icon)
                 .with_parent(background)
                 .build();
 
@@ -803,7 +806,7 @@ fn main() {
             let _caret = gui
                 .create_control_reserved(caret)
                 .with_anchors([0.0, 0.0, 0.0, 0.0])
-                .with_graphic(painel.clone().with_color([0, 0, 0, 255]).with_border(0.0))
+                .with_graphic(white.clone().with_color([0, 0, 0, 255]))
                 .with_parent(input_box)
                 .build();
             let _input_text = gui
@@ -824,12 +827,7 @@ fn main() {
         let h_scroll_bar = gui
             .create_control()
             .with_min_size([20.0, 20.0])
-            .with_graphic(
-                painel
-                    .clone()
-                    .with_color([150, 150, 150, 255])
-                    .with_border(0.0),
-            )
+            .with_graphic(white.clone().with_color([150, 150, 150, 255]))
             .with_behaviour(ScrollBar::new(
                 h_scroll_bar_handle,
                 scroll_view,
@@ -840,24 +838,14 @@ fn main() {
             .build();
         let h_scroll_bar_handle = gui
             .create_control_reserved(h_scroll_bar_handle)
-            .with_graphic(
-                painel
-                    .clone()
-                    .with_color([220, 220, 220, 255])
-                    .with_border(0.0),
-            )
+            .with_graphic(white.clone().with_color([220, 220, 220, 255]))
             .with_parent(h_scroll_bar)
             .build();
         let v_scroll_bar_handle = gui.reserve_id();
         let v_scroll_bar = gui
             .create_control()
             .with_min_size([20.0, 20.0])
-            .with_graphic(
-                painel
-                    .clone()
-                    .with_color([150, 150, 150, 255])
-                    .with_border(0.0),
-            )
+            .with_graphic(white.clone().with_color([150, 150, 150, 255]))
             .with_parent(scroll_view)
             .with_behaviour(ScrollBar::new(
                 v_scroll_bar_handle,
@@ -868,12 +856,7 @@ fn main() {
             .build();
         let v_scroll_bar_handle = gui
             .create_control_reserved(v_scroll_bar_handle)
-            .with_graphic(
-                painel
-                    .clone()
-                    .with_color([220, 220, 220, 255])
-                    .with_border(0.0),
-            )
+            .with_graphic(white.clone().with_color([220, 220, 220, 255]))
             .with_parent(v_scroll_bar)
             .build();
         let list = gui
@@ -884,12 +867,7 @@ fn main() {
 
         let _scroll_view = gui
             .create_control_reserved(scroll_view)
-            .with_graphic(
-                painel
-                    .clone()
-                    .with_color([100, 100, 100, 255])
-                    .with_border(0.0),
-            )
+            .with_graphic(white.with_color([100, 100, 100, 255]))
             .with_expand_y(true)
             .with_parent(page_3)
             .with_behaviour_and_layout(ScrollView::new(

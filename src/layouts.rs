@@ -38,8 +38,6 @@ impl Layout for MarginLayout {
             self.margins[0] + self.margins[2] + min_size[0],
             self.margins[1] + self.margins[3] + min_size[1],
         ]
-
-        
     }
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
         let rect = ctx.get_layouting(this).get_rect();

@@ -3,8 +3,9 @@ use std::{collections::HashMap, rc::Rc};
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use ui_engine::{
+    graphics::{Panel, Text},
     layouts::{FitText, MarginLayout, VBoxLayout},
-    render::{GUIRender, GUIRenderer, Panel, Text},
+    render::{GUIRender, GUIRenderer},
     style::ButtonStyle,
     widgets::Button,
     GUI,

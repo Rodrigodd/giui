@@ -49,8 +49,9 @@ use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use ui_engine::{
     event::SetValue,
+    graphics::{Graphic, Panel, Text, Texture},
     layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
-    render::{GUIRender, GUIRenderer, Graphic, Panel, Text, Texture},
+    render::{GUIRender, GUIRenderer},
     style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
     widgets::{
         Blocker, Button, ButtonGroup, CloseMenu, DropMenu, Dropdown, Item, Menu, MenuBar, MenuItem,
@@ -695,12 +696,7 @@ impl OptionsGUI {
             .build()
     }
 
-    fn create_tabs(
-        &self,
-        surface: Id,
-        gui: &mut GUI,
-        style: &StyleSheet,
-    ) -> Id {
+    fn create_tabs(&self, surface: Id, gui: &mut GUI, style: &StyleSheet) -> Id {
         let line = gui
             .create_control()
             .with_layout(HBoxLayout::new(0.0, [0.0; 4], -1))

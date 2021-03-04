@@ -1,4 +1,4 @@
-use crate::render::Graphic;
+use crate::graphics::Graphic;
 
 #[derive(Clone)]
 pub struct OnFocusStyle {

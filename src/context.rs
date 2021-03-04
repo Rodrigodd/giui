@@ -4,8 +4,8 @@ use ab_glyph::FontArc;
 use winit::{event::ModifiersState, window::CursorIcon};
 
 use crate::{
-    control::ControlBuilderInner, event, render::Graphic, Behaviour, ControlBuilder, Controls, Id,
-    Layout, Rect, GUI,
+    control::ControlBuilderInner, event, graphics::Graphic, Behaviour, ControlBuilder, Controls,
+    Id, Layout, Rect, GUI,
 };
 
 // contains a reference to all the controls, except the behaviour of one control
