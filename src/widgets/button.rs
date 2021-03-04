@@ -2,13 +2,13 @@ use crate::{style::ButtonStyle, Behaviour, Context, Id, InputFlags, MouseButton,
 
 use std::rc::Rc;
 
-pub struct Button<F: Fn(Id, &mut Context)> {
+pub struct Button<F: FnMut(Id, &mut Context)> {
     state: u8, // 0 - normal, 1 - hover, 2 - pressed
     focus: bool,
     on_click: F,
     style: Rc<ButtonStyle>,
 }
-impl<F: Fn(Id, &mut Context)> Button<F> {
+impl<F: FnMut(Id, &mut Context)> Button<F> {
     pub fn new(style: Rc<ButtonStyle>, on_click: F) -> Self {
         Self {
             state: 0,
@@ -18,7 +18,7 @@ impl<F: Fn(Id, &mut Context)> Button<F> {
         }
     }
 }
-impl<F: Fn(Id, &mut Context)> Behaviour for Button<F> {
+impl<F: FnMut(Id, &mut Context)> Behaviour for Button<F> {
     fn on_active(&mut self, this: Id, ctx: &mut Context) {
         ctx.set_graphic(this, self.style.normal.clone());
     }

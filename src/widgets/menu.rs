@@ -67,11 +67,11 @@ impl MenuBehaviour {
 
                 let menu = ctx
                     .create_control()
-                    .with_anchors([0.0, 0.0, 0.0, 0.0])
-                    .with_margins([x, y, x, y])
-                    .with_behaviour(MenuBehaviour::new(menu.clone(), self.style.clone(), this))
-                    .with_graphic(self.style.button.normal.clone())
-                    .with_layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
+                    .anchors([0.0, 0.0, 0.0, 0.0])
+                    .margins([x, y, x, y])
+                    .behaviour(MenuBehaviour::new(menu.clone(), self.style.clone(), this))
+                    .graphic(self.style.button.normal.clone())
+                    .layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
                     .build();
                 self.open = Some(menu);
             }
@@ -85,50 +85,48 @@ impl Behaviour for MenuBehaviour {
                 Item::Separator => {
                     let item = ctx
                         .create_control()
-                        .with_parent(this)
-                        .with_min_size([0.0, 5.0])
+                        .parent(this)
+                        .min_size([0.0, 5.0])
                         .build();
                     let _dash = ctx
                         .create_control()
-                        .with_graphic(self.style.separator.clone())
-                        .with_parent(item)
-                        .with_margins([8.0, 2.0, -8.0, -2.0])
+                        .graphic(self.style.separator.clone())
+                        .parent(item)
+                        .margins([8.0, 2.0, -8.0, -2.0])
                         .build();
                 }
                 Item::Button(text, _) => {
                     let item = ctx
                         .create_control()
-                        .with_parent(this)
-                        .with_layout(MarginLayout::new([18.0, 2.0, 18.0, 2.0]))
+                        .parent(this)
+                        .layout(MarginLayout::new([18.0, 2.0, 18.0, 2.0]))
                         .build();
                     let _text = ctx
                         .create_control()
-                        .with_parent(item)
-                        .with_graphic(Text::new([0, 0, 0, 255], text.clone(), 16.0, (-1, 0)).into())
-                        .with_layout(FitText)
+                        .parent(item)
+                        .graphic(Text::new([0, 0, 0, 255], text.clone(), 16.0, (-1, 0)).into())
+                        .layout(FitText)
                         .build();
                 }
                 Item::SubMenu(menu) => {
                     let item = ctx
                         .create_control()
-                        .with_parent(this)
-                        .with_layout(HBoxLayout::new(0.0, [18.0, 2.0, 2.0, 2.0], -1))
+                        .parent(this)
+                        .layout(HBoxLayout::new(0.0, [18.0, 2.0, 2.0, 2.0], -1))
                         .build();
                     let _text = ctx
                         .create_control()
-                        .with_parent(item)
-                        .with_graphic(
-                            Text::new([0, 0, 0, 255], menu.name.clone(), 16.0, (-1, 0)).into(),
-                        )
-                        .with_layout(FitText)
-                        .with_expand_x(true)
+                        .parent(item)
+                        .graphic(Text::new([0, 0, 0, 255], menu.name.clone(), 16.0, (-1, 0)).into())
+                        .layout(FitText)
+                        .expand_x(true)
                         .build();
                     let _arrow = ctx
                         .create_control()
-                        .with_min_size([16.0, 16.0])
-                        .with_fill_y(RectFill::ShrinkCenter)
-                        .with_graphic(self.style.arrow.clone())
-                        .with_parent(item)
+                        .min_size([16.0, 16.0])
+                        .fill_y(RectFill::ShrinkCenter)
+                        .graphic(self.style.arrow.clone())
+                        .parent(item)
                         .build();
                 }
             }
@@ -237,15 +235,15 @@ impl MenuBar {
 
         let menu = ctx
             .create_control()
-            .with_anchors([0.0, 0.0, 0.0, 0.0])
-            .with_margins([x, y, x, y])
-            .with_behaviour(MenuBehaviour::new(
+            .anchors([0.0, 0.0, 0.0, 0.0])
+            .margins([x, y, x, y])
+            .behaviour(MenuBehaviour::new(
                 self.menus[i].clone(),
                 self.style.clone(),
                 this,
             ))
-            .with_graphic(self.style.button.normal.clone())
-            .with_layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
+            .graphic(self.style.button.normal.clone())
+            .layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
             .build();
         self.open = Some(menu);
     }
@@ -255,14 +253,14 @@ impl Behaviour for MenuBar {
         for menu in self.menus.iter() {
             let item = ctx
                 .create_control()
-                .with_parent(this)
-                .with_layout(MarginLayout::new([2.0, 2.0, 2.0, 2.0]))
-                .with_graphic(self.style.button.normal.clone())
+                .parent(this)
+                .layout(MarginLayout::new([2.0, 2.0, 2.0, 2.0]))
+                .graphic(self.style.button.normal.clone())
                 .build();
             ctx.create_control()
-                .with_parent(item)
-                .with_graphic(Text::new([0, 0, 0, 255], menu.name.clone(), 16.0, (0, 0)).into())
-                .with_layout(FitText)
+                .parent(item)
+                .graphic(Text::new([0, 0, 0, 255], menu.name.clone(), 16.0, (0, 0)).into())
+                .layout(FitText)
                 .build();
         }
     }

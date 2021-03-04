@@ -293,12 +293,12 @@ fn create_gui(
 ) {
     let surface = gui
         .create_control()
-        .with_layout(VBoxLayout::new(10.0, [10.0; 4], -1))
+        .layout(VBoxLayout::new(10.0, [10.0; 4], -1))
         .build();
 
     let button = gui
         .create_control()
-        .with_behaviour(Button::new(button_style.clone(), {
+        .behaviour(Button::new(button_style.clone(), {
             let proxy = proxy.clone();
             let button_style = button_style.clone();
             let owner = owner.clone();
@@ -335,22 +335,22 @@ fn create_gui(
                 });
             }
         }))
-        .with_parent(surface)
-        .with_layout(MarginLayout::new([5.0; 4]))
-        .with_fill_x(ui_engine::RectFill::ShrinkCenter)
-        .with_fill_y(ui_engine::RectFill::ShrinkEnd)
-        .with_expand_y(true)
+        .parent(surface)
+        .layout(MarginLayout::new([5.0; 4]))
+        .fill_x(ui_engine::RectFill::ShrinkCenter)
+        .fill_y(ui_engine::RectFill::ShrinkEnd)
+        .expand_y(true)
         .build();
     let _text = gui
         .create_control()
-        .with_graphic(Text::new([0, 0, 0, 255], "Open A Modal Window!".into(), 16.0, (0, 0)).into())
-        .with_layout(FitText)
-        .with_parent(button)
+        .graphic(Text::new([0, 0, 0, 255], "Open A Modal Window!".into(), 16.0, (0, 0)).into())
+        .layout(FitText)
+        .parent(button)
         .build();
 
     let button = gui
         .create_control()
-        .with_behaviour(Button::new(button_style.clone(), move |_, _| {
+        .behaviour(Button::new(button_style.clone(), move |_, _| {
             let window_builder = WindowBuilder::new().with_inner_size(PhysicalSize::new(200, 200));
 
             let _ = proxy.send_event(UserEvent::CreateNewWindow {
@@ -381,15 +381,15 @@ fn create_gui(
                 },
             });
         }))
-        .with_parent(surface)
-        .with_layout(MarginLayout::new([5.0; 4]))
-        .with_fill_x(ui_engine::RectFill::ShrinkCenter)
-        .with_fill_y(ui_engine::RectFill::ShrinkStart)
-        .with_expand_y(true)
+        .parent(surface)
+        .layout(MarginLayout::new([5.0; 4]))
+        .fill_x(ui_engine::RectFill::ShrinkCenter)
+        .fill_y(ui_engine::RectFill::ShrinkStart)
+        .expand_y(true)
         .build();
     let _text = gui
         .create_control()
-        .with_graphic(
+        .graphic(
             Text::new(
                 [0, 0, 0, 255],
                 "Open A Non-Modal Window!".into(),
@@ -398,7 +398,7 @@ fn create_gui(
             )
             .into(),
         )
-        .with_layout(FitText)
-        .with_parent(button)
+        .layout(FitText)
+        .parent(button)
         .build();
 }

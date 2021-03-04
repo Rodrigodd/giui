@@ -73,36 +73,36 @@ fn build_random_gui(gui: &mut GUI, rng: &mut SmallRng) -> Vec<Id> {
     for _ in 0..total {
         let builder = gui
             .create_control()
-            .with_active(rng.gen_bool(active_chance))
-            .with_min_size([rexp(rng, 1000.0) as f32, rexp(rng, 1000.0) as f32])
-            .with_anchors(rng.gen())
-            .with_margins([
+            .active(rng.gen_bool(active_chance))
+            .min_size([rexp(rng, 1000.0) as f32, rexp(rng, 1000.0) as f32])
+            .anchors(rng.gen())
+            .margins([
                 rexp(rng, 100.0) as f32,
                 rexp(rng, 100.0) as f32,
                 rexp(rng, 100.0) as f32,
                 rexp(rng, 100.0) as f32,
             ])
-            .with_behaviour(AssertInvariant::default())
-            .with_parent(*ids.choose(rng).unwrap_or(&Id::ROOT_ID));
+            .behaviour(AssertInvariant::default())
+            .parent(*ids.choose(rng).unwrap_or(&Id::ROOT_ID));
         let builder = match rng.gen_range(0..=5) {
             0 => builder,
-            1 => builder.with_layout(VBoxLayout::new(
+            1 => builder.layout(VBoxLayout::new(
                 2.0,
                 [2.0, 2.0, 2.0, 2.0],
                 rng.gen_range(-1..=1),
             )),
-            2 => builder.with_layout(HBoxLayout::new(
+            2 => builder.layout(HBoxLayout::new(
                 2.0,
                 [2.0, 2.0, 2.0, 2.0],
                 rng.gen_range(-1..=1),
             )),
-            3 => builder.with_layout(MarginLayout::new([2.0, 2.0, 2.0, 2.0])),
-            4 => builder.with_layout(GridLayout::new(
+            3 => builder.layout(MarginLayout::new([2.0, 2.0, 2.0, 2.0])),
+            4 => builder.layout(GridLayout::new(
                 [2.0, 2.0],
                 [2.0, 2.0, 2.0, 2.0],
                 rng.gen_range(1..10),
             )),
-            5 => builder.with_layout(RatioLayout::new(
+            5 => builder.layout(RatioLayout::new(
                 10.0 / (rng.gen::<f32>() * 99.0 + 1.0),
                 (rng.gen_range(-1..=1), rng.gen_range(-1..=1)),
             )),

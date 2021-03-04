@@ -31,10 +31,10 @@ impl Behaviour for ContextMenu {
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         let blocker = ctx
             .create_control()
-            .with_behaviour(Blocker::new(move |_, ctx| {
+            .behaviour(Blocker::new(move |_, ctx| {
                 ctx.send_event_to(this, CloseMenu)
             }))
-            .with_active(false)
+            .active(false)
             .build();
         self.blocker = Some(blocker);
     }
@@ -80,15 +80,15 @@ impl Behaviour for ContextMenu {
 
                     let menu = ctx
                         .create_control()
-                        .with_anchors([0.0, 0.0, 0.0, 0.0])
-                        .with_margins([x, y, x, y])
-                        .with_behaviour(MenuBehaviour::new(
+                        .anchors([0.0, 0.0, 0.0, 0.0])
+                        .margins([x, y, x, y])
+                        .behaviour(MenuBehaviour::new(
                             self.menu.clone(),
                             self.style.clone(),
                             this,
                         ))
-                        .with_graphic(self.style.button.normal.clone())
-                        .with_layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
+                        .graphic(self.style.button.normal.clone())
+                        .layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
                         .build();
                     self.open = Some(menu);
                     // when 'this' receive the event 'Repos', the 'menu' will already have its size defined.

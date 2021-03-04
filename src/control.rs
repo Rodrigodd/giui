@@ -37,82 +37,82 @@ impl<'a> ControlBuilder<'a> {
         self.id
     }
 
-    pub fn with_anchors(mut self, anchors: [f32; 4]) -> Self {
+    pub fn anchors(mut self, anchors: [f32; 4]) -> Self {
         self.inner.controls()[self.id].rect.anchors = anchors;
         self
     }
-    pub fn with_margins(mut self, margins: [f32; 4]) -> Self {
+    pub fn margins(mut self, margins: [f32; 4]) -> Self {
         self.inner.controls()[self.id].rect.margins = margins;
         self
     }
-    pub fn with_min_size(mut self, min_size: [f32; 2]) -> Self {
+    pub fn min_size(mut self, min_size: [f32; 2]) -> Self {
         self.inner.controls()[self.id].rect.user_min_size = min_size;
         self.inner.controls()[self.id].rect.min_size = min_size;
         self
     }
-    pub fn with_min_width(mut self, min_width: f32) -> Self {
+    pub fn min_width(mut self, min_width: f32) -> Self {
         self.inner.controls()[self.id].rect.min_size[0] = min_width;
         self
     }
-    pub fn with_min_height(mut self, min_height: f32) -> Self {
+    pub fn min_height(mut self, min_height: f32) -> Self {
         self.inner.controls()[self.id].rect.min_size[1] = min_height;
         self
     }
-    pub fn with_fill_x(mut self, fill: RectFill) -> Self {
+    pub fn fill_x(mut self, fill: RectFill) -> Self {
         self.inner.controls()[self.id].rect.set_fill_x(fill);
         self
     }
-    pub fn with_fill_y(mut self, fill: RectFill) -> Self {
+    pub fn fill_y(mut self, fill: RectFill) -> Self {
         self.inner.controls()[self.id].rect.set_fill_y(fill);
         self
     }
-    pub fn with_expand_x(mut self, expand: bool) -> Self {
+    pub fn expand_x(mut self, expand: bool) -> Self {
         self.inner.controls()[self.id].rect.expand_x = expand;
         self
     }
-    pub fn with_expand_y(mut self, expand: bool) -> Self {
+    pub fn expand_y(mut self, expand: bool) -> Self {
         self.inner.controls()[self.id].rect.expand_y = expand;
         self
     }
-    pub fn with_behaviour<T: Behaviour + 'static>(mut self, behaviour: T) -> Self {
+    pub fn behaviour<T: Behaviour + 'static>(mut self, behaviour: T) -> Self {
         // TODO: remove this someday
         debug_assert!(self.inner.controls()[self.id].behaviour.is_none());
         self.inner.controls()[self.id].behaviour = Some(Box::new(behaviour));
         self
     }
-    pub fn with_layout<T: Layout + 'static>(mut self, layout: T) -> Self {
+    pub fn layout<T: Layout + 'static>(mut self, layout: T) -> Self {
         self.inner.controls()[self.id].layout = Box::new(layout);
         self
     }
-    pub fn with_behaviour_and_layout<T: Layout + Behaviour + 'static>(
+    pub fn behaviour_and_layout<T: Layout + Behaviour + 'static>(
         self,
         behaviour_layout: T,
     ) -> Self {
         let x = Rc::new(RefCell::new(behaviour_layout));
-        self.with_behaviour(x.clone()).with_layout(x)
+        self.behaviour(x.clone()).layout(x)
     }
-    pub fn with_graphic(mut self, graphic: Graphic) -> Self {
+    pub fn graphic(mut self, graphic: Graphic) -> Self {
         self.inner.controls()[self.id].graphic = graphic;
         self
     }
-    pub fn with_parent(mut self, parent: Id) -> Self {
+    pub fn parent(mut self, parent: Id) -> Self {
         self.inner.controls()[self.id].parent = Some(parent);
         self
     }
-    pub fn with_active(mut self, active: bool) -> Self {
+    pub fn active(mut self, active: bool) -> Self {
         self.inner.controls()[self.id].active = active;
         self
     }
 
-    pub fn with_child<F>(mut self, create_child: F) -> Self
+    pub fn child<F>(mut self, create_child: F) -> Self
     where
         F: FnOnce(ControlBuilder) -> ControlBuilder,
     {
         let id = self.inner.controls().reserve();
-        self.with_child_reserved(id, create_child)
+        self.child_reserved(id, create_child)
     }
 
-    pub fn with_child_reserved<F>(mut self, id: Id, create_child: F) -> Self
+    pub fn child_reserved<F>(mut self, id: Id, create_child: F) -> Self
     where
         F: FnOnce(ControlBuilder) -> ControlBuilder,
     {
@@ -132,7 +132,7 @@ impl<'a> ControlBuilder<'a> {
                 fn build(&mut self, _id: Id) {}
             }
             let child_builder = ControlBuilder::new(id, ChildBuilderInner(self.inner.controls()));
-            (create_child)(child_builder).with_parent(parent).build();
+            (create_child)(child_builder).parent(parent).build();
         }
 
         // restore the parent active

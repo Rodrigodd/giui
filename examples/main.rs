@@ -121,10 +121,10 @@ fn main() {
         let graphic = white.clone().with_color([50, 50, 50, 255]);
         let hover = gui
             .create_control()
-            .with_anchors([0.0, 0.0, 0.0, 0.0])
-            .with_graphic(graphic)
-            .with_margins([3.0, 6.0, 6.0, 9.0])
-            .with_layout(MarginLayout::new([3.0, 3.0, 3.0, 3.0]))
+            .anchors([0.0, 0.0, 0.0, 0.0])
+            .graphic(graphic)
+            .margins([3.0, 6.0, 6.0, 9.0])
+            .layout(MarginLayout::new([3.0, 3.0, 3.0, 3.0]))
             .build();
         let graphic = Text::new(
             [255, 255, 255, 255],
@@ -135,9 +135,9 @@ fn main() {
         .into();
         let label = gui
             .create_control()
-            .with_graphic(graphic)
-            .with_parent(hover)
-            .with_layout(FitText)
+            .graphic(graphic)
+            .parent(hover)
+            .layout(FitText)
             .build();
 
         (hover, label)
@@ -145,24 +145,24 @@ fn main() {
 
     let surface = gui
         .create_control()
-        .with_layout(VBoxLayout::new(0.0, [0.0; 4], -1))
+        .layout(VBoxLayout::new(0.0, [0.0; 4], -1))
         .build();
     let _menubar = {
         let menu = gui.reserve_id();
         // TODO: the menu_bar's blocker espect that I know the size of menu_bar
         let blocker = gui
             .create_control()
-            .with_active(false)
-            .with_margins([0.0, 20.0, 0.0, 0.0])
-            .with_behaviour(Blocker::new(move |_, ctx| {
+            .active(false)
+            .margins([0.0, 20.0, 0.0, 0.0])
+            .behaviour(Blocker::new(move |_, ctx| {
                 ctx.send_event_to(menu, CloseMenu)
             }))
             .build();
         use Item::*;
         let proxy = event_loop.create_proxy();
         gui.create_control_reserved(menu)
-            .with_graphic(menu_button_style.normal.clone())
-            .with_behaviour(MenuBar::new(
+            .graphic(menu_button_style.normal.clone())
+            .behaviour(MenuBar::new(
                 menu_style.clone(),
                 blocker,
                 vec![
@@ -259,46 +259,46 @@ fn main() {
                     )),
                 ],
             ))
-            .with_layout(HBoxLayout::new(0.0, [0.0; 4], -1))
-            .with_parent(surface)
+            .layout(HBoxLayout::new(0.0, [0.0; 4], -1))
+            .parent(surface)
             .build()
     };
 
     let header = gui
         .create_control()
-        .with_layout(HBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
-        .with_parent(surface)
+        .layout(HBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
+        .parent(surface)
         .build();
 
     let page_area = gui
         .create_control()
-        .with_margins([0.0, 45.0, 0.0, 0.0])
-        .with_parent(surface)
-        .with_expand_y(true)
+        .margins([0.0, 45.0, 0.0, 0.0])
+        .parent(surface)
+        .expand_y(true)
         .build();
     let page_1 = {
-        let page_1 = gui.create_control().with_parent(page_area).build();
+        let page_1 = gui.create_control().parent(page_area).build();
         let menu = gui
             .create_control()
-            .with_anchors([0.0, 0.0, 0.0, 1.0])
-            .with_margins([0.0, 0.0, 200.0, 0.0])
-            .with_graphic(page_painel.clone())
-            .with_layout(VBoxLayout::new(5.0, [5.0, 5.0, 5.0, 5.0], -1))
-            .with_parent(page_1)
+            .anchors([0.0, 0.0, 0.0, 1.0])
+            .margins([0.0, 0.0, 200.0, 0.0])
+            .graphic(page_painel.clone())
+            .layout(VBoxLayout::new(5.0, [5.0, 5.0, 5.0, 5.0], -1))
+            .parent(page_1)
             .build();
         let right_painel = gui
             .create_control()
-            .with_margins([200.0, 0.0, 0.0, 0.0])
-            .with_graphic(page_painel.clone())
-            .with_parent(page_1)
+            .margins([200.0, 0.0, 0.0, 0.0])
+            .graphic(page_painel.clone())
+            .parent(page_1)
             .build();
         let top_text = {
             let text_box = gui
                 .create_control()
-                .with_anchors([0.0, 0.0, 1.0, 0.5])
-                .with_margins([15.0, 15.0, -15.0, -7.5])
-                .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
-                .with_parent(right_painel)
+                .anchors([0.0, 0.0, 1.0, 0.5])
+                .margins([15.0, 15.0, -15.0, -7.5])
+                .graphic(painel.clone().with_color([200, 200, 200, 255]))
+                .parent(right_painel)
                 .build();
             let graphic = Text::new(
             [0, 0, 0, 255],
@@ -307,18 +307,18 @@ fn main() {
             (0, -1),
         ).into();
             gui.create_control()
-                .with_anchors([0.0, 0.0, 1.0, 1.0])
-                .with_graphic(graphic)
-                .with_parent(text_box)
+                .anchors([0.0, 0.0, 1.0, 1.0])
+                .graphic(graphic)
+                .parent(text_box)
                 .build()
         };
         let bottom_text = {
             let text_box = gui
                 .create_control()
-                .with_anchors([0.0, 0.5, 1.0, 1.0])
-                .with_margins([15.0, 7.5, -15.0, -15.0])
-                .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
-                .with_parent(right_painel)
+                .anchors([0.0, 0.5, 1.0, 1.0])
+                .margins([15.0, 7.5, -15.0, -15.0])
+                .graphic(painel.clone().with_color([200, 200, 200, 255]))
+                .parent(right_painel)
                 .build();
             let graphic = Text::new(
             [0, 0, 0, 255],
@@ -327,10 +327,10 @@ fn main() {
             (-1, 0),
         ).into();
             gui.create_control()
-                .with_anchors([0.0, 0.0, 1.0, 1.0])
-                .with_margins([5.0, 5.0, -5.0, -5.0])
-                .with_graphic(graphic)
-                .with_parent(text_box)
+                .anchors([0.0, 0.0, 1.0, 1.0])
+                .margins([5.0, 5.0, -5.0, -5.0])
+                .graphic(graphic)
+                .parent(text_box)
                 .build();
             text_box
         };
@@ -341,25 +341,25 @@ fn main() {
             button_style.clone(),
             |_, _| println!("clicked my button!"),
         )
-        .with_min_size([0.0, 30.0])
-        .with_parent(menu)
+        .min_size([0.0, 30.0])
+        .parent(menu)
         .build();
         // {
         //     let button = gui
         //         .create_control()
-        //         .with_behaviour(Box::new(Button::new(button_style.clone(), |_, _| {
+        //         .behaviour(Box::new(Button::new(button_style.clone(), |_, _| {
         //             println!("clicked my button!")
         //         })))
-        //         .with_min_size([0.0, 30.0])
-        //         .with_parent(menu)
+        //         .min_size([0.0, 30.0])
+        //         .parent(menu)
         //         .build();
         //     let graphic =
         //         Text::new([40, 40, 100, 255], "My Button".to_owned(), 16.0, (0, 0)).into();
         //     gui.create_control()
-        //         .with_anchors([0.0, 0.0, 1.0, 1.0])
-        //         .with_margins([0.0, 0.0, 0.0, 0.0])
-        //         .with_graphic(graphic)
-        //         .with_parent(button)
+        //         .anchors([0.0, 0.0, 1.0, 1.0])
+        //         .margins([0.0, 0.0, 0.0, 0.0])
+        //         .graphic(graphic)
+        //         .parent(button)
         //         .build();
         //     button
         // };
@@ -368,9 +368,9 @@ fn main() {
             let handle = gui.reserve_id();
             let slider = gui
                 .create_control()
-                .with_min_size([0.0, 30.0])
-                .with_parent(menu)
-                .with_behaviour(Slider::new(
+                .min_size([0.0, 30.0])
+                .parent(menu)
+                .behaviour(Slider::new(
                     handle,
                     slide_area,
                     100,
@@ -386,17 +386,17 @@ fn main() {
                 .build();
             let _slide_area = gui
                 .create_control_reserved(slide_area)
-                .with_anchors([0.0, 0.5, 1.0, 0.5])
-                .with_margins([10.0, -3.0, -10.0, 3.0])
-                .with_graphic(painel.clone().with_color([170, 170, 170, 255]))
-                .with_parent(slider)
+                .anchors([0.0, 0.5, 1.0, 0.5])
+                .margins([10.0, -3.0, -10.0, 3.0])
+                .graphic(painel.clone().with_color([170, 170, 170, 255]))
+                .parent(slider)
                 .build();
             let _handle = gui
                 .create_control_reserved(handle)
-                .with_anchors([0.5, 0.5, 0.5, 0.5])
-                .with_margins([-3.0, -14.0, 3.0, 14.0])
-                .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
-                .with_parent(slider)
+                .anchors([0.5, 0.5, 0.5, 0.5])
+                .margins([-3.0, -14.0, 3.0, 14.0])
+                .graphic(painel.clone().with_color([200, 200, 200, 255]))
+                .parent(slider)
                 .build();
 
             slider
@@ -406,9 +406,9 @@ fn main() {
             let marker = gui.reserve_id();
             let toggle = gui
                 .create_control()
-                .with_min_size([0.0, 30.0])
-                .with_parent(menu)
-                .with_behaviour(Toggle::new(
+                .min_size([0.0, 30.0])
+                .parent(menu)
+                .behaviour(Toggle::new(
                     background,
                     marker,
                     false,
@@ -428,27 +428,27 @@ fn main() {
             let background = {
                 let graphic = white.clone().with_color([200, 200, 200, 255]);
                 gui.create_control_reserved(background)
-                    .with_anchors([0.0, 0.5, 0.0, 0.5])
-                    .with_margins([5.0, -10.0, 25.0, 10.0])
-                    .with_graphic(graphic)
-                    .with_parent(toggle)
+                    .anchors([0.0, 0.5, 0.0, 0.5])
+                    .margins([5.0, -10.0, 25.0, 10.0])
+                    .graphic(graphic)
+                    .parent(toggle)
                     .build()
             };
             let _marker = gui
                 .create_control_reserved(marker)
-                // .with_anchors([0.5, 0.5, 0.5, 0.5])
-                // .with_margins([-9.0, -9.0, 9.0, 9.0])
-                .with_graphic(marker_icon)
-                .with_parent(background)
+                // .anchors([0.5, 0.5, 0.5, 0.5])
+                // .margins([-9.0, -9.0, 9.0, 9.0])
+                .graphic(marker_icon)
+                .parent(background)
                 .build();
 
             let graphic =
                 Text::new([40, 40, 100, 255], "Bottom Text".to_owned(), 16.0, (-1, 0)).into();
             gui.create_control()
-                .with_anchors([0.0, 0.0, 1.0, 1.0])
-                .with_margins([30.0, 0.0, 0.0, 0.0])
-                .with_graphic(graphic)
-                .with_parent(toggle)
+                .anchors([0.0, 0.0, 1.0, 1.0])
+                .margins([30.0, 0.0, 0.0, 0.0])
+                .graphic(graphic)
+                .parent(toggle)
                 .build();
 
             toggle
@@ -458,40 +458,40 @@ fn main() {
                 let menu = gui.reserve_id();
                 let blocker = gui
                     .create_control()
-                    .with_active(false)
-                    .with_behaviour(Blocker::new(move |_, ctx| {
+                    .active(false)
+                    .behaviour(Blocker::new(move |_, ctx| {
                         ctx.send_event_to(menu, CloseMenu)
                     }))
                     .build();
                 let menu = gui
                     .create_control_reserved(menu)
-                    .with_active(false)
-                    .with_graphic(button_style.normal.clone())
-                    .with_behaviour(DropMenu::<String, _>::new(blocker, {
+                    .active(false)
+                    .graphic(button_style.normal.clone())
+                    .behaviour(DropMenu::<String, _>::new(blocker, {
                         let menu_button_style = menu_button_style.clone();
                         move |data, this, ctx| {
                             let id = ctx
                                 .create_control()
-                                .with_behaviour(MenuItem::new(this, menu_button_style.clone()))
-                                .with_layout(MarginLayout::new([4.0, 4.0, 4.0, 4.0]))
-                                .with_parent(this)
-                                // .with_min_size([10.0, 25.0])
+                                .behaviour(MenuItem::new(this, menu_button_style.clone()))
+                                .layout(MarginLayout::new([4.0, 4.0, 4.0, 4.0]))
+                                .parent(this)
+                                // .min_size([10.0, 25.0])
                                 .build();
                             let _text = ctx
                                 .create_control()
-                                .with_margins([10.0, 0.0, -10.0, 0.0])
-                                .with_graphic(
+                                .margins([10.0, 0.0, -10.0, 0.0])
+                                .graphic(
                                     Text::new([40, 40, 100, 255], data.to_string(), 16.0, (-1, 0))
                                         .into(),
                                 )
-                                .with_layout(FitText)
-                                .with_parent(id)
+                                .layout(FitText)
+                                .parent(id)
                                 .build();
                             id
                         }
                     }))
-                    .with_layout(VBoxLayout::new(0.0, [1.0, 1.0, 1.0, 1.0], -1))
-                    .with_min_size([0.0, 80.0])
+                    .layout(VBoxLayout::new(0.0, [1.0, 1.0, 1.0, 1.0], -1))
+                    .min_size([0.0, 80.0])
                     .build();
                 menu
             };
@@ -499,9 +499,9 @@ fn main() {
             let text = gui.reserve_id();
             let my_dropdown = gui
                 .create_control()
-                .with_min_size([0.0, 25.0])
-                .with_parent(menu)
-                .with_behaviour(Dropdown::new(
+                .min_size([0.0, 25.0])
+                .parent(menu)
+                .behaviour(Dropdown::new(
                     vec![
                         "Item A".to_string(),
                         "Item B".to_string(),
@@ -519,8 +519,8 @@ fn main() {
                 .build();
             let _text = gui
                 .create_control_reserved(text)
-                .with_margins([10.0, 0.0, -10.0, 0.0])
-                .with_graphic(
+                .margins([10.0, 0.0, -10.0, 0.0])
+                .graphic(
                     Text::new(
                         [40, 40, 100, 255],
                         "Select one, please".to_owned(),
@@ -529,7 +529,7 @@ fn main() {
                     )
                     .into(),
                 )
-                .with_parent(my_dropdown)
+                .parent(my_dropdown)
                 .build();
 
             my_dropdown
@@ -539,18 +539,18 @@ fn main() {
     let page_2 = {
         let page_2 = gui
             .create_control()
-            .with_graphic(page_painel.clone())
-            .with_parent(page_area)
-            .with_layout(GridLayout::new([10.0, 15.0], [10.0, 10.0, 10.0, 10.0], 3))
+            .graphic(page_painel.clone())
+            .parent(page_area)
+            .layout(GridLayout::new([10.0, 15.0], [10.0, 10.0, 10.0, 10.0], 3))
             .build();
 
         let create_vbox = |gui: &mut GUI, expand: [bool; 2], align: i8| {
             gui.create_control()
-                .with_parent(page_2)
-                .with_expand_x(expand[0])
-                .with_expand_y(expand[1])
-                .with_graphic(painel.clone().with_color([100, 100, 100, 255]))
-                .with_layout(VBoxLayout::new(5.0, [0.0, 0.0, 0.0, 0.0], align))
+                .parent(page_2)
+                .expand_x(expand[0])
+                .expand_y(expand[1])
+                .graphic(painel.clone().with_color([100, 100, 100, 255]))
+                .layout(VBoxLayout::new(5.0, [0.0, 0.0, 0.0, 0.0], align))
                 .build()
         };
 
@@ -561,13 +561,13 @@ fn main() {
                            parent: Id| {
             let rect = gui
                 .create_control()
-                .with_min_size(min_size)
-                .with_fill_x(fill[0])
-                .with_fill_y(fill[1])
-                .with_expand_x(expand[0])
-                .with_expand_y(expand[1])
-                .with_graphic(painel.clone().with_color([200, 200, 200, 255]))
-                .with_behaviour(Hoverable::new(
+                .min_size(min_size)
+                .fill_x(fill[0])
+                .fill_y(fill[1])
+                .expand_x(expand[0])
+                .expand_y(expand[1])
+                .graphic(painel.clone().with_color([200, 200, 200, 255]))
+                .behaviour(Hoverable::new(
                     hover,
                     hover_label,
                     format!(
@@ -583,7 +583,7 @@ fn main() {
                         if expand[1] { "Y" } else { "" },
                     ),
                 ))
-                .with_parent(parent)
+                .parent(parent)
                 .build();
             let graphic = Text::new(
                 [40, 40, 100, 255],
@@ -592,10 +592,7 @@ fn main() {
                 (0, 0),
             )
             .into();
-            gui.create_control()
-                .with_graphic(graphic)
-                .with_parent(rect)
-                .build();
+            gui.create_control().graphic(graphic).parent(rect).build();
             rect
         };
 
@@ -750,33 +747,31 @@ fn main() {
     let page_3 = {
         let page_3 = gui
             .create_control()
-            .with_graphic(page_painel.clone())
-            .with_parent(page_area)
-            .with_layout(VBoxLayout::new(5.0, [10.0, 10.0, 10.0, 10.0], -1))
+            .graphic(page_painel.clone())
+            .parent(page_area)
+            .layout(VBoxLayout::new(5.0, [10.0, 10.0, 10.0, 10.0], -1))
             .build();
         let list = gui.reserve_id();
         let _input_box = {
             let hbox = gui
                 .create_control()
-                .with_parent(page_3)
-                .with_layout(HBoxLayout::new(0.0, Default::default(), -1))
+                .parent(page_3)
+                .layout(HBoxLayout::new(0.0, Default::default(), -1))
                 .build();
             let _label = gui
                 .create_control()
-                .with_graphic(
-                    Text::new([0, 0, 0, 255], "Add new: ".to_owned(), 16.0, (-1, 0)).into(),
-                )
-                .with_layout(FitText)
-                .with_parent(hbox)
+                .graphic(Text::new([0, 0, 0, 255], "Add new: ".to_owned(), 16.0, (-1, 0)).into())
+                .layout(FitText)
+                .parent(hbox)
                 .build();
             let caret = gui.reserve_id();
             let input_text = gui.reserve_id();
             let input_box = gui
                 .create_control()
-                .with_min_size([0.0, 24.0])
-                .with_parent(hbox)
-                .with_expand_x(true)
-                .with_behaviour(TextField::new(
+                .min_size([0.0, 24.0])
+                .parent(hbox)
+                .expand_x(true)
+                .behaviour(TextField::new(
                     "".into(),
                     caret,
                     input_text,
@@ -805,49 +800,49 @@ fn main() {
                 .build();
             let _caret = gui
                 .create_control_reserved(caret)
-                .with_anchors([0.0, 0.0, 0.0, 0.0])
-                .with_graphic(white.clone().with_color([0, 0, 0, 255]))
-                .with_parent(input_box)
+                .anchors([0.0, 0.0, 0.0, 0.0])
+                .graphic(white.clone().with_color([0, 0, 0, 255]))
+                .parent(input_box)
                 .build();
             let _input_text = gui
                 .create_control_reserved(input_text)
-                .with_graphic(Text::new([0, 0, 0, 255], String::new(), 16.0, (-1, 0)).into())
-                .with_parent(input_box)
+                .graphic(Text::new([0, 0, 0, 255], String::new(), 16.0, (-1, 0)).into())
+                .parent(input_box)
                 .build();
             input_box
         };
         let scroll_view = gui.reserve_id();
         let view = gui
             .create_control()
-            .with_graphic(Graphic::None)
-            .with_parent(scroll_view)
-            .with_layout(ViewLayout::new(true, true))
+            .graphic(Graphic::None)
+            .parent(scroll_view)
+            .layout(ViewLayout::new(true, true))
             .build();
         let h_scroll_bar_handle = gui.reserve_id();
         let h_scroll_bar = gui
             .create_control()
-            .with_min_size([20.0, 20.0])
-            .with_graphic(white.clone().with_color([150, 150, 150, 255]))
-            .with_behaviour(ScrollBar::new(
+            .min_size([20.0, 20.0])
+            .graphic(white.clone().with_color([150, 150, 150, 255]))
+            .behaviour(ScrollBar::new(
                 h_scroll_bar_handle,
                 scroll_view,
                 false,
                 button_style.clone(),
             ))
-            .with_parent(scroll_view)
+            .parent(scroll_view)
             .build();
         let h_scroll_bar_handle = gui
             .create_control_reserved(h_scroll_bar_handle)
-            .with_graphic(white.clone().with_color([220, 220, 220, 255]))
-            .with_parent(h_scroll_bar)
+            .graphic(white.clone().with_color([220, 220, 220, 255]))
+            .parent(h_scroll_bar)
             .build();
         let v_scroll_bar_handle = gui.reserve_id();
         let v_scroll_bar = gui
             .create_control()
-            .with_min_size([20.0, 20.0])
-            .with_graphic(white.clone().with_color([150, 150, 150, 255]))
-            .with_parent(scroll_view)
-            .with_behaviour(ScrollBar::new(
+            .min_size([20.0, 20.0])
+            .graphic(white.clone().with_color([150, 150, 150, 255]))
+            .parent(scroll_view)
+            .behaviour(ScrollBar::new(
                 v_scroll_bar_handle,
                 scroll_view,
                 true,
@@ -856,21 +851,21 @@ fn main() {
             .build();
         let v_scroll_bar_handle = gui
             .create_control_reserved(v_scroll_bar_handle)
-            .with_graphic(white.clone().with_color([220, 220, 220, 255]))
-            .with_parent(v_scroll_bar)
+            .graphic(white.clone().with_color([220, 220, 220, 255]))
+            .parent(v_scroll_bar)
             .build();
         let list = gui
             .create_control_reserved(list)
-            .with_layout(VBoxLayout::new(3.0, [5.0, 5.0, 5.0, 5.0], -1))
-            .with_parent(view)
+            .layout(VBoxLayout::new(3.0, [5.0, 5.0, 5.0, 5.0], -1))
+            .parent(view)
             .build();
 
         let _scroll_view = gui
             .create_control_reserved(scroll_view)
-            .with_graphic(white.with_color([100, 100, 100, 255]))
-            .with_expand_y(true)
-            .with_parent(page_3)
-            .with_behaviour_and_layout(ScrollView::new(
+            .graphic(white.with_color([100, 100, 100, 255]))
+            .expand_y(true)
+            .parent(page_3)
+            .behaviour_and_layout(ScrollView::new(
                 view,
                 list,
                 Some((h_scroll_bar, h_scroll_bar_handle)),
@@ -892,13 +887,13 @@ fn main() {
     let page_4 = {
         let page_4 = gui
             .create_control()
-            .with_parent(page_area)
-            .with_layout(RatioLayout::new(1.0, (0, 0)))
+            .parent(page_area)
+            .layout(RatioLayout::new(1.0, (0, 0)))
             .build();
         let graphic = Texture::new(font_texture, [0.0, 0.0, 1.0, 1.0]).into();
         gui.create_control()
-            .with_graphic(graphic)
-            .with_behaviour(ContextMenu::new(menu_style, {
+            .graphic(graphic)
+            .behaviour(ContextMenu::new(menu_style, {
                 use Item::*;
                 Rc::new(Menu::new(
                     String::new(),
@@ -923,12 +918,12 @@ fn main() {
                     ],
                 ))
             }))
-            .with_parent(page_4)
+            .parent(page_4)
             .build();
         page_4
     };
     let page_na = {
-        let page_na = gui.create_control().with_parent(page_area).build();
+        let page_na = gui.create_control().parent(page_area).build();
         let graphic = Text::new(
         [255, 255, 255, 255],
         "This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(),
@@ -936,9 +931,9 @@ fn main() {
         (0, -1),
     ).into();
         gui.create_control()
-            .with_margins([15.0, 15.0, -15.0, -15.0])
-            .with_graphic(graphic)
-            .with_parent(page_na)
+            .margins([15.0, 15.0, -15.0, -15.0])
+            .graphic(graphic)
+            .parent(page_na)
             .build();
         page_na
     };
@@ -947,11 +942,11 @@ fn main() {
         let create_button = |gui: &mut GUI, page: Id, selected: bool, label: String| {
             let button = gui
                 .create_control()
-                .with_graphic(painel.clone())
-                .with_min_size([0.0, 30.0])
-                .with_parent(header)
-                .with_expand_x(true)
-                .with_behaviour(TabButton::new(
+                .graphic(painel.clone())
+                .min_size([0.0, 30.0])
+                .parent(header)
+                .expand_x(true)
+                .behaviour(TabButton::new(
                     tab_group.clone(),
                     page,
                     selected,
@@ -960,9 +955,9 @@ fn main() {
                 .build();
             let graphic = Text::new([40, 40, 100, 255], label, 16.0, (0, 0)).into();
             gui.create_control()
-                .with_graphic(graphic)
-                .with_parent(button)
-                .with_layout(FitText)
+                .graphic(graphic)
+                .parent(button)
+                .layout(FitText)
                 .build();
             button
         };
@@ -975,18 +970,18 @@ fn main() {
     let _window = {
         let window = gui
             .create_control()
-            .with_anchors([0.0, 0.0, 0.0, 0.0])
-            .with_margins([20.0, 20.0, 20.0, 20.0])
-            .with_behaviour(widgets::Window::new())
-            .with_layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
-            .with_graphic(painel.clone())
+            .anchors([0.0, 0.0, 0.0, 0.0])
+            .margins([20.0, 20.0, 20.0, 20.0])
+            .behaviour(widgets::Window::new())
+            .layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
+            .graphic(painel.clone())
             .build();
         let header = gui
             .create_control()
-            .with_graphic(painel.clone().with_color([0, 0, 255, 255]))
-            .with_layout(HBoxLayout::new(2.0, [2.0, 2.0, 2.0, 2.0], -1))
-            .with_fill_y(RectFill::ShrinkStart)
-            .with_parent(window)
+            .graphic(painel.clone().with_color([0, 0, 255, 255]))
+            .layout(HBoxLayout::new(2.0, [2.0, 2.0, 2.0, 2.0], -1))
+            .fill_y(RectFill::ShrinkStart)
+            .parent(window)
             .build();
         let style = Rc::new(ButtonStyle {
             normal: painel.clone().with_color([255, 0, 0, 255]),
@@ -996,46 +991,46 @@ fn main() {
         });
         let _title = gui
             .create_control()
-            .with_graphic(Graphic::from(Text::new(
+            .graphic(Graphic::from(Text::new(
                 [255, 255, 255, 255],
                 "This is a Window".to_string(),
                 20.0,
                 (-1, 0),
             )))
-            .with_layout(FitText)
-            .with_parent(header)
-            .with_expand_x(true)
+            .layout(FitText)
+            .parent(header)
+            .expand_x(true)
             .build();
         let _close_button = gui
             .create_control()
-            .with_behaviour(Button::new(style, move |_this, ctx| ctx.deactive(window)))
-            .with_parent(header)
-            .with_min_size([20.0, 20.0])
+            .behaviour(Button::new(style, move |_this, ctx| ctx.deactive(window)))
+            .parent(header)
+            .min_size([20.0, 20.0])
             .build();
         let content = gui
             .create_control()
-            .with_layout(MarginLayout::new([5.0, 5.0, 5.0, 5.0]))
-            .with_parent(window)
-            .with_expand_y(true)
+            .layout(MarginLayout::new([5.0, 5.0, 5.0, 5.0]))
+            .parent(window)
+            .expand_y(true)
             .build();
         let content = gui
             .create_control()
-            .with_behaviour(Blocker::new(|_, _| ()))
-            .with_layout(VBoxLayout::new(15.0, [10.0, 10.0, 10.0, 10.0], -1))
-            .with_parent(content)
-            .with_expand_y(true)
+            .behaviour(Blocker::new(|_, _| ()))
+            .layout(VBoxLayout::new(15.0, [10.0, 10.0, 10.0, 10.0], -1))
+            .parent(content)
+            .expand_y(true)
             .build();
         let _text = gui
             .create_control()
-            .with_graphic(Graphic::from(Text::new(
+            .graphic(Graphic::from(Text::new(
                 [0, 0, 0, 255],
                 "This is the content of a window.\nPlease be aware of it.".to_string(),
                 20.0,
                 (0, 0),
             )))
-            .with_layout(FitText)
-            .with_parent(content)
-            .with_expand_y(true)
+            .layout(FitText)
+            .parent(content)
+            .expand_y(true)
             .build();
         create_button(
             &mut gui,
@@ -1043,9 +1038,9 @@ fn main() {
             button_style.clone(),
             move |_this, ctx| ctx.deactive(window),
         )
-        .with_min_size([40.0, 25.0])
-        .with_parent(content)
-        .with_fill_x(RectFill::ShrinkCenter)
+        .min_size([40.0, 25.0])
+        .parent(content)
+        .fill_x(RectFill::ShrinkCenter)
         .build();
         window
     };
@@ -1153,28 +1148,28 @@ fn create_item(
         Panel::new(texture, [0.0 / 2.0, 0.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0], 10.0).into();
     let item = ctx
         .create_control()
-        .with_min_size([100.0, 35.0])
-        .with_graphic(painel.clone().with_color(color))
-        .with_parent(list)
-        .with_layout(HBoxLayout::new(0.0, [5.0, 0.0, 5.0, 0.0], 0))
+        .min_size([100.0, 35.0])
+        .graphic(painel.clone().with_color(color))
+        .parent(list)
+        .layout(HBoxLayout::new(0.0, [5.0, 0.0, 5.0, 0.0], 0))
         .build();
     let _text = ctx
         .create_control()
-        .with_parent(item)
-        .with_graphic(Text::new([0, 0, 0, 255], text, 16.0, (-1, 0)).into())
-        .with_layout(FitText)
-        .with_expand_x(true)
+        .parent(item)
+        .graphic(Text::new([0, 0, 0, 255], text, 16.0, (-1, 0)).into())
+        .layout(FitText)
+        .expand_x(true)
         .build();
     let _button = ctx
         .create_control()
-        .with_parent(item)
-        .with_graphic(painel)
-        .with_behaviour(Button::new(button_style, move |_, ctx| {
+        .parent(item)
+        .graphic(painel)
+        .behaviour(Button::new(button_style, move |_, ctx| {
             ctx.remove(item);
         }))
-        .with_min_size([15.0, 15.0])
-        .with_fill_x(RectFill::ShrinkCenter)
-        .with_fill_y(RectFill::ShrinkCenter)
+        .min_size([15.0, 15.0])
+        .fill_x(RectFill::ShrinkCenter)
+        .fill_y(RectFill::ShrinkCenter)
         .build();
 }
 
@@ -1186,11 +1181,11 @@ fn create_button<F: Fn(Id, &mut Context) + 'static>(
 ) -> ControlBuilder {
     let button_id: Id = gui.reserve_id();
     gui.create_control_reserved(button_id)
-        .with_child(|x| {
+        .child(|x| {
             // text
-            x.with_graphic(Text::new([40, 40, 100, 255], text, 16.0, (0, 0)).into())
-                .with_layout(FitText)
+            x.graphic(Text::new([40, 40, 100, 255], text, 16.0, (0, 0)).into())
+                .layout(FitText)
         })
-        .with_behaviour(Button::new(button_style, on_click))
-    // .with_layout(Box::new(MarginLayout::new([7.0, 7.0, 7.0, 7.0])))
+        .behaviour(Button::new(button_style, on_click))
+    // .layout(Box::new(MarginLayout::new([7.0, 7.0, 7.0, 7.0])))
 }

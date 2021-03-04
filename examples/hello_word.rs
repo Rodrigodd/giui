@@ -57,7 +57,7 @@ fn main() {
     // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
     let _text = gui
         .create_control()
-        .with_graphic(Text::new([0, 255, 0, 255], "Hello Word!!".to_string(), 70.0, (0, 0)).into())
+        .graphic(Text::new([0, 255, 0, 255], "Hello Word!!".to_string(), 70.0, (0, 0)).into())
         .build();
 
     // resize everthing to the screen size
