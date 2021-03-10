@@ -281,26 +281,26 @@ impl StyleSheet {
             }
             .into(),
             text_field: OnFocusStyle {
-                normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0).into(),
-                focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], 10.0).into(),
+                normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
+                focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4]).into(),
             }
             .into(),
             button: Rc::new(ButtonStyle {
-                normal: Graphic::from(Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0)),
-                hover: Graphic::from(Panel::new(texture, [0.5, 0.0, 0.5, 0.5], 10.0)),
-                pressed: Graphic::from(Panel::new(texture, [0.0, 0.5, 0.5, 0.5], 10.0)),
-                focus: Graphic::from(Panel::new(texture, [0.5, 0.5, 0.5, 0.5], 10.0)),
+                normal: Graphic::from(Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4])),
+                hover: Graphic::from(Panel::new(texture, [0.5, 0.0, 0.5, 0.5], [10.0; 4])),
+                pressed: Graphic::from(Panel::new(texture, [0.0, 0.5, 0.5, 0.5], [10.0; 4])),
+                focus: Graphic::from(Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4])),
             }),
             tab_button: Rc::new(TabStyle {
-                hover: Graphic::from(Panel::new(tab_texture, [0.5, 0.0, 0.5, 0.5], 10.0)),
-                pressed: Graphic::from(Panel::new(tab_texture, [0.0, 0.5, 0.5, 0.5], 10.0)),
-                unselected: Graphic::from(Panel::new(tab_texture, [0.0, 0.0, 0.5, 0.5], 10.0)),
-                selected: Graphic::from(Panel::new(tab_texture, [0.5, 0.5, 0.5, 0.5], 10.0)),
+                hover: Graphic::from(Panel::new(tab_texture, [0.5, 0.0, 0.5, 0.5], [10.0; 4])),
+                pressed: Graphic::from(Panel::new(tab_texture, [0.0, 0.5, 0.5, 0.5], [10.0; 4])),
+                unselected: Graphic::from(Panel::new(tab_texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4])),
+                selected: Graphic::from(Panel::new(tab_texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4])),
             }),
             popup_background: white.clone().with_color([0, 0, 0, 160]).into(),
             popup_header: white.clone().into(),
             popup_window: white.clone().with_color([200, 200, 200, 255]).into(),
-            list_background: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0).into(),
+            list_background: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
             page_background: white.clone().into(),
             scroll_background: Graphic::None,
             scroll_handle: Rc::new(ButtonStyle {

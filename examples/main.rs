@@ -81,17 +81,17 @@ fn main() {
         window_size.width as f32 / 2.0,
         window_size.height as f32 / 2.0,
     );
-    let painel: Graphic = Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0).into();
+    let painel: Graphic = Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into();
     let white: Graphic = Texture::new(texture, [0.2, 0.2, 0.3, 0.3]).into();
-    let page_painel: Graphic = Panel::new(texture, [0.0, 0.1, 0.5, 0.4], 10.0).into();
+    let page_painel: Graphic = Panel::new(texture, [0.0, 0.1, 0.5, 0.4], [10.0; 4]).into();
     let marker_icon: Graphic = Icon::new(marker_texture, [0.0, 0.0, 1.0, 1.0], [18.0; 2]).into();
     // let marker_icon: Graphic = Texture::new(marker_texture, [0.0, 0.0, 1.0, 1.0]).into();
 
     let button_style = Rc::new(ButtonStyle {
-        normal: Graphic::from(Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0)),
-        hover: Graphic::from(Panel::new(texture, [0.5, 0.0, 0.5, 0.5], 10.0)),
-        pressed: Graphic::from(Panel::new(texture, [0.0, 0.5, 0.5, 0.5], 10.0)),
-        focus: Graphic::from(Panel::new(texture, [0.5, 0.5, 0.5, 0.5], 10.0)),
+        normal: Graphic::from(Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4])),
+        hover: Graphic::from(Panel::new(texture, [0.5, 0.0, 0.5, 0.5], [10.0; 4])),
+        pressed: Graphic::from(Panel::new(texture, [0.0, 0.5, 0.5, 0.5], [10.0; 4])),
+        focus: Graphic::from(Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4])),
     });
     let menu_button_style = Rc::new(ButtonStyle {
         normal: Graphic::from(Texture::new(texture, [0.1, 0.1, 0.3, 0.3])),
@@ -107,10 +107,10 @@ fn main() {
             .into(),
     });
     let tab_style = Rc::new(TabStyle {
-        hover: Graphic::from(Panel::new(tab_texture, [0.5, 0.0, 0.5, 0.5], 10.0)),
-        pressed: Graphic::from(Panel::new(tab_texture, [0.0, 0.5, 0.5, 0.5], 10.0)),
-        unselected: Graphic::from(Panel::new(tab_texture, [0.0, 0.0, 0.5, 0.5], 10.0)),
-        selected: Graphic::from(Panel::new(tab_texture, [0.5, 0.5, 0.5, 0.5], 10.0)),
+        hover: Graphic::from(Panel::new(tab_texture, [0.5, 0.0, 0.5, 0.5], [10.0; 4])),
+        pressed: Graphic::from(Panel::new(tab_texture, [0.0, 0.5, 0.5, 0.5], [10.0; 4])),
+        unselected: Graphic::from(Panel::new(tab_texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4])),
+        selected: Graphic::from(Panel::new(tab_texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4])),
     });
     let focus_style = Rc::new(OnFocusStyle {
         normal: Graphic::None,
@@ -1144,8 +1144,12 @@ fn create_item(
     color: [u8; 4],
     button_style: Rc<ButtonStyle>,
 ) {
-    let painel: Graphic =
-        Panel::new(texture, [0.0 / 2.0, 0.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0], 10.0).into();
+    let painel: Graphic = Panel::new(
+        texture,
+        [0.0 / 2.0, 0.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0],
+        [10.0; 4],
+    )
+    .into();
     let item = ctx
         .create_control()
         .min_size([100.0, 35.0])

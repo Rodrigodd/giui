@@ -84,10 +84,10 @@ fn main() {
 
     // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
     let button_style = Rc::new(ButtonStyle {
-        normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], 10.0).into(),
-        hover: Panel::new(texture, [0.5, 0.0, 0.5, 0.5], 10.0).into(),
-        pressed: Panel::new(texture, [0.0, 0.5, 0.5, 0.5], 10.0).into(),
-        focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], 10.0).into(),
+        normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
+        hover: Panel::new(texture, [0.5, 0.0, 0.5, 0.5], [10.0; 4]).into(),
+        pressed: Panel::new(texture, [0.0, 0.5, 0.5, 0.5], [10.0; 4]).into(),
+        focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4]).into(),
     });
 
     let window = Rc::new(window);

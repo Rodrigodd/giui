@@ -14,6 +14,8 @@ pub mod render;
 pub mod style;
 pub mod widgets;
 
+mod deserialize;
+
 pub use context::*;
 pub use control::*;
 pub use gui::*;

@@ -3,12 +3,13 @@ use std::cmp::Ordering;
 use std::ops::Range;
 use xi_unicode::LineBreakIterator;
 
+#[derive(Debug)]
 pub struct FontGlyph {
     pub glyph: Glyph,
     pub font_id: (usize,),
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct TextInfo {
     bounding_box: [f32; 4],
     indices: Vec<usize>,

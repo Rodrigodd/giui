@@ -12,7 +12,8 @@ pub struct Sprite {
     pub uv_rect: [f32; 4],
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
+// #[cfg_attr(feature = "serde", derive(Deserialize))]
 pub enum Graphic {
     Panel(Panel),
     Texture(Texture),
@@ -154,7 +155,7 @@ impl Graphic {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Icon {
     pub texture: u32,
     pub uv_rect: [f32; 4],
@@ -198,7 +199,7 @@ impl Icon {
         }
     }
 }
-
+#[derive(Debug)]
 pub struct Texture {
     pub texture: u32,
     pub uv_rect: [f32; 4],
@@ -240,17 +241,17 @@ impl Texture {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Panel {
     pub texture: u32,
     pub uv_rects: [[f32; 4]; 9],
+    pub border: [f32; 4],
     pub color: [u8; 4],
     pub color_dirty: bool,
-    pub border: f32,
 }
 impl Panel {
     #[allow(clippy::many_single_char_names)]
-    pub fn new(texture: u32, uv_rect: [f32; 4], border: f32) -> Self {
+    pub fn new(texture: u32, uv_rect: [f32; 4], border: [f32; 4]) -> Self {
         // divide the given uv_rect in 9 equal sized ones
         let w = uv_rect[2];
         let h = uv_rect[3];
@@ -268,33 +269,39 @@ impl Panel {
         Self {
             texture,
             uv_rects,
+            border,
             color: [255, 255, 255, 255],
             color_dirty: true,
-            border,
         }
     }
 
     pub fn get_sprites(&self, rect: [f32; 4]) -> Vec<Sprite> {
         let width = (rect[2] - rect[0]).max(0.0);
         let height = (rect[3] - rect[1]).max(0.0);
-        let border = self.border.min(width / 2.0).min(height / 2.0).round();
+        // TODO: make the border scale equaly
+        let border = [
+            self.border[0].min(width / 2.0).round(),
+            self.border[1].min(height / 2.0).round(),
+            self.border[2].min(width / 2.0).round(),
+            self.border[3].min(height / 2.0).round(),
+        ];
         let x1 = rect[0];
-        let x2 = rect[0] + border;
-        let x3 = rect[2] - border;
+        let x2 = rect[0] + border[0];
+        let x3 = rect[2] - border[2];
 
         let y1 = rect[1];
-        let y2 = rect[1] + border;
-        let y3 = rect[3] - border;
+        let y2 = rect[1] + border[1];
+        let y3 = rect[3] - border[3];
 
-        let inner_width = width - border * 2.0;
-        let inner_height = height - border * 2.0;
+        let inner_width = x3 - x2;
+        let inner_height = y3 - y2;
 
         let mut sprites = Vec::with_capacity(9);
         for i in 0..9 {
             let x = [x1, x2, x3][i % 3];
             let y = [y1, y2, y3][i / 3];
-            let w = [border, inner_width, border][i % 3];
-            let h = [border, inner_height, border][i / 3];
+            let w = [border[0], inner_width, border[2]][i % 3];
+            let h = [border[1], inner_height, border[3]][i / 3];
             sprites.push(Sprite {
                 texture: self.texture,
                 color: self.color,
@@ -306,6 +313,7 @@ impl Panel {
     }
 }
 
+#[derive(Debug)]
 pub struct Text {
     pub color: [u8; 4],
     color_dirty: bool,
@@ -318,6 +326,22 @@ pub struct Text {
     last_pos: [f32; 2],
     min_size: Option<[f32; 2]>,
 }
+impl Default for Text {
+    fn default() -> Self {
+        Self {
+            color: Default::default(),
+            color_dirty: true,
+            text: Default::default(),
+            text_dirty: true,
+            font_size: Default::default(),
+            align: Default::default(),
+            glyphs: Default::default(),
+            text_info: Default::default(),
+            last_pos: Default::default(),
+            min_size: Default::default(),
+        }
+    }
+}
 impl Clone for Text {
     fn clone(&self) -> Self {
         Self::new(self.color, self.text.clone(), self.font_size, self.align)
@@ -327,15 +351,10 @@ impl Text {
     pub fn new(color: [u8; 4], text: String, font_size: f32, align: (i8, i8)) -> Text {
         Self {
             color,
-            color_dirty: true,
             text,
-            text_dirty: true,
             font_size,
             align,
-            glyphs: Vec::new(),
-            text_info: None,
-            last_pos: [0.0, 0.0],
-            min_size: None,
+            ..Default::default()
         }
     }
 
