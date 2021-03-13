@@ -1,11 +1,11 @@
 use super::*;
 
-pub const FIELDS: &[&str] = &["texture", "uv_rects", "border", "color", "color_dirty"];
+pub const FIELDS: &[&str] = &["texture", "uv_rect", "size", "color", "color_dirty"];
 #[allow(non_camel_case_types)]
 enum Field {
     Texture,
-    UVRects,
-    Border,
+    UVRect,
+    Size,
     Color,
 }
 struct FieldVisitor;
@@ -20,8 +20,8 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
     {
         match value {
             0u64 => Ok(Field::Texture),
-            1u64 => Ok(Field::UVRects),
-            2u64 => Ok(Field::Border),
+            1u64 => Ok(Field::UVRect),
+            2u64 => Ok(Field::Size),
             3u64 => Ok(Field::Color),
             _ => Err(serde::de::Error::invalid_value(
                 serde::de::Unexpected::Unsigned(value),
@@ -35,8 +35,8 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
     {
         match value {
             "texture" => Ok(Field::Texture),
-            "uv_rects" => Ok(Field::UVRects),
-            "border" => Ok(Field::Border),
+            "uv_rect" => Ok(Field::UVRect),
+            "size" => Ok(Field::Size),
             "color" => Ok(Field::Color),
             _ => Err(de::Error::unknown_field(value, FIELDS)),
         }
@@ -57,46 +57,23 @@ impl<'de> serde::Deserialize<'de> for Field {
         serde::Deserializer::deserialize_identifier(deserializer, FieldVisitor)
     }
 }
-pub struct PanelVisitor;
-impl<'de> serde::de::Visitor<'de> for PanelVisitor {
-    type Value = Panel;
+
+pub struct IconVisitor<'a, C: StyleLoaderCallback> {
+    pub loader: &'a mut StyleLoader<C>,
+}
+impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for IconVisitor<'a, C> {
+    type Value = Icon;
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Formatter::write_str(formatter, "struct Panel")
-    }
-    #[inline]
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: serde::de::SeqAccess<'de>,
-    {
-        const EXPECT: &str = "struct Panel with 5 elements";
-        let texture = seq
-            .next_element()?
-            .ok_or_else(|| de::Error::invalid_length(0, &EXPECT))?;
-        let uv_rects = seq
-            .next_element()?
-            .ok_or_else(|| de::Error::invalid_length(1, &EXPECT))?;
-        let border = seq
-            .next_element()?
-            .ok_or_else(|| de::Error::invalid_length(2, &EXPECT))?;
-        let color = seq
-            .next_element()?
-            .ok_or_else(|| de::Error::invalid_length(3, &EXPECT))?;
-        Ok(Panel {
-            texture,
-            uv_rects,
-            border,
-            color,
-            color_dirty: true,
-        })
+        fmt::Formatter::write_str(formatter, "struct Icon")
     }
     #[inline]
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
         A: MapAccess<'de>,
     {
-        let mut texture = None;
-        let mut uv_rects = None;
-        let mut border = None;
+        let mut texture: Option<String> = None;
+        let mut uv_rect: Option<[i32; 4]> = None;
+        let mut size = None;
         let mut color = None;
         while let Some(key) = MapAccess::next_key::<Field>(&mut map)? {
             match key {
@@ -106,17 +83,17 @@ impl<'de> serde::de::Visitor<'de> for PanelVisitor {
                     }
                     texture = Some(map.next_value()?);
                 }
-                Field::UVRects => {
-                    if Option::is_some(&uv_rects) {
-                        return Err(de::Error::duplicate_field("uv_rects"));
+                Field::UVRect => {
+                    if Option::is_some(&uv_rect) {
+                        return Err(de::Error::duplicate_field("uv_rect"));
                     }
-                    uv_rects = Some(map.next_value()?);
+                    uv_rect = Some(map.next_value()?);
                 }
-                Field::Border => {
-                    if Option::is_some(&border) {
-                        return Err(de::Error::duplicate_field("border"));
+                Field::Size => {
+                    if Option::is_some(&size) {
+                        return Err(de::Error::duplicate_field("size"));
                     }
-                    border = Some(map.next_value()?);
+                    size = Some(map.next_value()?);
                 }
                 Field::Color => {
                     if Option::is_some(&color) {
@@ -127,24 +104,32 @@ impl<'de> serde::de::Visitor<'de> for PanelVisitor {
             }
         }
         let texture = texture.ok_or_else(|| de::Error::missing_field("texture"))?;
-        let uv_rects = uv_rects.ok_or_else(|| de::Error::missing_field("uv_rects"))?;
-        let border = border.ok_or_else(|| de::Error::missing_field("border"))?;
+        let (texture, width, height) = self.loader.load_texture(texture);
+        let uv_rect = uv_rect.ok_or_else(|| de::Error::missing_field("uv_rect"))?;
+        let uv_rect = [
+            uv_rect[0] as f32 / width as f32,
+            uv_rect[1] as f32 / height as f32,
+            uv_rect[2] as f32 / width as f32,
+            uv_rect[3] as f32 / height as f32,
+        ];
+        let size = size.ok_or_else(|| de::Error::missing_field("size"))?;
         let color = color.ok_or_else(|| de::Error::missing_field("color"))?;
-        Ok(Panel {
+        Ok(Icon {
             texture,
-            uv_rects,
-            border,
+            uv_rect,
+            size,
             color,
             color_dirty: true,
         })
     }
 }
 
-impl<'de> serde::Deserialize<'de> for Panel {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+impl<'de, 'a, C: StyleLoaderCallback> DeserializeSeed<'de> for LoadStyle<'a, Icon, C> {
+    type Value = Icon;
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        serde::Deserializer::deserialize_struct(deserializer, "Panel", FIELDS, PanelVisitor)
+        serde::Deserializer::deserialize_struct(deserializer, "Icon", FIELDS, IconVisitor { loader: self.loader })
     }
 }
