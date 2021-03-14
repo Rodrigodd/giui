@@ -1,5 +1,5 @@
 [package]
-name = "ui_engine"
+name = "crui"
 version = "0.1.0"
 authors = ["Rodrigo Batista de Moraes <rodrigobatsmoraes@hotmail.com>"]
 edition = "2018"

@@ -47,7 +47,7 @@ use std::{
 
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
-use ui_engine::{
+use crui::{
     event::SetValue,
     graphics::{Graphic, Panel, Text, Texture},
     layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
@@ -103,17 +103,17 @@ fn main() {
 
     // load textures
     let texture = {
-        let data = image::open("D:/repos/rust/ui_engine/examples/panel.png").unwrap();
+        let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
         let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
     let icon_texture = {
-        let data = image::open("D:/repos/rust/ui_engine/examples/icons.png").unwrap();
+        let data = image::open("D:/repos/rust/crui/examples/icons.png").unwrap();
         let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
     let tab_texture = {
-        let data = image::open("D:/repos/rust/ui_engine/examples/tab.png").unwrap();
+        let data = image::open("D:/repos/rust/crui/examples/tab.png").unwrap();
         let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
@@ -977,8 +977,8 @@ impl OptionsGUI {
                 ctx.deactive(popup)
             }))
             .min_size([75.0, 20.0])
-            .fill_x(ui_engine::RectFill::ShrinkCenter)
-            .fill_y(ui_engine::RectFill::ShrinkCenter)
+            .fill_x(crui::RectFill::ShrinkCenter)
+            .fill_y(crui::RectFill::ShrinkCenter)
             .parent(button_area)
             .build();
         let _ok_button_text = gui

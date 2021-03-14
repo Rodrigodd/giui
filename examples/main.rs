@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
-use ui_engine::{
+use crui::{
     graphics::{Graphic, Icon, Panel, Text, Texture},
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
     render::{GUIRender, GUIRenderer},
@@ -53,22 +53,22 @@ fn main() {
         .collect();
     let mut gui = GUI::new(window_size.width as f32, window_size.height as f32, fonts);
     let texture = {
-        let data = image::open("D:/repos/rust/ui_engine/examples/panel.png").unwrap();
+        let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
         let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
     let tab_texture = {
-        let data = image::open("D:/repos/rust/ui_engine/examples/tab.png").unwrap();
+        let data = image::open("D:/repos/rust/crui/examples/tab.png").unwrap();
         let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
     let icon_texture = {
-        let data = image::open("D:/repos/rust/ui_engine/examples/icons.png").unwrap();
+        let data = image::open("D:/repos/rust/crui/examples/icons.png").unwrap();
         let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
     let marker_texture = {
-        let data = image::open("D:/repos/rust/ui_engine/examples/check.png").unwrap();
+        let data = image::open("D:/repos/rust/crui/examples/check.png").unwrap();
         let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };

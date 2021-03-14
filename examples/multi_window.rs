@@ -2,7 +2,7 @@ use std::{collections::HashMap, rc::Rc};
 
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
-use ui_engine::{
+use crui::{
     graphics::{Panel, Text},
     layouts::{FitText, MarginLayout, VBoxLayout},
     render::{GUIRender, GUIRenderer},
@@ -67,7 +67,7 @@ fn main() {
     };
     let font_texture = render.new_texture(128, 128, &[], false);
     let texture = {
-        let data = image::open("D:/repos/rust/ui_engine/examples/panel.png").unwrap();
+        let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
         let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
@@ -337,8 +337,8 @@ fn create_gui(
         }))
         .parent(surface)
         .layout(MarginLayout::new([5.0; 4]))
-        .fill_x(ui_engine::RectFill::ShrinkCenter)
-        .fill_y(ui_engine::RectFill::ShrinkEnd)
+        .fill_x(crui::RectFill::ShrinkCenter)
+        .fill_y(crui::RectFill::ShrinkEnd)
         .expand_y(true)
         .build();
     let _text = gui
@@ -383,8 +383,8 @@ fn create_gui(
         }))
         .parent(surface)
         .layout(MarginLayout::new([5.0; 4]))
-        .fill_x(ui_engine::RectFill::ShrinkCenter)
-        .fill_y(ui_engine::RectFill::ShrinkStart)
+        .fill_x(crui::RectFill::ShrinkCenter)
+        .fill_y(crui::RectFill::ShrinkStart)
         .expand_y(true)
         .build();
     let _text = gui

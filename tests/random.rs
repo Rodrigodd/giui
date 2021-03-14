@@ -1,7 +1,7 @@
 use core::f32;
 
 use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
-use ui_engine::{
+use crui::{
     layouts::{GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
     Behaviour, Context, Id, InputFlags, MouseEvent, GUI,
 };

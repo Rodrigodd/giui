@@ -1,6 +1,6 @@
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
-use ui_engine::{
+use crui::{
     graphics::Text,
     render::{GUIRender, GUIRenderer},
     GUI,
