@@ -58,10 +58,10 @@ impl<'de> serde::Deserialize<'de> for Field {
     }
 }
 
-pub struct IconVisitor<'a, C: StyleLoaderCallback> {
-    pub loader: &'a mut StyleLoader<C>,
+pub struct IconVisitor<'a, 'b> {
+    pub loader: &'a mut StyleLoader<'b>,
 }
-impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for IconVisitor<'a, C> {
+impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for IconVisitor<'a, 'b> {
     type Value = Icon;
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         fmt::Formatter::write_str(formatter, "struct Icon")
@@ -99,7 +99,7 @@ impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for IconVisitor<'a
                     if Option::is_some(&color) {
                         return Err(de::Error::duplicate_field("color"));
                     }
-                    color = Some(map.next_value()?);
+                    color = Some(map.next_value::<Color>()?.0);
                 }
             }
         }
@@ -113,7 +113,7 @@ impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for IconVisitor<'a
             uv_rect[3] as f32 / height as f32,
         ];
         let size = size.ok_or_else(|| de::Error::missing_field("size"))?;
-        let color = color.ok_or_else(|| de::Error::missing_field("color"))?;
+        let color = color.unwrap_or([255; 4]);
         Ok(Icon {
             texture,
             uv_rect,
@@ -124,7 +124,17 @@ impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for IconVisitor<'a
     }
 }
 
-impl<'de, 'a, C: StyleLoaderCallback> DeserializeSeed<'de> for LoadStyle<'a, Icon, C> {
+impl<'a, 'b: 'a> LoadStyle<'a, 'b> for Icon {
+    type Loader = IconLoader<'a, 'b>;
+    fn new_loader(loader: &'a mut StyleLoader<'b>) -> Self::Loader {
+        IconLoader { loader }
+    }
+}
+
+pub struct IconLoader<'a, 'b> {
+    loader: &'a mut StyleLoader<'b>,
+}
+impl<'de, 'a, 'b> DeserializeSeed<'de> for IconLoader<'a, 'b> {
     type Value = Icon;
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where

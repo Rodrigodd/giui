@@ -1,6 +1,9 @@
 use crate::graphics::{Graphic, Icon, Panel, Text, Texture};
 use serde::{
-    de::{self, DeserializeSeed, Deserialize, EnumAccess, Error, MapAccess, Unexpected, VariantAccess, Visitor},
+    de::{
+        self, Deserialize, DeserializeSeed, EnumAccess, Error, MapAccess, Unexpected,
+        VariantAccess, Visitor,
+    },
     Deserializer,
 };
 use std::{fmt, marker::PhantomData};
@@ -8,8 +11,8 @@ use std::{fmt, marker::PhantomData};
 #[cfg(test)]
 mod test;
 
-mod color;
-use color::Color;
+pub mod util;
+use util::Color;
 
 mod panel;
 use panel::{PanelVisitor, FIELDS as PANEL_FIELDS};
@@ -27,41 +30,48 @@ pub trait StyleLoaderCallback {
     fn load_texture(&mut self, name: String) -> (u32, u32, u32);
 }
 
-pub struct StyleLoader<C: StyleLoaderCallback> {
-    callback: C,
+pub struct StyleLoader<'l> {
+    callback: Box<dyn StyleLoaderCallback + 'l>,
 }
-impl<C: StyleLoaderCallback> StyleLoader<C> {
-    fn new(callback: C) -> Self {
-        Self { callback }
+impl<'l> StyleLoader<'l> {
+    fn new<C: StyleLoaderCallback + 'l>(callback: C) -> Self {
+        Self { callback: Box::new(callback) }
     }
     fn load_texture(&mut self, name: String) -> (u32, u32, u32) {
         self.callback.load_texture(name)
     }
 }
 
-pub struct LoadStyle<'a, T, C: StyleLoaderCallback> {
-    loader: &'a mut StyleLoader<C>,
-    _phantom: PhantomData<fn() -> T>,
+pub trait LoadStyle<'a, 'b> {
+    type Loader: for<'de> DeserializeSeed<'de, Value = Self> + 'a;
+    fn new_loader(loader: &'a mut StyleLoader<'b>) -> Self::Loader;
 }
 
-pub fn load_style<'de, T, D, C: StyleLoaderCallback + 'static>(deserializer: D, callback: C) -> Result<T, D::Error>
+pub fn load_style<'de, T, D, C>(deserializer: D, callback: C) -> Result<T, D::Error>
 where
-    D: Deserializer<'de>,
-    for<'a> LoadStyle<'a, T, C>: DeserializeSeed<'de, Value = T>,
-    T: 'static,
+    C: StyleLoaderCallback,
+    D: Deserializer<'de> + 'de,
+    // this bound should be something like `T: for<'b where 'b: 'a> LoadStyle<'b, 'a>`, but this does not exist (yet?).
+    T: for<'b> LoadStyle<'b, 'static>,
 {
-    let mut loader = StyleLoader::new(callback);
-    let load = LoadStyle {
-        loader: &mut loader,
-        _phantom: PhantomData::<fn() -> T>::default(),
+    let mut loader: StyleLoader = unsafe {
+        std::mem::transmute(StyleLoader::new(callback))
     };
-
-    let value = load.deserialize(deserializer);
-    drop(loader);
-    value
+    let load = <T as LoadStyle>::new_loader(&mut loader);
+    DeserializeSeed::deserialize(load, deserializer)
 }
 
-impl<'de, 'a, C: StyleLoaderCallback> DeserializeSeed<'de> for LoadStyle<'a, Graphic, C> {
+impl<'a, 'b: 'a> LoadStyle<'a, 'b> for Graphic {
+    type Loader = GraphicLoader<'a, 'b>;
+    fn new_loader(loader: &'a mut StyleLoader<'b>) -> Self::Loader {
+        GraphicLoader { loader }
+    }
+}
+
+pub struct GraphicLoader<'a, 'b> {
+    loader: &'a mut StyleLoader<'b>,
+}
+impl<'de, 'a, 'b> DeserializeSeed<'de> for GraphicLoader<'a, 'b> {
     type Value = Graphic;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -139,10 +149,10 @@ impl<'de, 'a, C: StyleLoaderCallback> DeserializeSeed<'de> for LoadStyle<'a, Gra
                 Deserializer::deserialize_identifier(deserializer, FieldVisitor)
             }
         }
-        struct GraphicVisitor<'a, C: StyleLoaderCallback> {
-            loader: &'a mut StyleLoader<C>,
+        struct GraphicVisitor<'a, 'b> {
+            loader: &'a mut StyleLoader<'b>,
         }
-        impl<'de, 'a, C: StyleLoaderCallback> Visitor<'de> for GraphicVisitor<'a, C> {
+        impl<'de, 'a, 'b: 'a> Visitor<'de> for GraphicVisitor<'a, 'b> {
             type Value = Graphic;
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 fmt::Formatter::write_str(formatter, "enum Graphic")
@@ -187,27 +197,26 @@ impl<'de, 'a, C: StyleLoaderCallback> DeserializeSeed<'de> for LoadStyle<'a, Gra
                     (Field::None, variant) => {
                         VariantAccess::unit_variant(variant)?;
                         Ok(Graphic::None)
-                    }
-                    // (Field::Panel, variant) => Result::map(
-                    //     VariantAccess::newtype_variant::<Panel>(variant),
-                    //     Graphic::Panel,
-                    // ),
-                    // (Field::Texture, variant) => Result::map(
-                    //     VariantAccess::newtype_variant::<Texture>(variant),
-                    //     Graphic::Texture,
-                    // ),
-                    // (Field::Icon, variant) => Result::map(
-                    //     VariantAccess::newtype_variant::<Icon>(variant),
-                    //     Graphic::Icon,
-                    // ),
-                    // (Field::Text, variant) => Result::map(
-                    //     VariantAccess::newtype_variant::<Text>(variant),
-                    //     Graphic::Text,
-                    // ),
-                    // (Field::None, variant) => {
-                    //     VariantAccess::unit_variant(variant)?;
-                    //     Ok(Graphic::None)
-                    // }
+                    } // (Field::Panel, variant) => Result::map(
+                      //     VariantAccess::newtype_variant::<Panel>(variant),
+                      //     Graphic::Panel,
+                      // ),
+                      // (Field::Texture, variant) => Result::map(
+                      //     VariantAccess::newtype_variant::<Texture>(variant),
+                      //     Graphic::Texture,
+                      // ),
+                      // (Field::Icon, variant) => Result::map(
+                      //     VariantAccess::newtype_variant::<Icon>(variant),
+                      //     Graphic::Icon,
+                      // ),
+                      // (Field::Text, variant) => Result::map(
+                      //     VariantAccess::newtype_variant::<Text>(variant),
+                      //     Graphic::Text,
+                      // ),
+                      // (Field::None, variant) => {
+                      //     VariantAccess::unit_variant(variant)?;
+                      //     Ok(Graphic::None)
+                      // }
                 }
             }
         }

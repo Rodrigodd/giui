@@ -1,12 +1,14 @@
 use crate::graphics::Graphic;
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Clone, Debug, LoadStyle)]
+#[crui(crate = "crate")]
 pub struct OnFocusStyle {
     pub normal: Graphic,
     pub focus: Graphic,
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Clone, Debug, LoadStyle)]
+#[crui(crate = "crate")]
 pub struct ButtonStyle {
     pub normal: Graphic,
     pub hover: Graphic,
@@ -14,7 +16,8 @@ pub struct ButtonStyle {
     pub focus: Graphic,
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Clone, Debug, LoadStyle)]
+#[crui(crate = "crate")]
 pub struct TabStyle {
     pub unselected: Graphic,
     pub hover: Graphic,
@@ -22,7 +25,8 @@ pub struct TabStyle {
     pub selected: Graphic,
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Clone, Debug, LoadStyle)]
+#[crui(crate = "crate")]
 pub struct MenuStyle {
     pub button: ButtonStyle,
     pub separator: Graphic,

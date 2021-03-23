@@ -57,10 +57,10 @@ impl<'de> serde::Deserialize<'de> for Field {
         serde::Deserializer::deserialize_identifier(deserializer, FieldVisitor)
     }
 }
-pub struct TextVisitor<'a, C: StyleLoaderCallback> {
-    pub loader: &'a mut StyleLoader<C>,
+pub struct TextVisitor<'a, 'b> {
+    pub loader: &'a mut StyleLoader<'b>,
 }
-impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for TextVisitor<'a, C> {
+impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for TextVisitor<'a, 'b> {
     type Value = Text;
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         fmt::Formatter::write_str(formatter, "struct Text")
@@ -105,12 +105,22 @@ impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for TextVisitor<'a
         let text = text.ok_or_else(|| de::Error::missing_field("text"))?;
         let font_size = font_size.ok_or_else(|| de::Error::missing_field("font_size"))?;
         let align = align.ok_or_else(|| de::Error::missing_field("align"))?;
-        let color = color.ok_or_else(|| de::Error::missing_field("color"))?;
+        let color = color.unwrap_or([255; 4]);
         Ok(Text::new(color, text, font_size, align))
     }
 }
 
-impl<'de, 'a, C: StyleLoaderCallback> DeserializeSeed<'de> for LoadStyle<'a, Text, C> {
+impl<'a, 'b: 'a> LoadStyle<'a, 'b> for Text {
+    type Loader = TextLoader<'a, 'b>;
+    fn new_loader(loader: &'a mut StyleLoader<'b>) -> Self::Loader {
+        TextLoader { loader }
+    }
+}
+
+pub struct TextLoader<'a, 'b> {
+    loader: &'a mut StyleLoader<'b>,
+}
+impl<'de, 'a, 'b> DeserializeSeed<'de> for TextLoader<'a, 'b> {
     type Value = Text;
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where

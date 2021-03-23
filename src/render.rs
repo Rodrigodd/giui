@@ -213,7 +213,7 @@ impl GUIRender {
                         Graphic::Icon(x) => {
                             let rect = rect;
                             let mut sprite = x.get_sprite(*rect.get_rect());
-                            if dbg!(cut_sprite(&mut sprite, &mask)) {
+                            if cut_sprite(&mut sprite, &mask) {
                                 self.sprites.push(sprite);
                             }
                         }

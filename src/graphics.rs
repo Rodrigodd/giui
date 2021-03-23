@@ -194,7 +194,7 @@ impl Icon {
         Sprite {
             texture: self.texture,
             color: self.color,
-            rect: dbg!([x, y, x + w, y + h]),
+            rect: [x, y, x + w, y + h],
             uv_rect: self.uv_rect,
         }
     }

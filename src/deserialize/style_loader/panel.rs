@@ -118,10 +118,10 @@ impl<'de> Deserialize<'de> for Border {
     }
 }
 
-pub struct PanelVisitor<'a, C: StyleLoaderCallback> {
-    pub loader: &'a mut StyleLoader<C>,
+pub struct PanelVisitor<'a, 'b> {
+    pub loader: &'a mut StyleLoader<'b>,
 }
-impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for PanelVisitor<'a, C> {
+impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for PanelVisitor<'a, 'b> {
     type Value = Panel;
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         fmt::Formatter::write_str(formatter, "struct Panel")
@@ -139,7 +139,7 @@ impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for PanelVisitor<'
         let mut border: Option<[i32; 4]> = None;
         let mut color = None;
         while let Some(key) = MapAccess::next_key::<Field>(&mut map)? {
-            match dbg!(key) {
+            match key {
                 Field::Texture => {
                     if Option::is_some(&texture) {
                         return Err(de::Error::duplicate_field("texture"));
@@ -150,7 +150,7 @@ impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for PanelVisitor<'
                     if Option::is_some(&uv_rect) {
                         return Err(de::Error::duplicate_field("uv_rect"));
                     }
-                    uv_rect = Some(dbg!(map.next_value())?);
+                    uv_rect = Some(map.next_value()?);
                 }
                 Field::UVRects => {
                     if Option::is_some(&uv_rects) {
@@ -182,7 +182,7 @@ impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for PanelVisitor<'
             let x = [
                 uv_rect[0],
                 uv_rect[0] + border[0],
-                uv_rect[1] + w - border[2],
+                uv_rect[0] + w - border[2],
             ];
             let y = [
                 uv_rect[1],
@@ -218,7 +218,7 @@ impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for PanelVisitor<'
             }
             uvs
         };
-        let color = color.ok_or_else(|| de::Error::missing_field("color"))?;
+        let color = color.unwrap_or([255; 4]);
         Ok(Panel {
             texture,
             uv_rects,
@@ -234,7 +234,17 @@ impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for PanelVisitor<'
     }
 }
 
-impl<'de, 'a, C: StyleLoaderCallback> DeserializeSeed<'de> for LoadStyle<'a, Panel, C> {
+impl<'a, 'b: 'a> LoadStyle<'a,'b> for Panel {
+    type Loader = PanelLoader<'a, 'b>;
+    fn new_loader(loader: &'a mut StyleLoader<'b>) -> Self::Loader {
+        PanelLoader { loader }
+    }
+}
+
+pub struct PanelLoader<'a, 'b> {
+    loader: &'a mut StyleLoader<'b>,
+}
+impl<'de, 'a, 'b> DeserializeSeed<'de> for PanelLoader<'a, 'b> {
     type Value = Panel;
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where

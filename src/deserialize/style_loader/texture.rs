@@ -54,10 +54,10 @@ impl<'de> serde::Deserialize<'de> for Field {
         serde::Deserializer::deserialize_identifier(deserializer, FieldVisitor)
     }
 }
-pub struct TextureVisitor<'a, C: StyleLoaderCallback> {
-    pub loader: &'a mut StyleLoader<C>,
+pub struct TextureVisitor<'a, 'b> {
+    pub loader: &'a mut StyleLoader<'b>,
 }
-impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for TextureVisitor<'a, C> {
+impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for TextureVisitor<'a, 'b> {
     type Value = Texture;
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         fmt::Formatter::write_str(formatter, "struct Texture")
@@ -101,7 +101,7 @@ impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for TextureVisitor
             uv_rect[2] as f32 / width as f32,
             uv_rect[3] as f32 / height as f32,
         ];
-        let color = color.ok_or_else(|| de::Error::missing_field("color"))?;
+        let color = color.unwrap_or([255; 4]);
         Ok(Texture {
             texture,
             uv_rect,
@@ -111,7 +111,17 @@ impl<'de, 'a, C: StyleLoaderCallback> serde::de::Visitor<'de> for TextureVisitor
     }
 }
 
-impl<'de, 'a, C: StyleLoaderCallback> DeserializeSeed<'de> for LoadStyle<'a, Texture, C> {
+impl<'a, 'b: 'a> LoadStyle<'a, 'b> for Texture {
+    type Loader = TextureLoader<'a, 'b>;
+    fn new_loader(loader: &'a mut StyleLoader<'b>) -> Self::Loader {
+        TextureLoader { loader }
+    }
+}
+
+pub struct TextureLoader<'a, 'b> {
+    loader: &'a mut StyleLoader<'b>,
+}
+impl<'de, 'a, 'b> DeserializeSeed<'de> for TextureLoader<'a, 'b> {
     type Value = Texture;
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
