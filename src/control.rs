@@ -161,7 +161,7 @@ impl<'a> ControlBuilder<'a> {
         {
             let mut parents = vec![id];
             while let Some(id) = parents.pop() {
-                parents.extend(controls.get_children(id).iter().rev());
+                parents.extend(controls.get_active_children(id).iter().rev());
                 controls[id].really_active = true;
             }
         }
@@ -251,7 +251,7 @@ impl Controls {
         false
     }
 
-    pub fn get_children(&self, id: Id) -> Vec<Id> {
+    pub fn get_active_children(&self, id: Id) -> Vec<Id> {
         self[id]
             .children
             .iter()
@@ -288,7 +288,7 @@ impl Controls {
         if let Some(parent) = self[id].parent {
             let mut up = self.tree_starting_at(parent);
             up.pop();
-            let children = self.get_children(parent);
+            let children = self.get_active_children(parent);
             let i = children
                 .iter()
                 .position(|x| *x == id)
@@ -306,7 +306,7 @@ impl Controls {
             let mut up = self.rev_tree_starting_at(parent);
             up.pop();
             let i = self
-                .get_children(parent)
+                .get_active_children(parent)
                 .iter()
                 .position(|x| *x == id)
                 .expect("Parent/children desync");

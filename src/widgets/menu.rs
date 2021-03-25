@@ -60,7 +60,7 @@ impl MenuBehaviour {
             Item::Separator => {}
             Item::Button(_, _) => {}
             Item::SubMenu(menu) => {
-                let child = ctx.get_children(this)[i];
+                let child = ctx.get_active_children(this)[i];
                 let rect = *ctx.get_rect(child);
                 let x = rect[2];
                 let y = rect[1];
@@ -168,7 +168,7 @@ impl Behaviour for MenuBehaviour {
                 }
             }
             MouseEvent::Moved { x, y } => {
-                let children = ctx.get_children(this);
+                let children = ctx.get_active_children(this);
                 self.is_over = false;
                 for (i, child) in children.iter().enumerate().rev() {
                     let rect = *ctx.get_rect(*child);
@@ -228,7 +228,7 @@ impl MenuBar {
     fn open_menu(&mut self, i: usize, this: Id, ctx: &mut Context) {
         self.close_menu(ctx);
         ctx.active(self.blocker);
-        let child = ctx.get_children(this)[i];
+        let child = ctx.get_active_children(this)[i];
         let rect = *ctx.get_rect(child);
         let x = rect[0];
         let y = rect[3];
@@ -291,7 +291,7 @@ impl Behaviour for MenuBar {
             }
             MouseEvent::Up(_) => {}
             MouseEvent::Moved { x, y } => {
-                let children = ctx.get_children(this);
+                let children = ctx.get_active_children(this);
                 self.is_over = false;
                 for (i, child) in children.iter().enumerate().rev() {
                     let rect = *ctx.get_rect(*child);

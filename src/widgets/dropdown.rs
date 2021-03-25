@@ -157,7 +157,7 @@ where
                 ctx.send_event(event::RequestFocus { id: this });
             }
             // set itens
-            for child in ctx.get_children(this) {
+            for child in ctx.get_active_children(this) {
                 ctx.remove(child);
             }
             for (i, item) in itens.iter().enumerate() {

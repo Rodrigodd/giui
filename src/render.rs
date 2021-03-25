@@ -58,7 +58,7 @@ impl GUIRender {
             } else {
                 ctx.get_layouting(parent).dirty_render_dirty_flags();
             }
-            parents.extend(ctx.get_children(parent).iter().rev())
+            parents.extend(ctx.get_active_children(parent).iter().rev())
         }
     }
 
@@ -90,7 +90,7 @@ impl GUIRender {
             // queue all glyphs for cache
             let mut parents = vec![Id::ROOT_ID];
             while let Some(parent) = parents.pop() {
-                parents.extend(ctx.get_children(parent).iter());
+                parents.extend(ctx.get_active_children(parent).iter());
                 if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(parent) {
                     let glyphs = text.get_glyphs(rect, fonts);
                     for glyph in glyphs {
@@ -252,7 +252,7 @@ impl GUIRender {
                 }
             }
             ctx.get_layouting(parent).clear_render_dirty_flags();
-            parents.extend(ctx.get_children(parent).iter().rev())
+            parents.extend(ctx.get_active_children(parent).iter().rev())
         }
 
         std::mem::swap(&mut self.sprites, &mut self.last_sprites);

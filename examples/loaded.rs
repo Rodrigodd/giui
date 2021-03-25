@@ -426,7 +426,7 @@ impl OptionsGUI {
         ctx.send_event_to(self.check_b, SetValue(self.options.borrow().check_b));
         ctx.send_event_to(self.dropdown, SetSelected(self.options.borrow().dropdown));
 
-        for child in ctx.get_children(self.list) {
+        for child in ctx.get_active_children(self.list) {
             ctx.remove(child);
         }
 

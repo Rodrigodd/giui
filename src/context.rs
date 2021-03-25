@@ -242,8 +242,8 @@ impl<'a> Context<'a> {
         self.gui.controls[id].parent
     }
 
-    pub fn get_children(&self, id: Id) -> Vec<Id> {
-        self.gui.controls.get_children(id)
+    pub fn get_active_children(&self, id: Id) -> Vec<Id> {
+        self.gui.controls.get_active_children(id)
     }
 }
 
@@ -314,8 +314,8 @@ impl<'a> MinSizeContext<'a> {
     //     self.controls[id].parent
     // }
 
-    pub fn get_children(&self, id: Id) -> Vec<Id> {
-        self.controls.get_children(id)
+    pub fn get_active_children(&self, id: Id) -> Vec<Id> {
+        self.controls.get_active_children(id)
     }
 }
 
@@ -360,7 +360,7 @@ impl<'a> LayoutContext<'a> {
                 // post order traversal
                 let mut i = 0;
                 while i != parents.len() {
-                    parents.extend(self.0.get_children(parents[i]).iter().rev());
+                    parents.extend(self.0.get_active_children(parents[i]).iter().rev());
                     i += 1;
                 }
                 while let Some(parent) = parents.pop() {
@@ -512,7 +512,7 @@ impl<'a> LayoutContext<'a> {
         self.controls[id].parent
     }
 
-    pub fn get_children(&self, id: Id) -> Vec<Id> {
-        self.controls.get_children(id)
+    pub fn get_active_children(&self, id: Id) -> Vec<Id> {
+        self.controls.get_active_children(id)
     }
 }

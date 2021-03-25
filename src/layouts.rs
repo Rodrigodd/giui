@@ -29,7 +29,7 @@ impl MarginLayout {
 impl Layout for MarginLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let mut min_size = [0.0f32, 0.0];
-        for child in ctx.get_children(this) {
+        for child in ctx.get_active_children(this) {
             let c_min_size = ctx.get_layouting(child).get_min_size();
             min_size[0] = min_size[0].max(c_min_size[0]);
             min_size[1] = min_size[1].max(c_min_size[1]);
@@ -47,7 +47,7 @@ impl Layout for MarginLayout {
             rect[2] - self.margins[2],
             rect[3] - self.margins[3],
         ];
-        for child in ctx.get_children(this) {
+        for child in ctx.get_active_children(this) {
             ctx.set_designed_rect(child, des_rect);
         }
     }
@@ -65,7 +65,7 @@ impl RatioLayout {
 impl Layout for RatioLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let mut min_size = [0.0f32, 0.0];
-        for child in ctx.get_children(this) {
+        for child in ctx.get_active_children(this) {
             let c_min_size = ctx.get_layouting(child).get_min_size();
             min_size[0] = min_size[0].max(c_min_size[0]);
             min_size[1] = min_size[1].max(c_min_size[1]);
@@ -108,7 +108,7 @@ impl Layout for RatioLayout {
                 y + rect.get_height(),
             ]
         };
-        for child in ctx.get_children(this) {
+        for child in ctx.get_active_children(this) {
             ctx.set_designed_rect(child, des_rect);
         }
     }
@@ -130,7 +130,7 @@ impl HBoxLayout {
 }
 impl Layout for HBoxLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
-        let children = ctx.get_children(this);
+        let children = ctx.get_active_children(this);
         if children.is_empty() {
             [
                 self.margins[0] + self.margins[2],
@@ -150,7 +150,7 @@ impl Layout for HBoxLayout {
     }
 
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
-        let children = ctx.get_children(this);
+        let children = ctx.get_active_children(this);
         if children.is_empty() {
             return;
         }
@@ -176,13 +176,13 @@ impl Layout for HBoxLayout {
                 1 => x += free_width,
                 _ => {}
             }
-            for child in ctx.get_children(this) {
+            for child in ctx.get_active_children(this) {
                 let min_width = ctx.get_min_size(child)[0];
                 ctx.set_designed_rect(child, [x, top, x + min_width, bottom]);
                 x += self.spacing + min_width;
             }
         } else {
-            for child in ctx.get_children(this) {
+            for child in ctx.get_active_children(this) {
                 let rect = ctx.get_layouting(child);
                 if rect.is_expand_x() {
                     // FIXME: this implementation imply that rect with same ratio,
@@ -216,7 +216,7 @@ impl VBoxLayout {
 }
 impl Layout for VBoxLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
-        let children = ctx.get_children(this);
+        let children = ctx.get_active_children(this);
         if children.is_empty() {
             [
                 self.margins[0] + self.margins[2],
@@ -236,7 +236,7 @@ impl Layout for VBoxLayout {
     }
 
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
-        let children = ctx.get_children(this);
+        let children = ctx.get_active_children(this);
         if children.is_empty() {
             return;
         }
@@ -262,13 +262,13 @@ impl Layout for VBoxLayout {
                 1 => y += free_height,
                 _ => {}
             }
-            for child in ctx.get_children(this) {
+            for child in ctx.get_active_children(this) {
                 let height = ctx.get_min_size(child)[1];
                 ctx.set_designed_rect(child, [left, y, right, y + height]);
                 y += self.spacing + height;
             }
         } else {
-            for child in ctx.get_children(this) {
+            for child in ctx.get_active_children(this) {
                 let rect = ctx.get_layouting(child);
                 if rect.is_expand_y() {
                     // FIXME: this implementation imply that rect with same ratio,
@@ -310,7 +310,7 @@ impl GridLayout {
 }
 impl Layout for GridLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
-        let children = ctx.get_children(this);
+        let children = ctx.get_active_children(this);
         if children.is_empty() {
             self.rows = 0;
             self.min_sizes.clear();
@@ -348,7 +348,7 @@ impl Layout for GridLayout {
     }
 
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
-        let children = ctx.get_children(this);
+        let children = ctx.get_active_children(this);
         if children.is_empty() {
             return;
         }

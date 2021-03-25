@@ -162,7 +162,7 @@ impl ViewLayout {
 }
 impl Layout for ViewLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
-        let content = match ctx.get_children(this).get(0) {
+        let content = match ctx.get_active_children(this).get(0) {
             Some(x) => *x,
             None => return [0.0; 2],
         };
