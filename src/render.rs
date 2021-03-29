@@ -4,7 +4,7 @@ use crate::{
     Id, RenderDirtyFlags,
 };
 use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
-use std::ops::Range;
+use std::{ops::Range, time::Instant};
 
 pub trait GUIRenderer {
     fn update_font_texure(&mut self, font_texture: u32, rect: [u32; 4], data: &[u8]);
@@ -18,6 +18,7 @@ pub struct GUIRender {
     last_sprites_map: Vec<(Id, Range<usize>)>,
     sprites: Vec<Sprite>,
     sprites_map: Vec<(Id, Range<usize>)>,
+    last_anim_draw: Option<Instant>,
 }
 impl GUIRender {
     pub fn new(font_texture: u32, font_texture_size: [u32; 2]) -> Self {
@@ -32,6 +33,7 @@ impl GUIRender {
             last_sprites_map: Vec::new(),
             sprites: Vec::new(),
             sprites_map: Vec::new(),
+            last_anim_draw: None,
         }
     }
 
@@ -51,6 +53,9 @@ impl GUIRender {
                     Graphic::Icon(x) => {
                         x.color_dirty = true;
                     }
+                    Graphic::AnimatedIcon(x) => {
+                        x.color_dirty = true;
+                    }
                     Graphic::Text(x) => x.dirty(),
                     Graphic::None => {}
                 }
@@ -66,7 +71,7 @@ impl GUIRender {
         &'a mut self,
         ctx: &mut Context,
         mut renderer: T,
-    ) -> &'a [Sprite] {
+    ) -> (&'a [Sprite], bool) {
         self.sprites.clear();
         self.sprites_map.clear();
         let mut masks: Vec<(usize, [f32; 4], bool)> = Vec::new();
@@ -125,6 +130,14 @@ impl GUIRender {
             }
             break;
         }
+
+        let mut is_animating = false;
+        let dt = if let Some(x) = self.last_anim_draw {
+            let dt = x.elapsed().as_secs_f32();
+            dt
+        } else {
+            0.0
+        };
 
         let mut parents = vec![Id::ROOT_ID];
         'tree: while let Some(parent) = parents.pop() {
@@ -217,6 +230,15 @@ impl GUIRender {
                                 self.sprites.push(sprite);
                             }
                         }
+                        Graphic::AnimatedIcon(x) => {
+                            is_animating = true;
+
+                            let rect = rect;
+                            let mut sprite = x.get_sprite(*rect.get_rect(), dt);
+                            if cut_sprite(&mut sprite, &mask) {
+                                self.sprites.push(sprite);
+                            }
+                        }
                         Graphic::Text(ref mut text) => {
                             let color = text.color;
                             let glyphs = text.get_glyphs(rect, fonts);
@@ -257,7 +279,12 @@ impl GUIRender {
 
         std::mem::swap(&mut self.sprites, &mut self.last_sprites);
         std::mem::swap(&mut self.sprites_map, &mut self.last_sprites_map);
-        &self.last_sprites
+
+        if is_animating {
+            self.last_anim_draw = Some(Instant::now());
+        }
+
+        (&self.last_sprites, is_animating)
     }
 }
 

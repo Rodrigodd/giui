@@ -211,6 +211,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
             self.selection_index = None;
             self.caret_index = self.text_info.get_caret_index_at_pos(0, x);
             self.update_carret(this, ctx, true);
+            self.callback.on_change(this, ctx, &self.text);
         }
     }
 

@@ -79,6 +79,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
     /// v_scroll must be a descendant of this
     pub fn new(
         content_width: f32,
+        spacing: f32,
         view: Id,
         v_scroll_bar: Id,
         v_scroll_bar_handle: Id,
@@ -89,7 +90,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
     ) -> Self {
         Self {
             // TODO: spacing and margins must be paramenters
-            spacing: 2.0,
+            spacing,
             margins: [2.0; 4],
             content_width,
             delta_x: 0.0,

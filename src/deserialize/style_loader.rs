@@ -1,4 +1,4 @@
-use crate::graphics::{Graphic, Icon, Panel, Text, Texture};
+use crate::graphics::{Graphic, Icon, AnimatedIcon, Panel, Text, Texture};
 use serde::{
     de::{
         self, Deserialize, DeserializeSeed, EnumAccess, Error, MapAccess, Unexpected,
@@ -22,6 +22,9 @@ use texture::{TextureVisitor, FIELDS as TEXTURE_FIELDS};
 
 mod icon;
 use icon::{IconVisitor, FIELDS as ICON_FIELDS};
+
+mod animated_icon;
+use animated_icon::{AnimatedIconVisitor, FIELDS as ANIMATED_ICON_FIELDS};
 
 mod text;
 use text::{TextVisitor, FIELDS as TEXT_FIELDS};
@@ -84,6 +87,7 @@ impl<'de, 'a, 'b> DeserializeSeed<'de> for GraphicLoader<'a, 'b> {
             Panel,
             Texture,
             Icon,
+            AnimatedIcon,
             Text,
             None,
         }
@@ -102,6 +106,7 @@ impl<'de, 'a, 'b> DeserializeSeed<'de> for GraphicLoader<'a, 'b> {
                     0u64 => Ok(Field::Panel),
                     1u64 => Ok(Field::Texture),
                     2u64 => Ok(Field::Icon),
+                    5u64 => Ok(Field::AnimatedIcon),
                     3u64 => Ok(Field::Text),
                     4u64 => Ok(Field::None),
                     _ => Err(Error::invalid_value(
@@ -118,6 +123,7 @@ impl<'de, 'a, 'b> DeserializeSeed<'de> for GraphicLoader<'a, 'b> {
                     "Panel" => Ok(Field::Panel),
                     "Texture" => Ok(Field::Texture),
                     "Icon" => Ok(Field::Icon),
+                    "AnimatedIcon" => Ok(Field::AnimatedIcon),
                     "Text" => Ok(Field::Text),
                     "None" => Ok(Field::None),
                     _ => Err(Error::unknown_variant(value, VARIANTS)),
@@ -131,6 +137,7 @@ impl<'de, 'a, 'b> DeserializeSeed<'de> for GraphicLoader<'a, 'b> {
                     b"Panel" => Ok(Field::Panel),
                     b"Texture" => Ok(Field::Texture),
                     b"Icon" => Ok(Field::Icon),
+                    b"AnimatedIcon" => Ok(Field::AnimatedIcon),
                     b"Text" => Ok(Field::Text),
                     b"None" => Ok(Field::None),
                     _ => {
@@ -186,6 +193,14 @@ impl<'de, 'a, 'b> DeserializeSeed<'de> for GraphicLoader<'a, 'b> {
                         },
                     )
                     .map(Graphic::Icon),
+                    (Field::AnimatedIcon, variant) => VariantAccess::struct_variant(
+                        variant,
+                        ANIMATED_ICON_FIELDS,
+                        AnimatedIconVisitor {
+                            loader: self.loader,
+                        },
+                    )
+                    .map(Graphic::AnimatedIcon),
                     (Field::Text, variant) => VariantAccess::struct_variant(
                         variant,
                         TEXT_FIELDS,
@@ -197,26 +212,27 @@ impl<'de, 'a, 'b> DeserializeSeed<'de> for GraphicLoader<'a, 'b> {
                     (Field::None, variant) => {
                         VariantAccess::unit_variant(variant)?;
                         Ok(Graphic::None)
-                    } // (Field::Panel, variant) => Result::map(
-                      //     VariantAccess::newtype_variant::<Panel>(variant),
-                      //     Graphic::Panel,
-                      // ),
-                      // (Field::Texture, variant) => Result::map(
-                      //     VariantAccess::newtype_variant::<Texture>(variant),
-                      //     Graphic::Texture,
-                      // ),
-                      // (Field::Icon, variant) => Result::map(
-                      //     VariantAccess::newtype_variant::<Icon>(variant),
-                      //     Graphic::Icon,
-                      // ),
-                      // (Field::Text, variant) => Result::map(
-                      //     VariantAccess::newtype_variant::<Text>(variant),
-                      //     Graphic::Text,
-                      // ),
-                      // (Field::None, variant) => {
-                      //     VariantAccess::unit_variant(variant)?;
-                      //     Ok(Graphic::None)
-                      // }
+                    }
+                    // (Field::Panel, variant) => Result::map(
+                    //     VariantAccess::newtype_variant::<Panel>(variant),
+                    //     Graphic::Panel,
+                    // ),
+                    // (Field::Texture, variant) => Result::map(
+                    //     VariantAccess::newtype_variant::<Texture>(variant),
+                    //     Graphic::Texture,
+                    // ),
+                    // (Field::Icon, variant) => Result::map(
+                    //     VariantAccess::newtype_variant::<Icon>(variant),
+                    //     Graphic::Icon,
+                    // ),
+                    // (Field::Text, variant) => Result::map(
+                    //     VariantAccess::newtype_variant::<Text>(variant),
+                    //     Graphic::Text,
+                    // ),
+                    // (Field::None, variant) => {
+                    //     VariantAccess::unit_variant(variant)?;
+                    //     Ok(Graphic::None)
+                    // }
                 }
             }
         }

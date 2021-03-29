@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::{HashMap, HashSet}, rc::Rc};
 
 use ab_glyph::FontArc;
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
@@ -122,11 +122,17 @@ fn main() {
         },
     );
 
+    let mut is_animating: HashSet<WindowId> = HashSet::new();
+
     // winit event loop
     event_loop.run(move |event, event_loop, control| {
-        *control = ControlFlow::Wait;
-
         match event {
+            Event::NewEvents(_) => {
+                *control = ControlFlow::Wait;
+                for window_id in is_animating.drain() {
+                    windows[&window_id].window.request_redraw();
+                }
+            }
             Event::UserEvent(UserEvent::CreateNewWindow {
                 owner,
                 modal,
@@ -257,7 +263,7 @@ fn main() {
                     }
                 }
                 let mut ctx = gui.get_context();
-                let sprites = gui_render.render(&mut ctx, Render(&mut render));
+                let (sprites, is_anim) = gui_render.render(&mut ctx, Render(&mut render));
                 let mut renderer = render.render(window_id);
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
                 renderer.draw_sprites(
@@ -278,6 +284,12 @@ fn main() {
                         })
                         .collect::<Vec<_>>(),
                 );
+
+                if is_anim {
+                    *control = ControlFlow::Poll;
+                    is_animating.insert(window_id);
+                }
+
                 renderer.finish();
             }
             _ => {}

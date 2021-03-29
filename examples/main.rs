@@ -1062,9 +1062,17 @@ fn main() {
         window.id(),
     );
 
+    let mut is_animating = false;
+
+    // winit event loop
     event_loop.run(move |event, _, control| {
-        *control = ControlFlow::Wait;
         match event {
+            Event::NewEvents(_) => {
+                *control = ControlFlow::Wait;
+                if is_animating {
+                    window.request_redraw()
+                }
+            }
             Event::WindowEvent { event, window_id } if window_id == window.id() => {
                 // gui receive events
                 gui.handle_event(&event);
@@ -1108,7 +1116,8 @@ fn main() {
                     }
                 }
                 let mut ctx = gui.get_context();
-                let sprites = gui_render.render(&mut ctx, Render(&mut render));
+                let (sprites, is_anim) = gui_render.render(&mut ctx, Render(&mut render));
+                is_animating = is_anim;
                 let mut renderer = render.render(window_id);
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
                 renderer.draw_sprites(
@@ -1129,6 +1138,11 @@ fn main() {
                         })
                         .collect::<Vec<_>>(),
                 );
+
+                if is_animating {
+                    *control = ControlFlow::Poll;
+                }
+
                 renderer.finish();
             }
             _ => {}

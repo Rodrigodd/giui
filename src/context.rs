@@ -197,7 +197,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn is_active(&self, id: Id) -> bool {
-        self.gui.controls[id].active
+        self.gui.controls.get(id).map_or(false, |x| x.active)
     }
 
     pub fn is_focus(&self, id: Id) -> bool {
