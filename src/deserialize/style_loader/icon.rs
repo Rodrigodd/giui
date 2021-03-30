@@ -140,6 +140,13 @@ impl<'de, 'a, 'b> DeserializeSeed<'de> for IconLoader<'a, 'b> {
     where
         D: serde::Deserializer<'de>,
     {
-        serde::Deserializer::deserialize_struct(deserializer, "Icon", FIELDS, IconVisitor { loader: self.loader })
+        serde::Deserializer::deserialize_struct(
+            deserializer,
+            "Icon",
+            FIELDS,
+            IconVisitor {
+                loader: self.loader,
+            },
+        )
     }
 }

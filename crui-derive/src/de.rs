@@ -65,7 +65,7 @@ pub fn expand_derive_deserialize(
     let serde = cont.attrs.serde_path();
 
     let impl_block = quote! {
-        
+
         #[automatically_derived]
         impl #load_style_impl _crui::style_loader::LoadStyle<'r, 'loader> for #ident #ty_generics #where_clause {
             type Loader = #loader_name <'r, 'loader>;

@@ -234,7 +234,7 @@ impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for PanelVisitor<'a, 'b> {
     }
 }
 
-impl<'a, 'b: 'a> LoadStyle<'a,'b> for Panel {
+impl<'a, 'b: 'a> LoadStyle<'a, 'b> for Panel {
     type Loader = PanelLoader<'a, 'b>;
     fn new_loader(loader: &'a mut StyleLoader<'b>) -> Self::Loader {
         PanelLoader { loader }

@@ -46,7 +46,6 @@ use std::{
 // }
 
 use ab_glyph::FontArc;
-use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use crui::{
     event::SetValue,
     graphics::{Graphic, Panel, Text, Texture},
@@ -60,6 +59,7 @@ use crui::{
     },
     Context, ControlBuilder, Id, RectFill, GUI,
 };
+use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -165,7 +165,7 @@ fn main() {
         window.inner_size(),
         window.id(),
     );
-    
+
     let mut is_animating = false;
 
     // winit event loop

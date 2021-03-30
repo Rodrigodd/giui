@@ -126,6 +126,13 @@ impl<'de, 'a, 'b> DeserializeSeed<'de> for TextLoader<'a, 'b> {
     where
         D: serde::Deserializer<'de>,
     {
-        serde::Deserializer::deserialize_struct(deserializer, "Text", FIELDS, TextVisitor { loader: self.loader })
+        serde::Deserializer::deserialize_struct(
+            deserializer,
+            "Text",
+            FIELDS,
+            TextVisitor {
+                loader: self.loader,
+            },
+        )
     }
 }

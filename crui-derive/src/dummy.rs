@@ -10,7 +10,6 @@ pub fn wrap_in_const(
     ty: &Ident,
     code: TokenStream,
 ) -> TokenStream {
-
     let try_replacement = r#try::replacement();
 
     let dummy_const = if cfg!(underscore_consts) {

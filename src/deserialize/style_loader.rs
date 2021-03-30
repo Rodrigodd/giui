@@ -1,4 +1,4 @@
-use crate::graphics::{Graphic, Icon, AnimatedIcon, Panel, Text, Texture};
+use crate::graphics::{AnimatedIcon, Graphic, Icon, Panel, Text, Texture};
 use serde::{
     de::{
         self, Deserialize, DeserializeSeed, EnumAccess, Error, MapAccess, Unexpected,
@@ -38,7 +38,9 @@ pub struct StyleLoader<'l> {
 }
 impl<'l> StyleLoader<'l> {
     fn new<C: StyleLoaderCallback + 'l>(callback: C) -> Self {
-        Self { callback: Box::new(callback) }
+        Self {
+            callback: Box::new(callback),
+        }
     }
     fn load_texture(&mut self, name: String) -> (u32, u32, u32) {
         self.callback.load_texture(name)
@@ -57,9 +59,7 @@ where
     // this bound should be something like `T: for<'b where 'b: 'a> LoadStyle<'b, 'a>`, but this does not exist (yet?).
     T: for<'b> LoadStyle<'b, 'static>,
 {
-    let mut loader: StyleLoader = unsafe {
-        std::mem::transmute(StyleLoader::new(callback))
-    };
+    let mut loader: StyleLoader = unsafe { std::mem::transmute(StyleLoader::new(callback)) };
     let load = <T as LoadStyle>::new_loader(&mut loader);
     DeserializeSeed::deserialize(load, deserializer)
 }
@@ -212,27 +212,26 @@ impl<'de, 'a, 'b> DeserializeSeed<'de> for GraphicLoader<'a, 'b> {
                     (Field::None, variant) => {
                         VariantAccess::unit_variant(variant)?;
                         Ok(Graphic::None)
-                    }
-                    // (Field::Panel, variant) => Result::map(
-                    //     VariantAccess::newtype_variant::<Panel>(variant),
-                    //     Graphic::Panel,
-                    // ),
-                    // (Field::Texture, variant) => Result::map(
-                    //     VariantAccess::newtype_variant::<Texture>(variant),
-                    //     Graphic::Texture,
-                    // ),
-                    // (Field::Icon, variant) => Result::map(
-                    //     VariantAccess::newtype_variant::<Icon>(variant),
-                    //     Graphic::Icon,
-                    // ),
-                    // (Field::Text, variant) => Result::map(
-                    //     VariantAccess::newtype_variant::<Text>(variant),
-                    //     Graphic::Text,
-                    // ),
-                    // (Field::None, variant) => {
-                    //     VariantAccess::unit_variant(variant)?;
-                    //     Ok(Graphic::None)
-                    // }
+                    } // (Field::Panel, variant) => Result::map(
+                      //     VariantAccess::newtype_variant::<Panel>(variant),
+                      //     Graphic::Panel,
+                      // ),
+                      // (Field::Texture, variant) => Result::map(
+                      //     VariantAccess::newtype_variant::<Texture>(variant),
+                      //     Graphic::Texture,
+                      // ),
+                      // (Field::Icon, variant) => Result::map(
+                      //     VariantAccess::newtype_variant::<Icon>(variant),
+                      //     Graphic::Icon,
+                      // ),
+                      // (Field::Text, variant) => Result::map(
+                      //     VariantAccess::newtype_variant::<Text>(variant),
+                      //     Graphic::Text,
+                      // ),
+                      // (Field::None, variant) => {
+                      //     VariantAccess::unit_variant(variant)?;
+                      //     Ok(Graphic::None)
+                      // }
                 }
             }
         }

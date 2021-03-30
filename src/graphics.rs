@@ -260,7 +260,7 @@ impl AnimatedIcon {
             texture: self.texture,
             color: self.color,
             rect: [x, y, x + w, y + h],
-            uv_rect: self.frames[(self.curr_time*self.fps) as usize],
+            uv_rect: self.frames[(self.curr_time * self.fps) as usize],
         };
 
         self.curr_time = (self.curr_time + dt) % (self.frames.len() as f32 / self.fps);

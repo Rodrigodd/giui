@@ -1,7 +1,9 @@
-use std::{collections::{HashMap, HashSet}, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use ab_glyph::FontArc;
-use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use crui::{
     graphics::{Panel, Text},
     layouts::{FitText, MarginLayout, VBoxLayout},
@@ -10,6 +12,7 @@ use crui::{
     widgets::Button,
     GUI,
 };
+use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{Event, WindowEvent},

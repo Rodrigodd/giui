@@ -94,10 +94,8 @@ where
     where
         D: Deserializer<'de>,
     {
-        DeserializeSeed::deserialize(
-            <T as LoadStyle>::new_loader(self.loader),
-            deserializer,
-        ).map(Rc::new)
+        DeserializeSeed::deserialize(<T as LoadStyle>::new_loader(self.loader), deserializer)
+            .map(Rc::new)
     }
 }
 

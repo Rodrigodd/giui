@@ -3,7 +3,6 @@
 use std::rc::Rc;
 
 use ab_glyph::FontArc;
-use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use crui::{
     graphics::{Graphic, Icon, Panel, Text, Texture},
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
@@ -16,6 +15,7 @@ use crui::{
     },
     Context, ControlBuilder, Id, RectFill, GUI,
 };
+use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},

@@ -1,7 +1,4 @@
-use crate::{
-    graphics::{Graphic, Icon, Panel, Text, Texture},
-    // style::{ButtonStyle, OnFocusStyle},
-};
+use crate::graphics::{Graphic, Icon, Panel, Text, Texture};
 
 #[test]
 fn deserialize_panel() {

@@ -7,7 +7,7 @@ struct Grid {
     rows: u32,
     cols: u32,
     #[serde(default)]
-    #[serde(deserialize_with="grid_len")]
+    #[serde(deserialize_with = "grid_len")]
     len: Option<u32>,
 }
 
@@ -18,7 +18,15 @@ where
     Deserialize::deserialize(d).map(Option::Some)
 }
 
-pub const FIELDS: &[&str] = &["texture", "frames", "fps", "grid", "size", "color", "color_dirty"];
+pub const FIELDS: &[&str] = &[
+    "texture",
+    "frames",
+    "fps",
+    "grid",
+    "size",
+    "color",
+    "color_dirty",
+];
 #[allow(non_camel_case_types)]
 enum Field {
     Texture,
@@ -136,12 +144,7 @@ impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for AnimatedIconVisitor<'a, 'b> {
                     let h = (rect[3] - rect[1]) / rows as i32;
                     'grid: for y in 0..rows as i32 {
                         for x in 0..cols as i32 {
-                            grid_frames.push([
-                                rect[0] + w * x,
-                                rect[1] + h * y,
-                                w,
-                                h,
-                            ]);
+                            grid_frames.push([rect[0] + w * x, rect[1] + h * y, w, h]);
                             if grid_frames.len() == len {
                                 break 'grid;
                             }

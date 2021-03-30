@@ -127,6 +127,13 @@ impl<'de, 'a, 'b> DeserializeSeed<'de> for TextureLoader<'a, 'b> {
     where
         D: serde::Deserializer<'de>,
     {
-        serde::Deserializer::deserialize_struct(deserializer, "Texture", FIELDS, TextureVisitor { loader: self.loader })
+        serde::Deserializer::deserialize_struct(
+            deserializer,
+            "Texture",
+            FIELDS,
+            TextureVisitor {
+                loader: self.loader,
+            },
+        )
     }
 }
