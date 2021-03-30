@@ -133,15 +133,19 @@ impl Behaviour for MenuBehaviour {
         }
     }
 
+    fn on_deactive(&mut self, _this: Id, ctx: &mut Context) {
+        self.close_menu(ctx);
+    }
+    
+    fn on_remove(&mut self, _this: Id, ctx: &mut Context) {
+        self.close_menu(ctx);
+    }
+
     fn on_event(&mut self, event: Box<dyn Any>, _: Id, ctx: &mut Context) {
         if event.is::<ItemClicked>() {
             self.close_menu(ctx);
             ctx.send_event_to(self.owner, ItemClicked);
         }
-    }
-
-    fn on_deactive(&mut self, _this: Id, ctx: &mut Context) {
-        self.close_menu(ctx);
     }
 
     fn input_flags(&self) -> InputFlags {
@@ -154,6 +158,7 @@ impl Behaviour for MenuBehaviour {
             MouseEvent::Down(Left) => {
                 self.click = true;
             }
+            MouseEvent::Down(_) => {}
             MouseEvent::Up(Left) => {
                 if self.is_over && self.click {
                     let i = self.over.unwrap();
@@ -167,6 +172,7 @@ impl Behaviour for MenuBehaviour {
                     }
                 }
             }
+            MouseEvent::Up(_) => {}
             MouseEvent::Moved { x, y } => {
                 let children = ctx.get_active_children(this);
                 self.is_over = false;
@@ -189,11 +195,20 @@ impl Behaviour for MenuBehaviour {
                             self.click = false;
                         }
                         self.is_over = true;
-                        break;
+                        return;
                     }
                 }
             }
-            _ => {}
+            MouseEvent::Enter => {}
+            MouseEvent::Exit => {
+                if self.open.is_some() {
+                    return;
+                }
+                if let Some(i) = self.over.take() {
+                    let children = ctx.get_active_children(this);
+                    ctx.set_graphic(children[i], self.style.button.normal.clone());
+                }
+            }
         }
     }
 }
@@ -265,9 +280,13 @@ impl Behaviour for MenuBar {
         }
     }
 
-    fn on_event(&mut self, event: Box<dyn Any>, _: Id, ctx: &mut Context) {
+    fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
         if event.is::<ItemClicked>() || event.is::<CloseMenu>() {
             self.close_menu(ctx);
+            if let Some(i) = self.over.take() {
+                let children = ctx.get_active_children(this);
+                ctx.set_graphic(children[i], self.style.button.normal.clone());
+            }
         }
     }
 
@@ -289,6 +308,7 @@ impl Behaviour for MenuBar {
                     ctx.remove(open);
                 }
             }
+            MouseEvent::Down(_) => {}
             MouseEvent::Up(_) => {}
             MouseEvent::Moved { x, y } => {
                 let children = ctx.get_active_children(this);
@@ -307,11 +327,26 @@ impl Behaviour for MenuBar {
                             self.over = Some(i);
                         }
                         self.is_over = true;
-                        break;
+                        return;
                     }
                 }
+                if self.open.is_some() {
+                    return;
+                }
+                if let Some(i) = self.over.take() {
+                    ctx.set_graphic(children[i], self.style.button.normal.clone());
+                }
             }
-            _ => {}
+            MouseEvent::Enter => {}
+            MouseEvent::Exit => {
+                if self.open.is_some() {
+                    return;
+                }
+                if let Some(i) = self.over.take() {
+                    let children = ctx.get_active_children(this);
+                    ctx.set_graphic(children[i], self.style.button.normal.clone());
+                }
+            }
         }
     }
 }
