@@ -100,9 +100,35 @@ pub enum MouseEvent {
     Exit,
     Down(MouseButton),
     Up(MouseButton),
-    Moved { x: f32, y: f32 },
+    Moved,
+    None,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum MouseAction {
+    Click,
+    DoubleClick,
+    Drag,
+    None,
+}
+
+#[derive(Clone, Debug)]
+pub struct MouseInfo {
+    pub event: MouseEvent,
+    pub action: MouseAction,
+    pub pos: [f32; 2],
+    pub delta: Option<[f32; 2]>,
+}
+impl Default for MouseInfo {
+    fn default() -> Self {
+        Self {
+            event: MouseEvent::None,
+            action: MouseAction::None,
+            pos: [f32::NAN; 2],
+            delta: None,
+        }
+    }
+}
 #[derive(Copy, Clone)]
 pub enum KeyboardEvent {
     Char(char),
@@ -111,10 +137,24 @@ pub enum KeyboardEvent {
 
 #[derive(Default)]
 struct Input {
-    mouse_x: f32,
-    mouse_y: f32,
-    // TODO: this was used when a control is deactive under the mouse. It is really necessary?
-    // mouse_invalid: bool
+    mouse_pos: Option<[f32; 2]>,
+    last_mouse_pos: Option<[f32; 2]>,
+    mouse_pressed: bool,
+    click: bool,
+}
+impl Input {
+    fn get_mouse_info(&self, event: MouseEvent, action: MouseAction) -> MouseInfo {
+        let delta = self
+            .mouse_pos
+            .zip(self.last_mouse_pos)
+            .map(|(a, b)| [a[0] - b[0], a[1] - b[1]]);
+        MouseInfo {
+            event,
+            action,
+            pos: self.mouse_pos.unwrap(),
+            delta,
+        }
+    }
 }
 
 pub struct GUI {
@@ -203,7 +243,8 @@ impl GUI {
                 id.to_string(),
                 self.controls[id]
                     .parent
-                    .map(|x| format!("child of {}", x)).unwrap_or_default()
+                    .map(|x| format!("child of {}", x))
+                    .unwrap_or_default()
             );
             self.dirty_layout(id);
             self.controls[id].state = ControlState::Started;
@@ -276,8 +317,11 @@ impl GUI {
                 parents.extend(self.get_active_children(id).iter().rev());
                 if Some(id) == self.current_mouse {
                     self.update_layout();
+                    let mouse = self
+                        .input
+                        .get_mouse_info(MouseEvent::Exit, MouseAction::None);
                     if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
-                        this.on_mouse_event(MouseEvent::Exit, id, &mut ctx);
+                        this.on_mouse_event(mouse, id, &mut ctx);
                     }
                     self.current_mouse = None;
                 }
@@ -396,7 +440,11 @@ impl GUI {
         }
     }
 
-    pub fn call_event<F: Fn(&mut dyn Behaviour, Id, &mut Context)>(&mut self, id: Id, event: F) {
+    pub fn call_event<F: FnOnce(&mut dyn Behaviour, Id, &mut Context)>(
+        &mut self,
+        id: Id,
+        event: F,
+    ) {
         self.lazy_update();
         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
             event(this, id, &mut ctx);
@@ -446,25 +494,16 @@ impl GUI {
         self.lazy_update();
         match event {
             WindowEvent::CursorMoved { position, .. } => {
-                self.input.mouse_x = position.x as f32;
-                self.input.mouse_y = position.y as f32;
                 self.mouse_moved(position.x as f32, position.y as f32);
             }
-            WindowEvent::MouseInput { state, button, .. } => {
-                if let ElementState::Pressed = state {
-                    self.set_focus(self.current_mouse);
+            WindowEvent::MouseInput { state, button, .. } => match state {
+                ElementState::Pressed => {
+                    self.mouse_down((*button).into());
                 }
-                if let Some(curr) = self.current_mouse {
-                    match state {
-                        ElementState::Pressed => {
-                            self.send_mouse_event_to(curr, MouseEvent::Down((*button).into()));
-                        }
-                        ElementState::Released => {
-                            self.send_mouse_event_to(curr, MouseEvent::Up((*button).into()));
-                        }
-                    };
+                ElementState::Released => {
+                    self.mouse_up((*button).into());
                 }
-            }
+            },
             WindowEvent::MouseWheel { delta, .. } => {
                 if let Some(curr) = self.current_mouse {
                     //TODO: I should handle Line and Pixel Delta differences more wisely?
@@ -478,7 +517,7 @@ impl GUI {
             WindowEvent::CursorLeft { .. } => {
                 if !self.over_is_locked {
                     if let Some(curr) = self.current_mouse.take() {
-                        self.send_mouse_event_to(curr, MouseEvent::Exit);
+                        self.send_mouse_event_to(curr, MouseEvent::Exit, MouseAction::None);
                     }
                 }
             }
@@ -616,13 +655,13 @@ impl GUI {
     }
 
     pub fn mouse_moved(&mut self, mouse_x: f32, mouse_y: f32) {
+        self.input.last_mouse_pos = self.input.mouse_pos;
+        self.input.mouse_pos = Some([mouse_x, mouse_y]);
         if self.current_mouse.is_some() && self.over_is_locked {
             self.send_mouse_event_to(
                 self.current_mouse.unwrap(),
-                MouseEvent::Moved {
-                    x: mouse_x,
-                    y: mouse_y,
-                },
+                MouseEvent::Moved,
+                MouseAction::None,
             );
             return;
         }
@@ -654,35 +693,44 @@ impl GUI {
 
         if curr_mouse == self.current_mouse {
             if let Some(current_mouse) = self.current_mouse {
-                self.send_mouse_event_to(
-                    current_mouse,
-                    MouseEvent::Moved {
-                        x: mouse_x,
-                        y: mouse_y,
-                    },
-                );
+                self.send_mouse_event_to(current_mouse, MouseEvent::Moved, MouseAction::None);
             }
         } else {
             if let Some(current_mouse) = self.current_mouse {
-                self.send_mouse_event_to(current_mouse, MouseEvent::Exit);
+                self.send_mouse_event_to(current_mouse, MouseEvent::Exit, MouseAction::None);
             }
             self.current_mouse = curr_mouse;
             if let Some(current_mouse) = self.current_mouse {
-                self.send_mouse_event_to(current_mouse, MouseEvent::Enter);
-                self.send_mouse_event_to(
-                    current_mouse,
-                    MouseEvent::Moved {
-                        x: mouse_x,
-                        y: mouse_y,
-                    },
-                );
+                self.input.click = false;
+                self.send_mouse_event_to(current_mouse, MouseEvent::Enter, MouseAction::None);
+                self.send_mouse_event_to(current_mouse, MouseEvent::Moved, MouseAction::None);
             }
         }
     }
 
+    pub fn mouse_down(&mut self, button: MouseButton) {
+        self.set_focus(self.current_mouse);
+        if let Some(curr) = self.current_mouse {
+            self.input.click = matches!(MouseButton::Left, button);
+            self.send_mouse_event_to(curr, MouseEvent::Down(button), MouseAction::None);
+        }
+    }
+
+    pub fn mouse_up(&mut self, button: MouseButton) {
+        if let Some(curr) = self.current_mouse {
+            let action = if self.input.click {
+                MouseAction::Click
+            } else {
+                MouseAction::None
+            };
+            self.send_mouse_event_to(curr, MouseEvent::Up(button), action);
+        }
+    }
+
     // TODO: think more carefully in what functions must be public
-    pub fn send_mouse_event_to(&mut self, id: Id, event: MouseEvent) {
-        self.call_event(id, |this, id, ctx| this.on_mouse_event(event, id, ctx));
+    pub fn send_mouse_event_to(&mut self, id: Id, event: MouseEvent, action: MouseAction) {
+        let mouse = self.input.get_mouse_info(event, action);
+        self.call_event(id, move |this, id, ctx| this.on_mouse_event(mouse, id, ctx));
     }
 
     pub fn dirty_layout(&mut self, id: Id) {
@@ -1014,7 +1062,7 @@ pub trait Behaviour {
 
     fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {}
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {}
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {}
 
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {}
 
@@ -1092,8 +1140,8 @@ impl<T: Behaviour> Behaviour for std::rc::Rc<std::cell::RefCell<T>> {
         self.as_ref().borrow_mut().on_scroll_event(delta, this, ctx)
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
-        self.as_ref().borrow_mut().on_mouse_event(event, this, ctx)
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_mouse_event(mouse, this, ctx)
     }
 
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {

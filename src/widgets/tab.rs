@@ -1,4 +1,6 @@
-use crate::{style::TabStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent};
+use crate::{
+    style::TabStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
+};
 
 use std::rc::Rc;
 use std::{any::Any, cell::RefCell};
@@ -89,9 +91,9 @@ impl Behaviour for TabButton {
         InputFlags::MOUSE
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        match mouse.event {
             MouseEvent::Enter => {
                 self.click = false;
                 if !self.selected {
@@ -120,7 +122,8 @@ impl Behaviour for TabButton {
             }
             MouseEvent::Up(_) => {}
             MouseEvent::Down(_) => {}
-            MouseEvent::Moved { .. } => {}
+            MouseEvent::Moved => {}
+            MouseEvent::None => {}
         }
     }
 }

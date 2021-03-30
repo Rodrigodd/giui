@@ -3,7 +3,7 @@ use crate::{
     layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
     style::MenuStyle,
     widgets::CloseMenu,
-    Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, RectFill,
+    Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo, RectFill,
 };
 
 use std::{any::Any, rc::Rc};
@@ -136,7 +136,7 @@ impl Behaviour for MenuBehaviour {
     fn on_deactive(&mut self, _this: Id, ctx: &mut Context) {
         self.close_menu(ctx);
     }
-    
+
     fn on_remove(&mut self, _this: Id, ctx: &mut Context) {
         self.close_menu(ctx);
     }
@@ -152,9 +152,9 @@ impl Behaviour for MenuBehaviour {
         InputFlags::MOUSE
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        match mouse.event {
             MouseEvent::Down(Left) => {
                 self.click = true;
             }
@@ -173,7 +173,8 @@ impl Behaviour for MenuBehaviour {
                 }
             }
             MouseEvent::Up(_) => {}
-            MouseEvent::Moved { x, y } => {
+            MouseEvent::Moved => {
+                let [x, y] = mouse.pos;
                 let children = ctx.get_active_children(this);
                 self.is_over = false;
                 for (i, child) in children.iter().enumerate().rev() {
@@ -209,6 +210,7 @@ impl Behaviour for MenuBehaviour {
                     ctx.set_graphic(children[i], self.style.button.normal.clone());
                 }
             }
+            MouseEvent::None => {}
         }
     }
 }
@@ -294,9 +296,9 @@ impl Behaviour for MenuBar {
         InputFlags::MOUSE
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        match mouse.event {
             MouseEvent::Down(Left) => {
                 if self.is_over {
                     if self.open.is_none() {
@@ -310,7 +312,8 @@ impl Behaviour for MenuBar {
             }
             MouseEvent::Down(_) => {}
             MouseEvent::Up(_) => {}
-            MouseEvent::Moved { x, y } => {
+            MouseEvent::Moved => {
+                let [x, y] = mouse.pos;
                 let children = ctx.get_active_children(this);
                 self.is_over = false;
                 for (i, child) in children.iter().enumerate().rev() {
@@ -347,6 +350,7 @@ impl Behaviour for MenuBar {
                     ctx.set_graphic(children[i], self.style.button.normal.clone());
                 }
             }
+            MouseEvent::None => {}
         }
     }
 }

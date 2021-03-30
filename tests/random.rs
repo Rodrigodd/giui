@@ -1,10 +1,10 @@
 use core::f32;
 
-use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
 use crui::{
     layouts::{GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    Behaviour, Context, Id, InputFlags, MouseEvent, GUI,
+    Behaviour, Context, Id, InputFlags, MouseEvent, MouseInfo, GUI,
 };
+use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
 
 #[derive(Default)]
 struct AssertInvariant {
@@ -36,9 +36,9 @@ impl Behaviour for AssertInvariant {
         InputFlags::MOUSE
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, _ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, _this: Id, _ctx: &mut Context) {
         assert!(self.started);
-        match event {
+        match mouse.event {
             MouseEvent::Enter => {
                 assert!(!self.is_over);
                 self.is_over = true;
@@ -52,6 +52,7 @@ impl Behaviour for AssertInvariant {
             MouseEvent::Moved { .. } => {
                 assert!(self.is_over);
             }
+            MouseEvent::None => {}
         }
     }
 

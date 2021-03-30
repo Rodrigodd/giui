@@ -1,6 +1,6 @@
 use winit::window::CursorIcon;
 
-use crate::{event, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent};
+use crate::{event, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo};
 
 const LEFT: u8 = 0x1;
 const RIGHT: u8 = 0x2;
@@ -29,9 +29,9 @@ impl Behaviour for Window {
         InputFlags::MOUSE
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        match mouse.event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {
                 ctx.set_cursor(CursorIcon::Default);
@@ -54,7 +54,8 @@ impl Behaviour for Window {
                 self.dragging = false;
                 ctx.send_event(event::UnlockOver);
             }
-            MouseEvent::Moved { mut x, mut y } => {
+            MouseEvent::Moved => {
+                let [mut x, mut y] = mouse.pos;
                 if !self.dragging {
                     let rect = *ctx.get_rect(this);
                     self.state = 0;
@@ -167,6 +168,7 @@ impl Behaviour for Window {
             }
             MouseEvent::Up(_) => {}
             MouseEvent::Down(_) => {}
+            MouseEvent::None => {}
         }
     }
 }

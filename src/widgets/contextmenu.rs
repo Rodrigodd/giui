@@ -2,7 +2,7 @@ use crate::{
     layouts::VBoxLayout,
     style::MenuStyle,
     widgets::{Blocker, CloseMenu, ItemClicked, Menu, MenuBehaviour},
-    Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent,
+    Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
 };
 
 use std::{any::Any, rc::Rc};
@@ -12,7 +12,6 @@ struct Repos;
 pub struct ContextMenu {
     menu: Rc<Menu>,
     open: Option<Id>,
-    mouse_pos: [f32; 2],
     style: Rc<MenuStyle>,
     blocker: Option<Id>,
 }
@@ -21,7 +20,6 @@ impl ContextMenu {
         Self {
             menu,
             open: None,
-            mouse_pos: [0.0, 0.0],
             style,
             blocker: None,
         }
@@ -71,12 +69,13 @@ impl Behaviour for ContextMenu {
         InputFlags::MOUSE
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    #[allow(clippy::single_match)]
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        match mouse.event {
             MouseEvent::Up(Right) => {
                 if self.open.is_none() {
-                    let [x, y] = self.mouse_pos;
+                    let [x, y] = mouse.pos;
 
                     let menu = ctx
                         .create_control()
@@ -96,9 +95,6 @@ impl Behaviour for ContextMenu {
                     ctx.move_to_front(self.blocker.unwrap());
                     ctx.active(self.blocker.unwrap());
                 }
-            }
-            MouseEvent::Moved { x, y } => {
-                self.mouse_pos = [x, y];
             }
             _ => {}
         }

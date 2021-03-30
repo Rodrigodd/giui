@@ -1,7 +1,7 @@
 use crate::{
     event::SetValue,
     style::{ButtonStyle, OnFocusStyle},
-    Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent,
+    Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
 };
 
 use std::{any::Any, rc::Rc};
@@ -73,9 +73,9 @@ impl<F: Fn(Id, &mut Context, bool)> Behaviour for Toggle<F> {
         InputFlags::MOUSE | InputFlags::FOCUS
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        match mouse.event {
             MouseEvent::Enter => {
                 let graphic = ctx.get_graphic_mut(self.button);
                 graphic.set_color([190, 190, 190, 255]);
@@ -103,9 +103,10 @@ impl<F: Fn(Id, &mut Context, bool)> Behaviour for Toggle<F> {
                     }
                 }
             }
-            MouseEvent::Moved { .. } => {}
+            MouseEvent::Moved => {}
             MouseEvent::Up(_) => {}
             MouseEvent::Down(_) => {}
+            MouseEvent::None => {}
         }
     }
 }

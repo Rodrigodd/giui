@@ -1,4 +1,4 @@
-use crate::{Behaviour, Context, Id, InputFlags, MouseEvent};
+use crate::{Behaviour, Context, Id, InputFlags, MouseEvent, MouseInfo};
 
 pub struct Hoverable {
     is_over: bool,
@@ -25,8 +25,8 @@ impl Behaviour for Hoverable {
         InputFlags::MOUSE
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) {
-        match event {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, _this: Id, ctx: &mut Context) {
+        match mouse.event {
             MouseEvent::Enter => {
                 ctx.active(self.hover);
                 ctx.get_graphic_mut(self.label).set_text(&self.text);
@@ -40,7 +40,8 @@ impl Behaviour for Hoverable {
             }
             MouseEvent::Down(_) => {}
             MouseEvent::Up(_) => {}
-            MouseEvent::Moved { x, y } => {
+            MouseEvent::Moved => {
+                let [x, y] = mouse.pos;
                 if self.is_over {
                     let [width, heigth] = ctx.get_size(crate::Id::ROOT_ID);
                     let x = x / width;
@@ -48,6 +49,7 @@ impl Behaviour for Hoverable {
                     ctx.set_anchors(self.hover, [x, y, x, y]);
                 }
             }
+            MouseEvent::None => {}
         }
     }
 }

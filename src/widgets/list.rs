@@ -919,7 +919,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
 
         if h_active {
             let view_width = view_rect[2] - view_rect[0];
-            
+
             let start = self.delta_x / self.content_width;
             let end = ((self.delta_x + view_width) / self.content_width).min(1.0);
 

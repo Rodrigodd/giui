@@ -1,5 +1,6 @@
 use crate::{
     event, style::ButtonStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent,
+    MouseInfo,
 };
 
 use std::any::Any;
@@ -51,9 +52,9 @@ impl Behaviour for MenuItem {
         InputFlags::MOUSE | InputFlags::FOCUS
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        match mouse.event {
             MouseEvent::Enter => {
                 self.state = 1;
                 ctx.set_graphic(this, self.style.hover.clone());
@@ -106,8 +107,8 @@ impl<F: Fn(Id, &mut Context)> Behaviour for Blocker<F> {
         InputFlags::MOUSE
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
-        if let MouseEvent::Down(_) = event {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
+        if let MouseEvent::Down(_) = mouse.event {
             (self.on_down)(this, ctx);
         }
     }
@@ -250,9 +251,9 @@ where
         InputFlags::MOUSE | InputFlags::FOCUS
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        match mouse.event {
             MouseEvent::Enter => {
                 self.state = 1;
                 ctx.set_graphic(this, self.style.hover.clone());
@@ -281,13 +282,6 @@ where
                             self.menu,
                             ShowMenu(this, self.selected, self.itens.clone()),
                         );
-                    // ctx.send_event_to(self.menu, SetOwner(this));
-                    // ctx.send_event_to(self.menu, SetItens(self.itens.clone()));
-                    // if let Some(selected) = self.selected {
-                    //     ctx.send_event_to(self.menu, SetFocus(selected));
-                    // } else {
-                    //     ctx.send_event(event::RequestFocus { id: self.menu });
-                    // }
                     } else {
                         self.opened = false;
                         ctx.deactive(self.menu);

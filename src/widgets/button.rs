@@ -1,9 +1,12 @@
-use crate::{style::ButtonStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent};
+use crate::{
+    style::ButtonStyle, Behaviour, Context, Id, InputFlags, MouseAction, MouseButton, MouseEvent,
+    MouseInfo,
+};
 
 use std::rc::Rc;
 
 pub struct Button<F: FnMut(Id, &mut Context)> {
-    state: u8, // 0 - normal, 1 - hover, 2 - pressed
+    normal: bool,
     focus: bool,
     on_click: F,
     style: Rc<ButtonStyle>,
@@ -11,7 +14,7 @@ pub struct Button<F: FnMut(Id, &mut Context)> {
 impl<F: FnMut(Id, &mut Context)> Button<F> {
     pub fn new(style: Rc<ButtonStyle>, on_click: F) -> Self {
         Self {
-            state: 0,
+            normal: true,
             focus: false,
             on_click,
             style,
@@ -27,15 +30,18 @@ impl<F: FnMut(Id, &mut Context)> Behaviour for Button<F> {
         InputFlags::MOUSE | InputFlags::FOCUS
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        if let MouseAction::Click = mouse.action {
+            (self.on_click)(this, ctx);
+        }
+        match mouse.event {
             MouseEvent::Enter => {
-                self.state = 1;
+                self.normal = false;
                 ctx.set_graphic(this, self.style.hover.clone());
             }
             MouseEvent::Exit => {
-                self.state = 0;
+                self.normal = true;
                 if self.focus {
                     ctx.set_graphic(this, self.style.focus.clone());
                 } else {
@@ -43,14 +49,9 @@ impl<F: FnMut(Id, &mut Context)> Behaviour for Button<F> {
                 }
             }
             MouseEvent::Down(Left) => {
-                self.state = 2;
                 ctx.set_graphic(this, self.style.pressed.clone());
             }
             MouseEvent::Up(Left) => {
-                if self.state == 2 {
-                    (self.on_click)(this, ctx);
-                }
-                self.state = 1;
                 ctx.set_graphic(this, self.style.hover.clone());
             }
             _ => {}
@@ -59,7 +60,7 @@ impl<F: FnMut(Id, &mut Context)> Behaviour for Button<F> {
 
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
         self.focus = focus;
-        if self.state == 0 {
+        if self.normal {
             if focus {
                 ctx.set_graphic(this, self.style.focus.clone());
             } else {

@@ -1,6 +1,6 @@
 use crate::{
     event, style::ButtonStyle, Behaviour, Context, Id, InputFlags, KeyboardEvent, Layout,
-    LayoutContext, MinSizeContext, MouseButton, MouseEvent,
+    LayoutContext, MinSizeContext, MouseButton, MouseEvent, MouseInfo,
 };
 
 use std::{any::Any, rc::Rc};
@@ -70,9 +70,9 @@ impl Behaviour for ScrollBar {
         InputFlags::MOUSE
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, _this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, _this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        match mouse.event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {
                 ctx.set_graphic(self.handle, self.style.normal.clone());
@@ -128,7 +128,8 @@ impl Behaviour for ScrollBar {
                     ctx.set_graphic(self.handle, self.style.hover.clone());
                 }
             }
-            MouseEvent::Moved { x, y } => {
+            MouseEvent::Moved => {
+                let [x, y] = mouse.pos;
                 self.mouse_pos = if self.vertical { y } else { x };
                 if self.dragging {
                     let handle_rect = *ctx.get_rect(self.handle);
@@ -172,6 +173,7 @@ impl Behaviour for ScrollBar {
             }
             MouseEvent::Up(_) => {}
             MouseEvent::Down(_) => {}
+            MouseEvent::None => {}
         }
     }
 }

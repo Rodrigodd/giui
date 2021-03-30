@@ -3,7 +3,7 @@ use crate::{
     graphics::Graphic,
     style::OnFocusStyle,
     text::TextInfo,
-    Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseButton, MouseEvent,
+    Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseButton, MouseEvent, MouseInfo,
 };
 
 use copypasta::{ClipboardContext, ClipboardProvider};
@@ -229,9 +229,9 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
         self.update_carret(this, ctx, false);
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        match mouse.event {
             MouseEvent::Enter => {
                 ctx.set_cursor(CursorIcon::Text);
             }
@@ -251,7 +251,8 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 self.mouse_down = false;
                 ctx.send_event(event::UnlockOver);
             }
-            MouseEvent::Moved { x, .. } => {
+            MouseEvent::Moved => {
+                let [x, _] = mouse.pos;
                 self.mouse_x = x;
                 if self.mouse_down {
                     let left = ctx.get_rect(this)[0] - self.x_scroll;
@@ -273,6 +274,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
             }
             MouseEvent::Up(_) => {}
             MouseEvent::Down(_) => {}
+            MouseEvent::None => {}
         }
     }
 

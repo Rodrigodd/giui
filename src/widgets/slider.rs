@@ -2,6 +2,7 @@ use event::SetValue;
 
 use crate::{
     event, style::OnFocusStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent,
+    MouseInfo,
 };
 
 use std::{any::Any, rc::Rc};
@@ -112,9 +113,9 @@ impl<C: SliderCallback> Behaviour for Slider<C> {
         InputFlags::MOUSE | InputFlags::FOCUS
     }
 
-    fn on_mouse_event(&mut self, event: MouseEvent, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        match event {
+        match mouse.event {
             MouseEvent::Enter => {}
             MouseEvent::Exit => {}
             MouseEvent::Down(Left) => {
@@ -132,7 +133,8 @@ impl<C: SliderCallback> Behaviour for Slider<C> {
                 self.callback.on_release(this, ctx, value);
                 ctx.send_event(event::UnlockOver);
             }
-            MouseEvent::Moved { x, .. } => {
+            MouseEvent::Moved => {
+                let [x, _] = mouse.pos;
                 self.mouse_x = x;
                 if self.dragging {
                     self.update_value(ctx);
@@ -143,6 +145,7 @@ impl<C: SliderCallback> Behaviour for Slider<C> {
             }
             MouseEvent::Up(_) => {}
             MouseEvent::Down(_) => {}
+            MouseEvent::None => {}
         }
     }
 }
