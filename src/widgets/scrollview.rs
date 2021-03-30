@@ -34,6 +34,32 @@ impl ScrollBar {
             style,
         }
     }
+
+    pub fn set_anchors(
+        ctx: &mut LayoutContext,
+        handle: Id,
+        vertical: bool,
+        mut start: f32,
+        mut end: f32,
+        length: f32,
+    ) {
+        let handle_min_size = ctx.get_min_size(handle)[vertical as usize];
+
+        let gap = handle_min_size - (end - start) * length;
+
+        if gap > 0.0 {
+            start *= 1.0 - gap / length;
+            end *= 1.0 - gap / length;
+        }
+
+        if !vertical {
+            ctx.set_anchor_left(handle, start);
+            ctx.set_anchor_right(handle, end);
+        } else {
+            ctx.set_anchor_top(handle, start);
+            ctx.set_anchor_bottom(handle, end);
+        }
+    }
 }
 impl Behaviour for ScrollBar {
     fn on_active(&mut self, _this: Id, ctx: &mut Context) {
@@ -480,21 +506,17 @@ impl Layout for ScrollView {
 
         if h_active {
             if let Some((_, h_scroll_bar_handle)) = self.h_scroll_bar_and_handle {
-                ctx.set_anchor_left(h_scroll_bar_handle, self.delta_x / content_size[0]);
-                ctx.set_anchor_right(
-                    h_scroll_bar_handle,
-                    ((self.delta_x + this_width) / content_size[0]).min(1.0),
-                );
+                let start = self.delta_x / content_size[0];
+                let end = ((self.delta_x + view_width) / content_size[0]).min(1.0);
+                ScrollBar::set_anchors(ctx, h_scroll_bar_handle, false, start, end, view_width);
             }
         }
 
         if v_active {
             if let Some((_, v_scroll_bar_handle)) = self.v_scroll_bar_and_handle {
-                ctx.set_anchor_top(v_scroll_bar_handle, self.delta_y / content_size[1]);
-                ctx.set_anchor_bottom(
-                    v_scroll_bar_handle,
-                    ((self.delta_y + this_height) / content_size[1]).min(1.0),
-                );
+                let start = self.delta_y / content_size[1];
+                let end = ((self.delta_y + this_height) / content_size[1]).min(1.0);
+                ScrollBar::set_anchors(ctx, v_scroll_bar_handle, true, start, end, view_height);
             }
         }
 

@@ -6,6 +6,8 @@ use crate::{
 use std::{any::Any, collections::BTreeMap};
 use winit::event::VirtualKeyCode;
 
+use super::ScrollBar;
+
 pub struct SetList<T>(pub Vec<T>);
 
 #[derive(Default)]
@@ -128,14 +130,20 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             let id = x.id;
             // println!("move focused {}", id);
             let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-            let bottom_margin = if i + 1 == self.items.len() { self.margins[3] } else { self.space };
+            let bottom_margin = if i + 1 == self.items.len() {
+                self.margins[3]
+            } else {
+                self.space
+            };
             let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
             ctx.set_designed_rect(
                 id,
                 [
                     view_rect[0] + self.margins[0] - self.delta_x,
                     y + top_margin,
-                    (view_rect[2]).max(view_rect[0] + self.content_width) - self.margins[2] - self.delta_x,
+                    (view_rect[2]).max(view_rect[0] + self.content_width)
+                        - self.margins[2]
+                        - self.delta_x,
                     y + height - bottom_margin,
                 ],
             );
@@ -152,14 +160,20 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 let id = x.id;
                 // println!("move {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() { self.margins[3] } else { self.space };
-                let height = ctx.get_min_size(id)[1]  + top_margin + bottom_margin;
+                let bottom_margin = if i + 1 == self.items.len() {
+                    self.margins[3]
+                } else {
+                    self.space
+                };
+                let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
                 ctx.set_designed_rect(
                     id,
                     [
                         view_rect[0] + self.margins[0] - self.delta_x,
                         y + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width) - self.margins[2] - self.delta_x,
+                        (view_rect[2]).max(view_rect[0] + self.content_width)
+                            - self.margins[2]
+                            - self.delta_x,
                         y + height - bottom_margin,
                     ],
                 );
@@ -173,14 +187,20 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 let id = (self.create_item)(&self.items[i], this, ctx.create_control()).build();
                 // println!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() { self.margins[3] } else { self.space };
+                let bottom_margin = if i + 1 == self.items.len() {
+                    self.margins[3]
+                } else {
+                    self.space
+                };
                 let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
                 ctx.set_designed_rect(
                     id,
                     [
                         view_rect[0] + self.margins[0] - self.delta_x,
                         y + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width) - self.margins[2] - self.delta_x,
+                        (view_rect[2]).max(view_rect[0] + self.content_width)
+                            - self.margins[2]
+                            - self.delta_x,
                         y + height - bottom_margin,
                     ],
                 );
@@ -205,7 +225,11 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             let id = x.id;
             // println!("move focused {}", id);
             let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-            let bottom_margin = if i + 1 == self.items.len() { self.margins[3] } else { self.space };
+            let bottom_margin = if i + 1 == self.items.len() {
+                self.margins[3]
+            } else {
+                self.space
+            };
             let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
             let mut y = view_rect[1] - start_y.fract() * height;
             ctx.set_designed_rect(
@@ -213,7 +237,9 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 [
                     view_rect[0] + self.margins[0] - self.delta_x,
                     y + top_margin,
-                    (view_rect[2]).max(view_rect[0] + self.content_width) - self.margins[2] - self.delta_x,
+                    (view_rect[2]).max(view_rect[0] + self.content_width)
+                        - self.margins[2]
+                        - self.delta_x,
                     y + height - bottom_margin,
                 ],
             );
@@ -231,7 +257,11 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 let id = x.id;
                 // println!("move {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() { self.margins[3] } else { self.space };
+                let bottom_margin = if i + 1 == self.items.len() {
+                    self.margins[3]
+                } else {
+                    self.space
+                };
                 let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
                 let mut y = view_rect[1] - start_y.fract() * height;
                 ctx.set_designed_rect(
@@ -239,7 +269,9 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                     [
                         view_rect[0] + self.margins[0] - self.delta_x,
                         y + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width) - self.margins[2] - self.delta_x,
+                        (view_rect[2]).max(view_rect[0] + self.content_width)
+                            - self.margins[2]
+                            - self.delta_x,
                         y + height - bottom_margin,
                     ],
                 );
@@ -254,7 +286,11 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 let id = (self.create_item)(&self.items[i], this, ctx.create_control()).build();
                 // println!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() { self.margins[3] } else { self.space };
+                let bottom_margin = if i + 1 == self.items.len() {
+                    self.margins[3]
+                } else {
+                    self.space
+                };
                 let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
                 let mut y = view_rect[1] - start_y.fract() * height;
                 ctx.set_designed_rect(
@@ -262,7 +298,9 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                     [
                         view_rect[0] + self.margins[0] - self.delta_x,
                         y + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width) - self.margins[2] - self.delta_x,
+                        (view_rect[2]).max(view_rect[0] + self.content_width)
+                            - self.margins[2]
+                            - self.delta_x,
                         y + height - bottom_margin,
                     ],
                 );
@@ -287,14 +325,20 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             let id = x.id;
             // println!("move focused {}", id);
             let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-            let bottom_margin = if i + 1 == self.items.len() { self.margins[3] } else { self.space };
+            let bottom_margin = if i + 1 == self.items.len() {
+                self.margins[3]
+            } else {
+                self.space
+            };
             let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
             ctx.set_designed_rect(
                 id,
                 [
                     view_rect[0] + self.margins[0] - self.delta_x,
                     y - height + top_margin,
-                    (view_rect[2]).max(view_rect[0] + self.content_width) - self.margins[2] - self.delta_x,
+                    (view_rect[2]).max(view_rect[0] + self.content_width)
+                        - self.margins[2]
+                        - self.delta_x,
                     y - bottom_margin,
                 ],
             );
@@ -311,14 +355,20 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 let id = x.id;
                 // println!("move {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() { self.margins[3] } else { self.space };
-                let height = ctx.get_min_size(id)[1]+ top_margin + bottom_margin;
+                let bottom_margin = if i + 1 == self.items.len() {
+                    self.margins[3]
+                } else {
+                    self.space
+                };
+                let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
                 ctx.set_designed_rect(
                     id,
                     [
                         view_rect[0] + self.margins[0] - self.delta_x,
                         y - height + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width) - self.margins[2] - self.delta_x,
+                        (view_rect[2]).max(view_rect[0] + self.content_width)
+                            - self.margins[2]
+                            - self.delta_x,
                         y - bottom_margin,
                     ],
                 );
@@ -332,14 +382,20 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 let id = (self.create_item)(&self.items[i], this, ctx.create_control()).build();
                 // println!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() { self.margins[3] } else { self.space };
+                let bottom_margin = if i + 1 == self.items.len() {
+                    self.margins[3]
+                } else {
+                    self.space
+                };
                 let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
                 ctx.set_designed_rect(
                     id,
                     [
                         view_rect[0] + self.margins[0] - self.delta_x,
                         y - height + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width) - self.margins[2] - self.delta_x,
+                        (view_rect[2]).max(view_rect[0] + self.content_width)
+                            - self.margins[2]
+                            - self.delta_x,
                         y - bottom_margin,
                     ],
                 );
@@ -378,8 +434,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             i += 1;
         }
 
-        self.end_y =
-            (i - 1) as f32 + (view_rect[3] - (y - height)) / height;
+        self.end_y = (i - 1) as f32 + (view_rect[3] - (y - height)) / height;
         // println!("end at {}", self.end_y);
     }
 
@@ -583,25 +638,38 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
         }
     }
 
-    fn on_active(&mut self, _this: Id, ctx: &mut Context) {
-        let view_rect = ctx.get_rect(self.view);
+    fn on_active(&mut self, _this: Id, _ctx: &mut Context) {
+        // let view_rect = ctx.get_rect(self.view);
 
-        let view_width = view_rect[2] - view_rect[0];
+        // let view_width = view_rect[2] - view_rect[0];
+        // let view_height = view_rect[3] - view_rect[1];
 
-        ctx.set_anchor_left(self.h_scroll_bar_handle, self.delta_x / self.content_width);
-        ctx.set_anchor_right(
-            self.h_scroll_bar_handle,
-            ((self.delta_x + view_width) / self.content_width).min(1.0),
-        );
+        // let handle_min_width = ctx.get_min_size(self.h_scroll_bar_handle)[0];
+        // let handle_min_height = ctx.get_min_size(self.v_scroll_bar_handle)[1];
 
-        ctx.set_anchor_top(
-            self.v_scroll_bar_handle,
-            self.start_y / self.items.len() as f32,
-        );
-        ctx.set_anchor_bottom(
-            self.v_scroll_bar_handle,
-            (self.end_y / self.items.len() as f32).min(1.0),
-        );
+        // let mut start = self.delta_x / self.content_width;
+        // let mut end = ((self.delta_x + view_width) / self.content_width).min(1.0);
+        // let gap = handle_min_width - (end - start) * view_width;
+
+        // if gap > 0.0 {
+        //     start *= 1.0 - gap / view_width;
+        //     end *= 1.0 - gap / view_width;
+        // }
+
+        // ctx.set_anchor_left(self.h_scroll_bar_handle, start);
+        // ctx.set_anchor_right(self.h_scroll_bar_handle, end);
+
+        // let mut start = self.start_y / self.items.len() as f32;
+        // let mut end = (self.end_y / self.items.len() as f32).min(1.0);
+        // let gap = handle_min_height - (end - start) * view_height;
+
+        // if gap > 0.0 {
+        //     start *= 1.0 - gap / view_height;
+        //     end *= 1.0 - gap / view_height;
+        // }
+
+        // ctx.set_anchor_top(self.v_scroll_bar_handle, start);
+        // ctx.set_anchor_bottom(self.v_scroll_bar_handle, end);
     }
 
     fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
@@ -764,7 +832,9 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                     [
                         view_rect[0] + self.margins[0] - self.delta_x,
                         view_rect[3] + 1010.0,
-                        (view_rect[2]).max(view_rect[0] + self.content_width) - self.margins[2] - self.delta_x,
+                        (view_rect[2]).max(view_rect[0] + self.content_width)
+                            - self.margins[2]
+                            - self.delta_x,
                         view_rect[3] + 1110.0,
                     ],
                 );
@@ -846,23 +916,23 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
         }
 
         // set the length of each bar handle
+
         if h_active {
-            ctx.set_anchor_left(self.h_scroll_bar_handle, self.delta_x / self.content_width);
-            ctx.set_anchor_right(
-                self.h_scroll_bar_handle,
-                ((self.delta_x + this_width) / self.content_width).min(1.0),
-            );
+            let view_width = view_rect[2] - view_rect[0];
+            
+            let start = self.delta_x / self.content_width;
+            let end = ((self.delta_x + view_width) / self.content_width).min(1.0);
+
+            ScrollBar::set_anchors(ctx, self.h_scroll_bar_handle, false, start, end, view_width);
         }
 
         if v_active {
-            ctx.set_anchor_top(
-                self.v_scroll_bar_handle,
-                self.start_y / self.items.len() as f32,
-            );
-            ctx.set_anchor_bottom(
-                self.v_scroll_bar_handle,
-                (self.end_y / self.items.len() as f32).min(1.0),
-            );
+            let view_height = view_rect[3] - view_rect[1];
+
+            let start = self.start_y / self.items.len() as f32;
+            let end = (self.end_y / self.items.len() as f32).min(1.0);
+
+            ScrollBar::set_anchors(ctx, self.v_scroll_bar_handle, true, start, end, view_height);
         }
     }
 }
