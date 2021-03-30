@@ -833,6 +833,7 @@ fn main() {
             .build();
         let h_scroll_bar_handle = gui
             .create_control_reserved(h_scroll_bar_handle)
+            .min_size([20.0, 20.0])
             .graphic(white.clone().with_color([220, 220, 220, 255]))
             .parent(h_scroll_bar)
             .build();
@@ -851,6 +852,7 @@ fn main() {
             .build();
         let v_scroll_bar_handle = gui
             .create_control_reserved(v_scroll_bar_handle)
+            .min_size([20.0, 20.0])
             .graphic(white.clone().with_color([220, 220, 220, 255]))
             .parent(v_scroll_bar)
             .build();

@@ -27,7 +27,7 @@ impl ButtonGroup {
     pub fn set_selected(&mut self, selected: Option<Id>, ctx: &mut Context) {
         let mut this = self.0.borrow_mut();
         this.selected = selected;
-        (this.on_change)(selected.expect("None selected is not implemented yet"), ctx);
+        (this.on_change)(selected.expect("None selected is not implemented"), ctx);
     }
 }
 
@@ -58,6 +58,7 @@ impl TabButton {
         }
         self.selected = true;
         self.tab_group.set_selected(Some(this), ctx);
+        ctx.active(self.page);
         ctx.set_graphic(this, self.style.selected.clone());
     }
 
