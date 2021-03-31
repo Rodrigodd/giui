@@ -1,6 +1,5 @@
 use crate::{
-    style::ButtonStyle, Behaviour, Context, Id, InputFlags, MouseAction, MouseButton, MouseEvent,
-    MouseInfo,
+    style::ButtonStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
 };
 
 use std::rc::Rc;
@@ -32,7 +31,7 @@ impl<F: FnMut(Id, &mut Context)> Behaviour for Button<F> {
 
     fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use MouseButton::*;
-        if let MouseAction::Click = mouse.action {
+        if mouse.click() {
             (self.on_click)(this, ctx);
         }
         match mouse.event {

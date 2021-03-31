@@ -5,7 +5,12 @@ use crate::{
     Control, ControlBuilder, ControlState, Controls, LayoutDirtyFlags, Rect,
 };
 use ab_glyph::FontArc;
-use std::{any::Any, mem, num::NonZeroU32};
+use std::{
+    any::Any,
+    mem,
+    num::NonZeroU32,
+    time::{Duration, Instant},
+};
 use winit::{
     event::{ElementState, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
     window::CursorIcon,
@@ -104,28 +109,37 @@ pub enum MouseEvent {
     None,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum MouseAction {
-    Click,
-    DoubleClick,
-    Drag,
-    None,
-}
+// #[derive(Clone, Copy, Debug)]
+// pub enum MouseAction {
+//     Click,
+//     DoubleClick,
+//     Drag,
+//     None,
+// }
 
 #[derive(Clone, Debug)]
 pub struct MouseInfo {
     pub event: MouseEvent,
-    pub action: MouseAction,
+    // pub action: MouseAction,
     pub pos: [f32; 2],
     pub delta: Option<[f32; 2]>,
+    /// number of consecutives MouseDown's
+    pub click_count: u8,
+}
+impl MouseInfo {
+    /// Returns `true` if the mouse_action is a click.
+    pub fn click(&self) -> bool {
+        self.click_count > 0 && matches!(self.event, MouseEvent::Up(MouseButton::Left))
+    }
 }
 impl Default for MouseInfo {
     fn default() -> Self {
         Self {
             event: MouseEvent::None,
-            action: MouseAction::None,
+            // action: MouseAction::None,
             pos: [f32::NAN; 2],
             delta: None,
+            click_count: 0,
         }
     }
 }
@@ -139,19 +153,23 @@ pub enum KeyboardEvent {
 struct Input {
     mouse_pos: Option<[f32; 2]>,
     last_mouse_pos: Option<[f32; 2]>,
-    click: bool,
+    /// number of consecutives MouseDown's
+    click_count: u8,
+    /// used to check for double clicks
+    last_mouse_down: Option<Instant>,
 }
 impl Input {
-    fn get_mouse_info(&self, event: MouseEvent, action: MouseAction) -> MouseInfo {
+    fn get_mouse_info(&self, event: MouseEvent) -> MouseInfo {
         let delta = self
             .mouse_pos
             .zip(self.last_mouse_pos)
             .map(|(a, b)| [a[0] - b[0], a[1] - b[1]]);
         MouseInfo {
             event,
-            action,
+            // action,
             pos: self.mouse_pos.unwrap(),
             delta,
+            click_count: self.click_count,
         }
     }
 }
@@ -316,9 +334,7 @@ impl Gui {
                 parents.extend(self.get_active_children(id).iter().rev());
                 if Some(id) == self.current_mouse {
                     self.update_layout();
-                    let mouse = self
-                        .input
-                        .get_mouse_info(MouseEvent::Exit, MouseAction::None);
+                    let mouse = self.input.get_mouse_info(MouseEvent::Exit);
                     if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
                         this.on_mouse_event(mouse, id, &mut ctx);
                     }
@@ -516,7 +532,7 @@ impl Gui {
             WindowEvent::CursorLeft { .. } => {
                 if !self.over_is_locked {
                     if let Some(curr) = self.current_mouse.take() {
-                        self.send_mouse_event_to(curr, MouseEvent::Exit, MouseAction::None);
+                        self.send_mouse_event_to(curr, MouseEvent::Exit);
                     }
                 }
             }
@@ -657,11 +673,7 @@ impl Gui {
         self.input.last_mouse_pos = self.input.mouse_pos;
         self.input.mouse_pos = Some([mouse_x, mouse_y]);
         if self.current_mouse.is_some() && self.over_is_locked {
-            self.send_mouse_event_to(
-                self.current_mouse.unwrap(),
-                MouseEvent::Moved,
-                MouseAction::None,
-            );
+            self.send_mouse_event_to(self.current_mouse.unwrap(), MouseEvent::Moved);
             return;
         }
 
@@ -692,17 +704,17 @@ impl Gui {
 
         if curr_mouse == self.current_mouse {
             if let Some(current_mouse) = self.current_mouse {
-                self.send_mouse_event_to(current_mouse, MouseEvent::Moved, MouseAction::None);
+                self.send_mouse_event_to(current_mouse, MouseEvent::Moved);
             }
         } else {
             if let Some(current_mouse) = self.current_mouse {
-                self.send_mouse_event_to(current_mouse, MouseEvent::Exit, MouseAction::None);
+                self.send_mouse_event_to(current_mouse, MouseEvent::Exit);
             }
             self.current_mouse = curr_mouse;
             if let Some(current_mouse) = self.current_mouse {
-                self.input.click = false;
-                self.send_mouse_event_to(current_mouse, MouseEvent::Enter, MouseAction::None);
-                self.send_mouse_event_to(current_mouse, MouseEvent::Moved, MouseAction::None);
+                self.input.click_count = 0;
+                self.send_mouse_event_to(current_mouse, MouseEvent::Enter);
+                self.send_mouse_event_to(current_mouse, MouseEvent::Moved);
             }
         }
     }
@@ -710,25 +722,34 @@ impl Gui {
     pub fn mouse_down(&mut self, button: MouseButton) {
         self.set_focus(self.current_mouse);
         if let Some(curr) = self.current_mouse {
-            self.input.click = matches!(button, MouseButton::Left);
-            self.send_mouse_event_to(curr, MouseEvent::Down(button), MouseAction::None);
+            if let MouseButton::Left = button {
+                const DOUBLE_CLICK_TIME: Duration = Duration::from_millis(500);
+                let time = if let Some(last_click) = self.input.last_mouse_down {
+                    last_click.elapsed()
+                } else {
+                    Duration::from_millis(0)
+                };
+                self.input.last_mouse_down = Some(Instant::now());
+                self.input.click_count = if time < DOUBLE_CLICK_TIME {
+                    // with saturating the program don't will crash after 256 consective clicks
+                    self.input.click_count.saturating_add(1)
+                } else {
+                    1
+                }
+            }
+            self.send_mouse_event_to(curr, MouseEvent::Down(button));
         }
     }
 
     pub fn mouse_up(&mut self, button: MouseButton) {
         if let Some(curr) = self.current_mouse {
-            let action = if self.input.click {
-                MouseAction::Click
-            } else {
-                MouseAction::None
-            };
-            self.send_mouse_event_to(curr, MouseEvent::Up(button), action);
+            self.send_mouse_event_to(curr, MouseEvent::Up(button));
         }
     }
 
     // TODO: think more carefully in what functions must be public
-    pub fn send_mouse_event_to(&mut self, id: Id, event: MouseEvent, action: MouseAction) {
-        let mouse = self.input.get_mouse_info(event, action);
+    pub fn send_mouse_event_to(&mut self, id: Id, event: MouseEvent) {
+        let mouse = self.input.get_mouse_info(event);
         self.call_event(id, move |this, id, ctx| this.on_mouse_event(mouse, id, ctx));
     }
 
