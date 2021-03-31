@@ -1,8 +1,8 @@
 use ab_glyph::FontArc;
 use crui::{
     graphics::Text,
-    render::{GUIRender, GUIRenderer},
-    GUI,
+    render::{GuiRender, GuiRenderer},
+    Gui,
 };
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use winit::{
@@ -13,7 +13,7 @@ use winit::{
 };
 
 fn resize(
-    gui: &mut GUI,
+    gui: &mut Gui,
     render: &mut GLSpriteRender,
     camera: &mut Camera,
     size: PhysicalSize<u32>,
@@ -51,8 +51,8 @@ fn main() {
         .collect();
 
     // create the gui, and the gui_render
-    let mut gui = GUI::new(0.0, 0.0, fonts);
-    let mut gui_render = GUIRender::new(font_texture, [128, 128]);
+    let mut gui = Gui::new(0.0, 0.0, fonts);
+    let mut gui_render = GuiRender::new(font_texture, [128, 128]);
 
     // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
     let _text = gui
@@ -104,7 +104,7 @@ fn main() {
             Event::RedrawRequested(window_id) => {
                 // render the gui
                 struct Render<'a>(&'a mut GLSpriteRender);
-                impl<'a> GUIRenderer for Render<'a> {
+                impl<'a> GuiRenderer for Render<'a> {
                     fn update_font_texure(
                         &mut self,
                         font_texture: u32,

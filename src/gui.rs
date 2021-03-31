@@ -48,7 +48,7 @@ impl Id {
         index: 0,
         generation: unsafe { NonZeroU32::new_unchecked(1) },
     };
-    /// Get the index of the control in the controls vector inside GUI<R>
+    /// Get the index of the control in the controls vector inside Gui<R>
     pub fn index(&self) -> usize {
         self.index as usize
     }
@@ -139,7 +139,6 @@ pub enum KeyboardEvent {
 struct Input {
     mouse_pos: Option<[f32; 2]>,
     last_mouse_pos: Option<[f32; 2]>,
-    mouse_pressed: bool,
     click: bool,
 }
 impl Input {
@@ -157,7 +156,7 @@ impl Input {
     }
 }
 
-pub struct GUI {
+pub struct Gui {
     pub(crate) controls: Controls,
     pub(crate) fonts: Vec<FontArc>,
     pub(crate) modifiers: ModifiersState,
@@ -173,7 +172,7 @@ pub struct GUI {
     current_focus: Option<Id>,
     over_is_locked: bool,
 }
-impl GUI {
+impl Gui {
     pub fn new(width: f32, height: f32, fonts: Vec<FontArc>) -> Self {
         Self {
             modifiers: ModifiersState::empty(),
@@ -223,7 +222,7 @@ impl GUI {
 
     /// Create a control with a predetermined id, id that can be obtained by the method reserve_id().
     pub fn create_control_reserved(&mut self, reserved_id: Id) -> ControlBuilder {
-        struct Builder<'a>(&'a mut GUI);
+        struct Builder<'a>(&'a mut Gui);
         impl ControlBuilderInner for Builder<'_> {
             fn controls(&mut self) -> &mut Controls {
                 &mut self.0.controls
@@ -473,7 +472,7 @@ impl GUI {
 
     pub fn start(&mut self) {
         self.update_all_layouts();
-        fn print_tree(deep: usize, id: Id, gui: &mut GUI) {
+        fn print_tree(deep: usize, id: Id, gui: &mut Gui) {
             let childs = gui.controls[id].children.clone();
             let len = childs.len();
             for (i, child) in childs.iter().enumerate() {
@@ -711,7 +710,7 @@ impl GUI {
     pub fn mouse_down(&mut self, button: MouseButton) {
         self.set_focus(self.current_mouse);
         if let Some(curr) = self.current_mouse {
-            self.input.click = matches!(MouseButton::Left, button);
+            self.input.click = matches!(button, MouseButton::Left);
             self.send_mouse_event_to(curr, MouseEvent::Down(button), MouseAction::None);
         }
     }

@@ -6,14 +6,14 @@ use ab_glyph::FontArc;
 use crui::{
     graphics::{Graphic, Icon, Panel, Text, Texture},
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    render::{GUIRender, GUIRenderer},
+    render::{GuiRender, GuiRenderer},
     style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
     widgets::{
         self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, DropMenu, Dropdown, Hoverable,
         Item, Menu, MenuBar, MenuItem, ScrollBar, ScrollView, Slider, TabButton, TextField, Toggle,
         ViewLayout,
     },
-    Context, ControlBuilder, Id, RectFill, GUI,
+    Context, ControlBuilder, Id, RectFill, Gui,
 };
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use winit::{
@@ -24,7 +24,7 @@ use winit::{
 };
 
 fn resize(
-    gui: &mut GUI,
+    gui: &mut Gui,
     render: &mut GLSpriteRender,
     camera: &mut Camera,
     size: PhysicalSize<u32>,
@@ -46,12 +46,12 @@ fn main() {
     let (window, mut render) = GLSpriteRender::new(wb, &event_loop, true);
     let window_size = window.inner_size();
     let font_texture = render.new_texture(128, 128, &[], false);
-    let mut gui_render = GUIRender::new(font_texture, [128, 128]);
+    let mut gui_render = GuiRender::new(font_texture, [128, 128]);
     let fonts: Vec<FontArc> = [include_bytes!("../examples/NotoSans-Regular.ttf")]
         .iter()
         .map(|&font| FontArc::try_from_slice(font).unwrap())
         .collect();
-    let mut gui = GUI::new(window_size.width as f32, window_size.height as f32, fonts);
+    let mut gui = Gui::new(window_size.width as f32, window_size.height as f32, fonts);
     let texture = {
         let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
         let data = data.to_rgba8();
@@ -544,7 +544,7 @@ fn main() {
             .layout(GridLayout::new([10.0, 15.0], [10.0, 10.0, 10.0, 10.0], 3))
             .build();
 
-        let create_vbox = |gui: &mut GUI, expand: [bool; 2], align: i8| {
+        let create_vbox = |gui: &mut Gui, expand: [bool; 2], align: i8| {
             gui.create_control()
                 .parent(page_2)
                 .expand_x(expand[0])
@@ -554,7 +554,7 @@ fn main() {
                 .build()
         };
 
-        let create_rect = |gui: &mut GUI,
+        let create_rect = |gui: &mut Gui,
                            min_size: [f32; 2],
                            expand: [bool; 2],
                            fill: [RectFill; 2],
@@ -941,7 +941,7 @@ fn main() {
     };
     let _tabs = {
         let tab_group = ButtonGroup::new(|_, _| {});
-        let create_button = |gui: &mut GUI, page: Id, selected: bool, label: String| {
+        let create_button = |gui: &mut Gui, page: Id, selected: bool, label: String| {
             let button = gui
                 .create_control()
                 .graphic(painel.clone())
@@ -1095,7 +1095,7 @@ fn main() {
             Event::UserEvent(()) => *control = ControlFlow::Exit,
             Event::RedrawRequested(window_id) if window_id == window.id() => {
                 struct Render<'a>(&'a mut GLSpriteRender);
-                impl<'a> GUIRenderer for Render<'a> {
+                impl<'a> GuiRenderer for Render<'a> {
                     fn update_font_texure(
                         &mut self,
                         font_texture: u32,
@@ -1194,7 +1194,7 @@ fn create_item(
 }
 
 fn create_button<F: Fn(Id, &mut Context) + 'static>(
-    gui: &mut GUI,
+    gui: &mut Gui,
     text: String,
     button_style: Rc<ButtonStyle>,
     on_click: F,

@@ -50,14 +50,14 @@ use crui::{
     event::SetValue,
     graphics::{Graphic, Panel, Text, Texture},
     layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
-    render::{GUIRender, GUIRenderer},
+    render::{GuiRender, GuiRenderer},
     style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
     widgets::{
         Blocker, Button, ButtonGroup, CloseMenu, DropMenu, Dropdown, Item, Menu, MenuBar, MenuItem,
         ScrollBar, ScrollView, Select, SetMaxValue, SetMinValue, SetSelected, Slider,
         SliderCallback, TabButton, TextField, TextFieldCallback, Toggle, ViewLayout,
     },
-    Context, ControlBuilder, Id, RectFill, GUI,
+    Context, ControlBuilder, Id, RectFill, Gui,
 };
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use winit::{
@@ -68,7 +68,7 @@ use winit::{
 };
 
 fn resize(
-    gui: &mut GUI,
+    gui: &mut Gui,
     render: &mut GLSpriteRender,
     camera: &mut Camera,
     size: PhysicalSize<u32>,
@@ -125,8 +125,8 @@ fn main() {
         .collect();
 
     // create the gui, and the gui_render
-    let mut gui = GUI::new(0.0, 0.0, fonts);
-    let mut gui_render = GUIRender::new(font_texture, [128, 128]);
+    let mut gui = Gui::new(0.0, 0.0, fonts);
+    let mut gui_render = GuiRender::new(font_texture, [128, 128]);
 
     // populate the gui with controls.
     let err;
@@ -142,7 +142,7 @@ fn main() {
     };
     let options = Rc::new(RefCell::new(options));
     let style_sheet = StyleSheet::new(texture, icon_texture, tab_texture);
-    let options_gui = OptionsGUI::new(
+    let options_gui = OptionsGui::new(
         &mut gui,
         options.clone(),
         event_loop.create_proxy(),
@@ -204,7 +204,7 @@ fn main() {
             Event::RedrawRequested(window_id) => {
                 // render the gui
                 struct Render<'a>(&'a mut GLSpriteRender);
-                impl<'a> GUIRenderer for Render<'a> {
+                impl<'a> GuiRenderer for Render<'a> {
                     fn update_font_texure(
                         &mut self,
                         font_texture: u32,
@@ -399,7 +399,7 @@ impl Default for Options {
 }
 
 #[derive(Clone)]
-struct OptionsGUI {
+struct OptionsGui {
     options: Rc<RefCell<Options>>,
     surface: Id,
     field_a: Id,
@@ -418,7 +418,7 @@ struct OptionsGUI {
     popup_text: Id,
 }
 #[allow(clippy::too_many_arguments)]
-impl OptionsGUI {
+impl OptionsGui {
     fn update_gui(&self, ctx: &mut Context, style: &StyleSheet) {
         // TODO: this is very error prone.
         // For example, I could try send a number to the text field,
@@ -458,7 +458,7 @@ impl OptionsGUI {
     }
 
     fn new(
-        gui: &mut GUI,
+        gui: &mut Gui,
         options: Rc<RefCell<Options>>,
         proxy: EventLoopProxy<UserEvent>,
         style: &StyleSheet,
@@ -532,7 +532,7 @@ impl OptionsGUI {
         this
     }
 
-    fn create_page0(&self, gui: &mut GUI, parent: Id, style: &StyleSheet) {
+    fn create_page0(&self, gui: &mut Gui, parent: Id, style: &StyleSheet) {
         // I should avoid borrow RefCell in parameter position, because
         // the borrow is only dropped after the function is called.
         let initial_value = self.options.borrow().field_a.clone();
@@ -594,9 +594,9 @@ impl OptionsGUI {
         self.create_dropdown(gui, parent, style);
     }
 
-    fn create_page1(&self, gui: &mut GUI, parent: Id, style: &StyleSheet) {
+    fn create_page1(&self, gui: &mut Gui, parent: Id, style: &StyleSheet) {
         let list = self.list;
-        OptionsGUI::text_field(gui.reserve_id(), gui, "".into(), style, {
+        OptionsGui::text_field(gui.reserve_id(), gui, "".into(), style, {
             let button_style = style.button.clone();
             let background = style.list_background.clone();
             let options = self.options.clone();
@@ -650,7 +650,7 @@ impl OptionsGUI {
     fn create_menu_bar(
         &self,
         surface: Id,
-        gui: &mut GUI,
+        gui: &mut Gui,
         proxy: EventLoopProxy<UserEvent>,
         style: &StyleSheet,
     ) -> Id {
@@ -708,7 +708,7 @@ impl OptionsGUI {
             .build()
     }
 
-    fn create_tabs(&self, surface: Id, gui: &mut GUI, style: &StyleSheet) -> Id {
+    fn create_tabs(&self, surface: Id, gui: &mut Gui, style: &StyleSheet) -> Id {
         let line = gui
             .create_control()
             .layout(HBoxLayout::new(0.0, [0.0; 4], -1))
@@ -722,7 +722,7 @@ impl OptionsGUI {
                     tabs.iter().position(|x| *x == selected).unwrap();
             }
         });
-        OptionsGUI::tab_button(
+        OptionsGui::tab_button(
             self.tabs[0],
             gui,
             self.pages[0],
@@ -733,7 +733,7 @@ impl OptionsGUI {
         )
         .parent(line)
         .build();
-        OptionsGUI::tab_button(
+        OptionsGui::tab_button(
             self.tabs[1],
             gui,
             self.pages[1],
@@ -750,7 +750,7 @@ impl OptionsGUI {
 
     fn tab_button<'a>(
         id: Id,
-        gui: &'a mut GUI,
+        gui: &'a mut Gui,
         page: Id,
         selected: bool,
         label: String,
@@ -777,7 +777,7 @@ impl OptionsGUI {
     fn create_text_field<C: TextFieldCallback + 'static>(
         &self,
         id: Id,
-        gui: &mut GUI,
+        gui: &mut Gui,
         name: String,
         initial_value: String,
         parent: Id,
@@ -796,13 +796,13 @@ impl OptionsGUI {
             .expand_x(true)
             .parent(line)
             .build();
-        OptionsGUI::text_field(id, gui, initial_value, style, callback)
+        OptionsGui::text_field(id, gui, initial_value, style, callback)
             .min_size([100.0, 24.0])
             .parent(line)
             .build();
     }
 
-    fn create_slider(&self, gui: &mut GUI, parent: Id, style: &StyleSheet) {
+    fn create_slider(&self, gui: &mut Gui, parent: Id, style: &StyleSheet) {
         let min = self.options.borrow().min;
         let max = self.options.borrow().max;
         let initial_value = self.options.borrow().slider;
@@ -821,7 +821,7 @@ impl OptionsGUI {
 
         let slider = self.slider;
 
-        let _min_field = OptionsGUI::text_field(self.min, gui, min.to_string(), style, {
+        let _min_field = OptionsGui::text_field(self.min, gui, min.to_string(), style, {
             let options = self.options.clone();
             NumberField(move |ctx, x| {
                 ctx.send_event_to(slider, SetMinValue(x));
@@ -831,7 +831,7 @@ impl OptionsGUI {
         .min_size([50.0, 18.0])
         .parent(line)
         .build();
-        let slider = OptionsGUI::slider(slider, gui, min, max, initial_value, style, {
+        let slider = OptionsGui::slider(slider, gui, min, max, initial_value, style, {
             let options = self.options.clone();
             move |_, ctx: &mut Context, value: i32| {
                 ctx.get_graphic_mut(label).set_text(&value.to_string());
@@ -841,7 +841,7 @@ impl OptionsGUI {
         .expand_x(true)
         .parent(line)
         .build();
-        let _max_field = OptionsGUI::text_field(self.max, gui, max.to_string(), style, {
+        let _max_field = OptionsGui::text_field(self.max, gui, max.to_string(), style, {
             let options = self.options.clone();
             NumberField(move |ctx, x| {
                 ctx.send_event_to(slider, SetMaxValue(x));
@@ -855,7 +855,7 @@ impl OptionsGUI {
 
     fn create_check<F: Fn(Id, &mut Context, bool) + 'static>(
         &self,
-        gui: &mut GUI,
+        gui: &mut Gui,
         id: Id,
         name: String,
         initial_value: bool,
@@ -908,7 +908,7 @@ impl OptionsGUI {
             .build();
     }
 
-    fn create_dropdown(&self, gui: &mut GUI, parent: Id, style: &StyleSheet) {
+    fn create_dropdown(&self, gui: &mut Gui, parent: Id, style: &StyleSheet) {
         let line = gui
             .create_control()
             .layout(HBoxLayout::new(2.0, [2.0, 2.0, 2.0, 2.0], -1))
@@ -922,7 +922,7 @@ impl OptionsGUI {
             .parent(line)
             .build();
         let initial_value = self.options.borrow().dropdown;
-        OptionsGUI::dropdown(
+        OptionsGui::dropdown(
             self.dropdown,
             gui,
             vec!["Option A".into(), "Option B".into(), "Option C".into()],
@@ -941,7 +941,7 @@ impl OptionsGUI {
         .build();
     }
 
-    fn create_popup(&self, gui: &mut GUI, style: &StyleSheet) {
+    fn create_popup(&self, gui: &mut Gui, style: &StyleSheet) {
         let popup = gui
             .create_control_reserved(self.popup)
             .graphic(style.popup_background.clone())
@@ -1002,7 +1002,7 @@ impl OptionsGUI {
 
     fn text_field<'a, C: TextFieldCallback + 'static>(
         id: Id,
-        gui: &'a mut GUI,
+        gui: &'a mut Gui,
         initial_value: String,
         style: &StyleSheet,
         callback: C,
@@ -1031,7 +1031,7 @@ impl OptionsGUI {
 
     fn slider<'a, C: SliderCallback + 'static>(
         id: Id,
-        gui: &'a mut GUI,
+        gui: &'a mut Gui,
         min: i32,
         max: i32,
         initial_value: i32,
@@ -1080,7 +1080,7 @@ impl OptionsGUI {
 
     fn dropdown<'a, F: Fn((usize, String), Id, &mut Context) + 'static>(
         id: Id,
-        gui: &'a mut GUI,
+        gui: &'a mut Gui,
         itens: Vec<String>,
         initial_value: usize,
         style: &StyleSheet,
@@ -1200,7 +1200,7 @@ fn create_item(
 }
 
 fn scroll_view<'a>(
-    gui: &'a mut GUI,
+    gui: &'a mut Gui,
     id: Id,
     content: Id,
     style: &StyleSheet,

@@ -5,12 +5,12 @@ use winit::{event::ModifiersState, window::CursorIcon};
 
 use crate::{
     control::ControlBuilderInner, event, graphics::Graphic, Behaviour, ControlBuilder, Controls,
-    Id, Layout, Rect, GUI,
+    Id, Layout, Rect, Gui,
 };
 
 // contains a reference to all the controls, except the behaviour of one control
 pub struct Context<'a> {
-    gui: &'a mut GUI,
+    gui: &'a mut Gui,
     // modifiers: ModifiersState,
     // controls: &'a mut Controls,
     fonts: &'a [FontArc],
@@ -33,7 +33,7 @@ impl<'a> Drop for Context<'a> {
     }
 }
 impl<'a> Context<'a> {
-    pub(crate) fn new(gui: &'a mut GUI) -> Self {
+    pub(crate) fn new(gui: &'a mut Gui) -> Self {
         let fonts = unsafe { std::mem::transmute(gui.fonts.as_slice()) };
         Self {
             gui,
@@ -47,7 +47,7 @@ impl<'a> Context<'a> {
 
     pub(crate) fn new_with_mut_behaviour(
         this: Id,
-        gui: &'a mut GUI,
+        gui: &'a mut Gui,
     ) -> Option<(&'a mut dyn Behaviour, Self)> {
         let this_one = unsafe {
             &mut *(gui.controls[this].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)

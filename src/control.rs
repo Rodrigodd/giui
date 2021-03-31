@@ -349,7 +349,7 @@ pub(crate) enum ControlState {
     Reserved,
     /// A ControlBuilder has been created, refering this Control, but the control is not yet alive
     Building,
-    /// The control is alive, and exist in the GUI tree.
+    /// The control is alive, and exist in the Gui tree.
     Started,
 }
 impl std::fmt::Display for ControlState {

@@ -4,7 +4,7 @@ pub const FIELDS: &[&str] = &["texture", "uv_rect", "size", "color", "color_dirt
 #[allow(non_camel_case_types)]
 enum Field {
     Texture,
-    UVRect,
+    UvRect,
     Size,
     Color,
 }
@@ -20,7 +20,7 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
     {
         match value {
             0u64 => Ok(Field::Texture),
-            1u64 => Ok(Field::UVRect),
+            1u64 => Ok(Field::UvRect),
             2u64 => Ok(Field::Size),
             3u64 => Ok(Field::Color),
             _ => Err(serde::de::Error::invalid_value(
@@ -35,7 +35,7 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
     {
         match value {
             "texture" => Ok(Field::Texture),
-            "uv_rect" => Ok(Field::UVRect),
+            "uv_rect" => Ok(Field::UvRect),
             "size" => Ok(Field::Size),
             "color" => Ok(Field::Color),
             _ => Err(de::Error::unknown_field(value, FIELDS)),
@@ -110,7 +110,7 @@ impl<'de> serde::de::Visitor<'de> for IconVisitor {
                     }
                     texture = Some(map.next_value()?);
                 }
-                Field::UVRect => {
+                Field::UvRect => {
                     if Option::is_some(&uv_rect) {
                         return Err(de::Error::duplicate_field("uv_rect"));
                     }

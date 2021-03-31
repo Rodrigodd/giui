@@ -2,7 +2,7 @@ use core::f32;
 
 use crui::{
     layouts::{GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    Behaviour, Context, Id, InputFlags, MouseEvent, MouseInfo, GUI,
+    Behaviour, Context, Id, InputFlags, MouseEvent, MouseInfo, Gui,
 };
 use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
 
@@ -67,7 +67,7 @@ fn rexp(rng: &mut SmallRng, max: f64) -> f64 {
     (rng.gen::<f64>() * max.ln()).exp()
 }
 
-fn build_random_gui(gui: &mut GUI, rng: &mut SmallRng) -> Vec<Id> {
+fn build_random_gui(gui: &mut Gui, rng: &mut SmallRng) -> Vec<Id> {
     let mut ids = Vec::new();
     let total = rexp(rng, 1000.0) as usize;
     let active_chance = rng.gen();
@@ -119,7 +119,7 @@ fn from_seed(seed: u64) {
     let rng = &mut rng;
     let width = rexp(rng, 10000.0) as f32;
     let height = rexp(rng, 10000.0) as f32;
-    let mut gui = GUI::new(width, height, Vec::new());
+    let mut gui = Gui::new(width, height, Vec::new());
     let ids = build_random_gui(&mut gui, rng);
 
     let mut mouse_x = rng.gen::<f32>() * width;

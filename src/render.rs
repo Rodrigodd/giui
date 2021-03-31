@@ -6,12 +6,12 @@ use crate::{
 use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
 use std::{ops::Range, time::Instant};
 
-pub trait GUIRenderer {
+pub trait GuiRenderer {
     fn update_font_texure(&mut self, font_texture: u32, rect: [u32; 4], data: &[u8]);
     fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]);
 }
 
-pub struct GUIRender {
+pub struct GuiRender {
     draw_cache: DrawCache,
     font_texture: u32,
     last_sprites: Vec<Sprite>,
@@ -20,7 +20,7 @@ pub struct GUIRender {
     sprites_map: Vec<(Id, Range<usize>)>,
     last_anim_draw: Option<Instant>,
 }
-impl GUIRender {
+impl GuiRender {
     pub fn new(font_texture: u32, font_texture_size: [u32; 2]) -> Self {
         //TODO: change this to default dimensions, and allow resizing
         let draw_cache = DrawCacheBuilder::default()
@@ -67,7 +67,7 @@ impl GUIRender {
         }
     }
 
-    pub fn render<'a, T: GUIRenderer>(
+    pub fn render<'a, T: GuiRenderer>(
         &'a mut self,
         ctx: &mut Context,
         mut renderer: T,
@@ -133,8 +133,7 @@ impl GUIRender {
 
         let mut is_animating = false;
         let dt = if let Some(x) = self.last_anim_draw {
-            let dt = x.elapsed().as_secs_f32();
-            dt
+            x.elapsed().as_secs_f32()
         } else {
             0.0
         };

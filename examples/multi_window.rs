@@ -7,10 +7,10 @@ use ab_glyph::FontArc;
 use crui::{
     graphics::{Panel, Text},
     layouts::{FitText, MarginLayout, VBoxLayout},
-    render::{GUIRender, GUIRenderer},
+    render::{GuiRender, GuiRenderer},
     style::ButtonStyle,
     widgets::Button,
-    GUI,
+    Gui,
 };
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use winit::{
@@ -22,8 +22,8 @@ use winit::{
 };
 
 struct Instance {
-    gui: GUI,
-    gui_render: GUIRender,
+    gui: Gui,
+    gui_render: GuiRender,
     camera: Camera,
     window: Rc<Window>,
     modal: Option<WindowId>,
@@ -34,12 +34,12 @@ enum UserEvent {
         owner: Option<WindowId>,
         modal: bool,
         window_builder: WindowBuilder,
-        build: Box<dyn FnOnce(&mut GUI, Rc<Window>) + 'static>,
+        build: Box<dyn FnOnce(&mut Gui, Rc<Window>) + 'static>,
     },
 }
 
 fn resize(
-    gui: &mut GUI,
+    gui: &mut Gui,
     render: &mut GLSpriteRender,
     camera: &mut Camera,
     size: PhysicalSize<u32>,
@@ -82,8 +82,8 @@ fn main() {
         .collect();
 
     // create the gui, and the gui_render
-    let mut gui = GUI::new(0.0, 0.0, fonts.clone());
-    let gui_render = GUIRender::new(font_texture, [128, 128]);
+    let mut gui = Gui::new(0.0, 0.0, fonts.clone());
+    let gui_render = GuiRender::new(font_texture, [128, 128]);
 
     // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
     let button_style = Rc::new(ButtonStyle {
@@ -156,8 +156,8 @@ fn main() {
                 let size = window.inner_size();
                 let width = size.width;
                 let height = size.height;
-                let mut gui = GUI::new(width as f32, height as f32, fonts.clone());
-                let gui_render = GUIRender::new(font_texture, [128, 128]);
+                let mut gui = Gui::new(width as f32, height as f32, fonts.clone());
+                let gui_render = GuiRender::new(font_texture, [128, 128]);
                 let mut camera = Camera::new(width, height, height as f32);
 
                 resize(
@@ -243,7 +243,7 @@ fn main() {
 
                 // render the gui
                 struct Render<'a>(&'a mut GLSpriteRender);
-                impl<'a> GUIRenderer for Render<'a> {
+                impl<'a> GuiRenderer for Render<'a> {
                     fn update_font_texure(
                         &mut self,
                         font_texture: u32,
@@ -301,7 +301,7 @@ fn main() {
 }
 
 fn create_gui(
-    gui: &mut GUI,
+    gui: &mut Gui,
     proxy: EventLoopProxy<UserEvent>,
     button_style: Rc<ButtonStyle>,
     owner: Rc<Window>,

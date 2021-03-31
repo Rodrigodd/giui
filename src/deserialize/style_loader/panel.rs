@@ -12,8 +12,8 @@ pub const FIELDS: &[&str] = &[
 #[derive(Debug)]
 enum Field {
     Texture,
-    UVRect,
-    UVRects,
+    UvRect,
+    UvRects,
     Border,
     Color,
 }
@@ -29,8 +29,8 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
     {
         match value {
             0u64 => Ok(Field::Texture),
-            1u64 => Ok(Field::UVRect),
-            2u64 => Ok(Field::UVRects),
+            1u64 => Ok(Field::UvRect),
+            2u64 => Ok(Field::UvRects),
             3u64 => Ok(Field::Border),
             4u64 => Ok(Field::Color),
             _ => Err(serde::de::Error::invalid_value(
@@ -45,8 +45,8 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
     {
         match value {
             "texture" => Ok(Field::Texture),
-            "uv_rect" => Ok(Field::UVRect),
-            "uv_rects" => Ok(Field::UVRects),
+            "uv_rect" => Ok(Field::UvRect),
+            "uv_rects" => Ok(Field::UvRects),
             "border" => Ok(Field::Border),
             "color" => Ok(Field::Color),
             _ => Err(de::Error::unknown_field(value, FIELDS)),
@@ -146,13 +146,13 @@ impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for PanelVisitor<'a, 'b> {
                     }
                     texture = Some(map.next_value()?);
                 }
-                Field::UVRect => {
+                Field::UvRect => {
                     if Option::is_some(&uv_rect) {
                         return Err(de::Error::duplicate_field("uv_rect"));
                     }
                     uv_rect = Some(map.next_value()?);
                 }
-                Field::UVRects => {
+                Field::UvRects => {
                     if Option::is_some(&uv_rects) {
                         return Err(de::Error::duplicate_field("uv_rects"));
                     }

@@ -25,4 +25,4 @@ pub use context::*;
 pub use control::*;
 pub use gui::*;
 pub use rect::*;
-pub use render::GUIRender;
+pub use render::GuiRender;
