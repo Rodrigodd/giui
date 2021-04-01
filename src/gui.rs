@@ -520,7 +520,7 @@ impl Gui {
                 }
             },
             WindowEvent::MouseWheel { delta, .. } => {
-                if let Some(curr) = self.current_mouse {
+                if let Some(curr) = self.current_scroll {
                     //TODO: I should handle Line and Pixel Delta differences more wisely?
                     let delta = match delta {
                         winit::event::MouseScrollDelta::LineDelta(x, y) => [*x * 100.0, *y * 100.0],

@@ -45,6 +45,7 @@ pub struct TextField<C: TextFieldCallback> {
     selection_index: Option<usize>,
     text_info: TextInfo,
     text_width: f32,
+    this_width: f32,
     x_scroll: f32,
     on_focus: bool,
     mouse_x: f32,
@@ -65,6 +66,7 @@ impl<C: TextFieldCallback> TextField<C> {
             selection_index: None,
             text_info: TextInfo::default(),
             text_width: 0.0,
+            this_width: 0.0,
             x_scroll: 0.0,
             on_focus: false,
             mouse_x: 0.0,
@@ -88,25 +90,25 @@ impl<C: TextFieldCallback> TextField<C> {
     }
 
     fn update_carret(&mut self, this: Id, ctx: &mut Context, focus_caret: bool) {
-        let this_rect = *ctx.get_rect(this);
-
         let mut caret_pos = self.text_info.get_caret_pos(self.caret_index);
-
+        
         const MARGIN: f32 = 5.0;
 
-        let this_width = this_rect[2] - this_rect[0];
-        if this_width > self.text_width {
+        let this_rect = *ctx.get_rect(this);
+        self.this_width = this_rect[2] - this_rect[0];
+
+        if self.this_width > self.text_width {
             self.x_scroll = -MARGIN;
         } else if focus_caret {
-            if caret_pos[0] - self.x_scroll > this_width - MARGIN {
-                self.x_scroll = caret_pos[0] - (this_width - MARGIN);
+            if caret_pos[0] - self.x_scroll > self.this_width - MARGIN {
+                self.x_scroll = caret_pos[0] - (self.this_width - MARGIN);
             }
             if caret_pos[0] - self.x_scroll < MARGIN {
                 self.x_scroll = caret_pos[0] - MARGIN;
             }
         } else {
-            if self.text_width - self.x_scroll < this_width - MARGIN {
-                self.x_scroll = self.text_width - (this_width - MARGIN);
+            if self.text_width - self.x_scroll < self.this_width - MARGIN {
+                self.x_scroll = self.text_width - (self.this_width - MARGIN);
             }
             if self.x_scroll < -MARGIN {
                 self.x_scroll = -MARGIN;
@@ -331,11 +333,16 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     }
 
     fn input_flags(&self) -> InputFlags {
-        InputFlags::MOUSE | InputFlags::SCROLL | InputFlags::FOCUS
+        let mut flags= InputFlags::MOUSE | InputFlags::FOCUS;
+
+        if self.text_width > self.this_width {
+            flags |= InputFlags::SCROLL ;
+        }
+        flags
     }
 
     fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {
-        let delta = if delta[0].abs() > delta[1].abs() {
+        let delta = if delta[0].abs() != 0.0 {
             delta[0]
         } else {
             delta[1]
