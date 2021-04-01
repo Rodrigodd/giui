@@ -349,7 +349,7 @@ impl<F: Fn(&mut Context, i32)> TextFieldCallback for NumberField<F> {
         }
     }
 
-    fn on_change(&mut self, _: Id, _: &mut Context, _: &String) {}
+    fn on_change(&mut self, _: Id, _: &mut Context, _: &str) {}
 
     fn on_unfocus(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool {
         self.on_submit(this, ctx, text)

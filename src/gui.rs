@@ -150,13 +150,13 @@ pub enum KeyboardEvent {
 }
 
 #[derive(Default)]
-struct Input {
-    mouse_pos: Option<[f32; 2]>,
-    last_mouse_pos: Option<[f32; 2]>,
+pub(crate) struct Input {
+    pub mouse_pos: Option<[f32; 2]>,
+    pub last_mouse_pos: Option<[f32; 2]>,
     /// number of consecutives MouseDown's
-    click_count: u8,
+    pub click_count: u8,
     /// used to check for double clicks
-    last_mouse_down: Option<Instant>,
+    pub last_mouse_down: Option<Instant>,
 }
 impl Input {
     fn get_mouse_info(&self, event: MouseEvent) -> MouseInfo {
@@ -184,7 +184,7 @@ pub struct Gui {
     // controls that 'on_start' need be called
     lazy_events: Vec<LazyEvent>,
     change_cursor: Option<CursorIcon>,
-    input: Input,
+    pub(crate) input: Input,
     current_mouse: Option<Id>,
     current_scroll: Option<Id>,
     current_focus: Option<Id>,

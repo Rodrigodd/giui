@@ -13,14 +13,14 @@ use winit::{event::VirtualKeyCode, window::CursorIcon};
 
 pub trait TextFieldCallback {
     fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool;
-    fn on_change(&mut self, this: Id, ctx: &mut Context, text: &String);
+    fn on_change(&mut self, this: Id, ctx: &mut Context, text: &str);
     fn on_unfocus(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool;
 }
 impl<F: FnMut(Id, &mut Context, &mut String) -> bool + 'static> TextFieldCallback for F {
     fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool {
         self(this, ctx, text)
     }
-    fn on_change(&mut self, _: Id, _: &mut Context, _: &String) {}
+    fn on_change(&mut self, _: Id, _: &mut Context, _: &str) {}
     fn on_unfocus(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
         true
     }
@@ -29,7 +29,7 @@ impl TextFieldCallback for () {
     fn on_submit(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
         true
     }
-    fn on_change(&mut self, _: Id, _: &mut Context, _: &String) {}
+    fn on_change(&mut self, _: Id, _: &mut Context, _: &str) {}
     fn on_unfocus(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
         true
     }
@@ -48,7 +48,9 @@ pub struct TextField<C: TextFieldCallback> {
     x_scroll: f32,
     on_focus: bool,
     mouse_x: f32,
-    mouse_down: bool,
+    /// If it is non zero, the mouse is being dragged. 1 for single click, 2 for double click, etc...
+    mouse_down: u8,
+    drag_start: usize,
     style: Rc<OnFocusStyle>,
 }
 impl<C: TextFieldCallback> TextField<C> {
@@ -66,7 +68,8 @@ impl<C: TextFieldCallback> TextField<C> {
             x_scroll: 0.0,
             on_focus: false,
             mouse_x: 0.0,
-            mouse_down: false,
+            mouse_down: 0,
+            drag_start: 0,
             style,
         }
     }
@@ -194,6 +197,118 @@ impl<C: TextFieldCallback> TextField<C> {
         self.update_text(this, ctx);
         self.callback.on_change(this, ctx, &self.text)
     }
+
+    fn get_word_start(&mut self, mut caret: usize) -> usize {
+        let mut s = false;
+        while caret != 0 {
+            let whitespace = match self.text[self.text_info.get_indice(caret)..]
+                .chars()
+                .next()
+            {
+                Some(x) => x.is_whitespace(),
+                None => false,
+            };
+            if !whitespace {
+                s = true;
+            } else if s {
+                caret += 1;
+                break;
+            }
+            caret -= 1;
+        }
+        caret
+    }
+
+    fn get_next_word_start(&mut self, mut caret: usize) -> usize {
+        let mut s = false;
+        loop {
+            let whitespace = match self.text[self.text_info.get_indice(caret)..]
+                .chars()
+                .next()
+            {
+                Some(x) => x.is_whitespace(),
+                None => {
+                    caret = self.text_info.len() - 1;
+                    break;
+                }
+            };
+            if whitespace {
+                s = true;
+            } else if s {
+                break;
+            }
+            caret += 1;
+        }
+        caret
+    }
+
+    fn get_token_start(&mut self, mut caret: usize) -> usize {
+        let start = match self.text[self.text_info.get_indice(caret)..]
+            .chars()
+            .next()
+        {
+            Some(x) => x.is_whitespace(),
+            None => false,
+        };
+        loop {
+            let whitespace = match self.text[self.text_info.get_indice(caret)..]
+                .chars()
+                .next()
+            {
+                Some(x) => x.is_whitespace(),
+                None => false,
+            };
+            if whitespace != start {
+                caret += 1;
+                break;
+            }
+            if caret == 0 {
+                break;
+            }
+            caret -= 1;
+        }
+        caret
+    }
+
+    fn get_token_end(&mut self, mut caret: usize) -> usize {
+        let start = match self.text[self.text_info.get_indice(caret)..]
+            .chars()
+            .next()
+        {
+            Some(x) => x.is_whitespace(),
+            None => {
+                return self.text_info.len() - 1;
+            }
+        };
+        loop {
+            let whitespace = match self.text[self.text_info.get_indice(caret)..]
+                .chars()
+                .next()
+            {
+                Some(x) => x.is_whitespace(),
+                None => {
+                    caret = self.text_info.len() - 1;
+                    break;
+                }
+            };
+            if whitespace != start {
+                break;
+            }
+            caret += 1;
+        }
+        caret
+    }
+
+    fn select_all(&mut self, this: Id, ctx: &mut Context) {
+        let start = 0;
+        let end = self
+            .text_info
+            .get_line_range(self.caret_index)
+            .map_or(0, |x| x.end.saturating_sub(1));
+        self.selection_index = Some(start);
+        self.caret_index = end;
+        self.update_carret(this, ctx, false);
+    }
 }
 impl<C: TextFieldCallback> Behaviour for TextField<C> {
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
@@ -241,35 +356,78 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
             MouseEvent::Down(Left) => {
                 let left = ctx.get_rect(this)[0] - self.x_scroll;
                 let x = self.mouse_x - left;
-                self.caret_index = self.text_info.get_caret_index_at_pos(0, x);
-                self.mouse_down = true;
-                self.selection_index = None;
+                let caret = self.text_info.get_caret_index_at_pos(0, x);
+                if caret == self.drag_start {
+                    match mouse.click_count {
+                        0 => unreachable!(),
+                        1 => {
+                            self.caret_index = caret;
+                            self.mouse_down = 1;
+                            self.selection_index = None;
+                        },
+                        2 => {
+                            let caret = self.caret_index;
+                            self.caret_index = self.get_token_start(caret);
+                            self.mouse_down = 2;
+                            self.selection_index = Some(self.get_token_end(caret));
+                        }
+                        3..=u8::MAX => {
+                            self.select_all(this, ctx);
+                        }
+                    }
+                } else {
+                    if mouse.click_count > 1 {
+                        ctx.reset_click_count_to_one();
+                    }
+                    self.caret_index = caret;
+                    self.mouse_down = 1;
+                    self.selection_index = None;
+                }
+                self.drag_start = caret;
                 self.update_carret(this, ctx, true);
                 ctx.send_event(event::LockOver);
             }
             MouseEvent::Up(Left) => {
-                self.mouse_down = false;
+                self.mouse_down = 0;
                 ctx.send_event(event::UnlockOver);
             }
             MouseEvent::Moved => {
                 let [x, _] = mouse.pos;
                 self.mouse_x = x;
-                if self.mouse_down {
-                    let left = ctx.get_rect(this)[0] - self.x_scroll;
-                    let x = self.mouse_x - left;
-                    let caret_index = self.text_info.get_caret_index_at_pos(0, x);
-                    if caret_index == self.caret_index {
-                        return;
-                    }
-                    if let Some(selection_index) = self.selection_index {
-                        if caret_index == selection_index {
-                            self.selection_index = None;
+                match self.mouse_down {
+                    0 => {},
+                    1 => {
+                        let left = ctx.get_rect(this)[0] - self.x_scroll;
+                        let x = self.mouse_x - left;
+                        let caret_index = self.text_info.get_caret_index_at_pos(0, x);
+                        if caret_index == self.caret_index {
+                            return;
                         }
-                    } else {
-                        self.selection_index = Some(self.caret_index);
+                        if let Some(selection_index) = self.selection_index {
+                            if caret_index == selection_index {
+                                self.selection_index = None;
+                            }
+                        } else {
+                            self.selection_index = Some(self.caret_index);
+                        }
+                        self.caret_index = caret_index;
+                        self.update_carret(this, ctx, true);
+                    },
+                    2..=u8::MAX => {
+                        let left = ctx.get_rect(this)[0] - self.x_scroll;
+                        let x = self.mouse_x - left;
+                        let caret_index = self.text_info.get_caret_index_at_pos(0, x);
+                        let selection_index = self.selection_index.unwrap_or(caret_index);
+                        let caret_index = if selection_index > caret_index {
+                            self.selection_index = Some(self.get_token_end(self.drag_start));
+                            self.get_token_start(caret_index)
+                        } else {
+                            self.selection_index = Some(self.get_token_start(self.drag_start));
+                            self.get_token_end(caret_index)
+                        };
+                        self.caret_index = caret_index;
+                        self.update_carret(this, ctx, true);
                     }
-                    self.caret_index = caret_index;
-                    self.update_carret(this, ctx, true);
                 }
             }
             MouseEvent::Up(_) => {}
@@ -351,14 +509,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 }
                 VirtualKeyCode::A => {
                     if ctx.modifiers().ctrl() {
-                        let start = 0;
-                        let end = self
-                            .text_info
-                            .get_line_range(self.caret_index)
-                            .map_or(0, |x| x.end.saturating_sub(1));
-                        self.selection_index = Some(start);
-                        self.caret_index = end;
-                        self.update_carret(this, ctx, false);
+                        self.select_all(this, ctx);
                     }
                 }
                 VirtualKeyCode::Return => {
@@ -397,24 +548,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     if self.caret_index == 0 {
                         self.move_caret(0, ctx);
                     } else if ctx.modifiers().ctrl() {
-                        let mut caret = self.caret_index - 1;
-                        let mut s = false;
-                        while caret != 0 {
-                            let whitespace = match self.text[self.text_info.get_indice(caret)..]
-                                .chars()
-                                .next()
-                            {
-                                Some(x) => x.is_whitespace(),
-                                None => false,
-                            };
-                            if !whitespace {
-                                s = true;
-                            } else if s {
-                                caret += 1;
-                                break;
-                            }
-                            caret -= 1;
-                        }
+                        let caret = self.get_word_start(self.caret_index - 1);
                         self.move_caret(caret, ctx);
                     } else {
                         self.move_caret(self.caret_index - 1, ctx);
@@ -425,26 +559,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     if self.caret_index + 1 >= self.text_info.len() {
                         self.move_caret(self.caret_index, ctx);
                     } else if ctx.modifiers().ctrl() {
-                        let mut caret = self.caret_index;
-                        let mut s = false;
-                        loop {
-                            let whitespace = match self.text[self.text_info.get_indice(caret)..]
-                                .chars()
-                                .next()
-                            {
-                                Some(x) => x.is_whitespace(),
-                                None => {
-                                    caret = self.text_info.len() - 1;
-                                    break;
-                                }
-                            };
-                            if whitespace {
-                                s = true;
-                            } else if s {
-                                break;
-                            }
-                            caret += 1;
-                        }
+                        let caret = self.get_next_word_start(self.caret_index);
                         self.move_caret(caret, ctx);
                     } else {
                         self.move_caret(self.caret_index + 1, ctx);

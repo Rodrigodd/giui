@@ -204,6 +204,13 @@ impl<'a> Context<'a> {
         self.gui.controls[id].focus
     }
 
+    /// Set MouseInfo::click_count to 1, wich keep track of consecutives clicks.
+    /// This means that, if called, if the next click is consecutive,
+    /// it will have a click count of 2.
+    pub fn reset_click_count_to_one(&mut self) {
+        self.gui.input.click_count = 1;
+    }
+
     /// This only took effect when Controls is dropped
     pub fn active(&mut self, id: Id) {
         self.events.push(Box::new(event::ActiveControl { id }));
