@@ -861,8 +861,25 @@ impl Gui {
                         }
                         self.update_layout();
                         println!("activing {}", id);
+                        
+                        debug_assert!(self.controls[id].really_active);
                         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
                             this.on_active(id, &mut ctx);
+                        }
+
+                        let mut tree = self.controls.get_active_children(id);
+                        tree.reverse();
+                        while let Some(id) = tree.pop() {
+                            if !self.controls[id].really_active {
+                                println!("activing {}", id);
+                                tree.extend(self.controls.get_active_children(id).iter().rev());
+                                self.controls[id].really_active = true;
+                                if let Some((this, mut ctx)) =
+                                    Context::new_with_mut_behaviour(id, self)
+                                {
+                                    this.on_active(id, &mut ctx);
+                                }
+                            }
                         }
                     }
                     LazyEvent::OnDeactive(id) => {

@@ -159,11 +159,7 @@ impl<'a> ControlBuilder<'a> {
                 .map(|x| controls[x].really_active)
                 .unwrap_or(true)
         {
-            let mut parents = vec![id];
-            while let Some(id) = parents.pop() {
-                parents.extend(controls.get_active_children(id).iter().rev());
-                controls[id].really_active = true;
-            }
+            controls[id].really_active = true;
         }
 
         inner.build(id);
