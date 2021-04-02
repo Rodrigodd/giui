@@ -434,8 +434,15 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             i += 1;
         }
 
-        self.end_y = (i - 1) as f32 + (view_rect[3] - (y - height)) / height;
-        // println!("end at {}", self.end_y);
+        {
+            let last = self.created_items.iter().rev().next().unwrap().1;
+            
+            let y = view_rect[1] + last.y;
+            let gap = (view_rect[3] - y) / last.height;
+            debug_assert!((0.0..1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, last.height, last.y);
+            self.end_y = last.i as f32 + gap;
+            // println!("end at {}", self.end_y);
+        }
     }
 
     fn create_items_from_bottom(&mut self, view_rect: [f32; 4], this: Id, ctx: &mut LayoutContext) {
@@ -463,14 +470,11 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
         }
 
         {
-            let start_control = self.created_items.iter().next().unwrap().1;
-            let id = start_control.id;
-            let height = ctx.get_min_size(id)[1];
-            let i = start_control.i;
-            let y = start_control.y + view_rect[1];
-
-            self.start_y = (i as f32) + (view_rect[1] - y) / height;
-            // println!("start_y: {}", self.start_y);
+            let first = dbg!(self.created_items.iter().next().unwrap()).1;
+            
+            let gap = - first.y / first.height;
+            debug_assert!((0.0..1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, first.height, first.y);
+            self.start_y = first.i as f32 + gap;
         }
     }
 
@@ -515,14 +519,13 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
 
         {
             let last = self.created_items.iter().rev().next().unwrap().1;
-            let id = last.id;
-            let height = ctx.get_min_size(id)[1];
-            let i = last.i;
+            
             let y = view_rect[1] + last.y;
-
-            self.end_y = i as f32 + (view_rect[3] - y) / height;
+            let gap = (view_rect[3] - y) / last.height;
+            debug_assert!((0.0..1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, last.height, last.y);
+            self.end_y = last.i as f32 + gap;
+            // println!("end at {}", self.end_y);
         }
-        // println!("end at {}", self.end_y);
     }
 
     fn create_items(&mut self, view_rect: [f32; 4], this: Id, ctx: &mut LayoutContext) {
@@ -582,7 +585,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             }
 
             // create items below, if necessary
-            while y < view_rect[3] {
+            while y <= view_rect[3] {
                 let height = self.create_item(i, this, y, ctx, view_rect);
                 y += height;
                 i += 1;
@@ -594,23 +597,41 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 }
             }
 
-            {
-                let start_control = self.created_items.iter().next().unwrap().1;
-                let id = start_control.id;
-                let height = ctx.get_min_size(id)[1];
-                let i = start_control.i;
-                let y = start_control.y + view_rect[1];
+            // destroy items above, if any
+            loop {
+                let (&i, item) = self.created_items.iter().next().unwrap();
+                if item.y + item.height > 0.0 {
+                    break;
+                }
+                // give item back to last_created_items
+                let item = self.created_items.remove(&i).unwrap();
+                self.last_created_items.insert(i, item);
+            }
 
-                self.start_y = i as f32 + (view_rect[1] - y) / height;
+            // destroy items below, if any
+            loop {
+                let (&i, item) = self.created_items.iter().next_back().unwrap();
+                if item.y <= view_rect[3] - view_rect[1] {
+                    break;
+                }
+                // give item back to last_created_items
+                let item = self.created_items.remove(&i).unwrap();
+                self.last_created_items.insert(i, item);
+            }
+
+            {
+                let first = self.created_items.iter().next().unwrap().1;
+                
+                let gap = - first.y / first.height;
+                debug_assert!((0.0..1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, first.height, first.y);
+                self.start_y = first.i as f32 + gap;
             }
             {
                 let last = self.created_items.iter().rev().next().unwrap().1;
-                let id = last.id;
-                let height = ctx.get_min_size(id)[1];
-                let i = last.i;
-                let y = view_rect[1] + last.y;
-
-                self.end_y = i as f32 + (view_rect[3] - y) / height;
+                
+                let gap = (view_rect[3] - view_rect[1] - last.y) / last.height;
+                debug_assert!((0.0..1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, last.height, last.y);
+                self.end_y = last.i as f32 + gap;
             }
             // println!("start at {}", self.start_y);
             // println!("end at {}", self.end_y);
