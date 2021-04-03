@@ -26,6 +26,11 @@ impl MarginLayout {
         Self { margins }
     }
 }
+impl Default for MarginLayout {
+    fn default() -> Self {
+        Self::new([0.0; 4])
+    }
+}
 impl Layout for MarginLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let mut min_size = [0.0f32, 0.0];
