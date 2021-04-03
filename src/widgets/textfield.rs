@@ -586,6 +586,9 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     );
                     self.update_carret(this, ctx, true);
                 }
+                _ if !ctx.modifiers().is_empty() => {
+                    return false;
+                }
                 _ => {}
             },
         }
