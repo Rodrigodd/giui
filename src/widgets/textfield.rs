@@ -7,8 +7,11 @@ use crate::{
 };
 
 use copypasta::{ClipboardContext, ClipboardProvider};
-use std::any::Any;
 use std::rc::Rc;
+use std::{
+    any::Any,
+    time::{Duration, Instant},
+};
 use winit::{event::VirtualKeyCode, window::CursorIcon};
 
 pub trait TextFieldCallback {
@@ -35,6 +38,8 @@ impl TextFieldCallback for () {
     }
 }
 
+struct BlinkCaret;
+
 pub struct TextField<C: TextFieldCallback> {
     callback: C,
     caret: Id,
@@ -53,6 +58,9 @@ pub struct TextField<C: TextFieldCallback> {
     mouse_down: u8,
     drag_start: usize,
     style: Rc<OnFocusStyle>,
+    blink: bool,
+    /// event_id of the last scheduled BlinkCaret event
+    blink_event: Option<u64>,
 }
 impl<C: TextFieldCallback> TextField<C> {
     pub fn new(text: String, caret: Id, label: Id, style: Rc<OnFocusStyle>, callback: C) -> Self {
@@ -73,6 +81,8 @@ impl<C: TextFieldCallback> TextField<C> {
             mouse_down: 0,
             drag_start: 0,
             style,
+            blink: false,
+            blink_event: None,
         }
     }
 
@@ -91,7 +101,12 @@ impl<C: TextFieldCallback> TextField<C> {
 
     fn update_carret(&mut self, this: Id, ctx: &mut Context, focus_caret: bool) {
         let mut caret_pos = self.text_info.get_caret_pos(self.caret_index);
-        
+        if let Some(event_id) = self.blink_event {
+            ctx.cancel_scheduled_event(event_id);
+        } else {
+            self.blink = false;
+        }
+
         const MARGIN: f32 = 5.0;
 
         let this_rect = *ctx.get_rect(this);
@@ -140,6 +155,13 @@ impl<C: TextFieldCallback> TextField<C> {
         } else {
             ctx.get_graphic_mut(self.caret).set_color([0, 0, 0, 255]);
             if self.on_focus {
+                self.blink_event = Some(ctx.send_event_to_scheduled(
+                    this,
+                    BlinkCaret,
+                    Instant::now() + Duration::from_millis(500),
+                ));
+            }
+            if self.on_focus && !self.blink {
                 ctx.set_margins(
                     self.caret,
                     [
@@ -203,10 +225,7 @@ impl<C: TextFieldCallback> TextField<C> {
     fn get_word_start(&mut self, mut caret: usize) -> usize {
         let mut s = false;
         while caret != 0 {
-            let whitespace = match self.text[self.text_info.get_indice(caret)..]
-                .chars()
-                .next()
-            {
+            let whitespace = match self.text[self.text_info.get_indice(caret)..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => false,
             };
@@ -224,10 +243,7 @@ impl<C: TextFieldCallback> TextField<C> {
     fn get_next_word_start(&mut self, mut caret: usize) -> usize {
         let mut s = false;
         loop {
-            let whitespace = match self.text[self.text_info.get_indice(caret)..]
-                .chars()
-                .next()
-            {
+            let whitespace = match self.text[self.text_info.get_indice(caret)..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => {
                     caret = self.text_info.len() - 1;
@@ -245,18 +261,12 @@ impl<C: TextFieldCallback> TextField<C> {
     }
 
     fn get_token_start(&mut self, mut caret: usize) -> usize {
-        let start = match self.text[self.text_info.get_indice(caret)..]
-            .chars()
-            .next()
-        {
+        let start = match self.text[self.text_info.get_indice(caret)..].chars().next() {
             Some(x) => x.is_whitespace(),
             None => false,
         };
         loop {
-            let whitespace = match self.text[self.text_info.get_indice(caret)..]
-                .chars()
-                .next()
-            {
+            let whitespace = match self.text[self.text_info.get_indice(caret)..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => false,
             };
@@ -273,20 +283,14 @@ impl<C: TextFieldCallback> TextField<C> {
     }
 
     fn get_token_end(&mut self, mut caret: usize) -> usize {
-        let start = match self.text[self.text_info.get_indice(caret)..]
-            .chars()
-            .next()
-        {
+        let start = match self.text[self.text_info.get_indice(caret)..].chars().next() {
             Some(x) => x.is_whitespace(),
             None => {
                 return self.text_info.len() - 1;
             }
         };
         loop {
-            let whitespace = match self.text[self.text_info.get_indice(caret)..]
-                .chars()
-                .next()
-            {
+            let whitespace = match self.text[self.text_info.get_indice(caret)..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => {
                     caret = self.text_info.len() - 1;
@@ -329,14 +333,17 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
             self.caret_index = self.text_info.get_caret_index_at_pos(0, x);
             self.update_carret(this, ctx, true);
             self.callback.on_change(this, ctx, &self.text);
+        } else if event.is::<BlinkCaret>() {
+            self.blink = !self.blink;
+            self.update_carret(this, ctx, true);
         }
     }
 
     fn input_flags(&self) -> InputFlags {
-        let mut flags= InputFlags::MOUSE | InputFlags::FOCUS;
+        let mut flags = InputFlags::MOUSE | InputFlags::FOCUS;
 
         if self.text_width > self.this_width {
-            flags |= InputFlags::SCROLL ;
+            flags |= InputFlags::SCROLL;
         }
         flags
     }
@@ -371,7 +378,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                             self.caret_index = caret;
                             self.mouse_down = 1;
                             self.selection_index = None;
-                        },
+                        }
                         2 => {
                             let caret = self.caret_index;
                             self.caret_index = self.get_token_start(caret);
@@ -402,7 +409,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 let [x, _] = mouse.pos;
                 self.mouse_x = x;
                 match self.mouse_down {
-                    0 => {},
+                    0 => {}
                     1 => {
                         let left = ctx.get_rect(this)[0] - self.x_scroll;
                         let x = self.mouse_x - left;
@@ -419,7 +426,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                         }
                         self.caret_index = caret_index;
                         self.update_carret(this, ctx, true);
-                    },
+                    }
                     2..=u8::MAX => {
                         let left = ctx.get_rect(this)[0] - self.x_scroll;
                         let x = self.mouse_x - left;
@@ -464,6 +471,12 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     }
 
     fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
+        if let Some(event_id) = self.blink_event.take() {
+            ctx.cancel_scheduled_event(event_id);
+        }
+        if self.blink {
+            self.update_carret(this, ctx, false);
+        }
         match event {
             KeyboardEvent::Char(ch) => {
                 if self.selection_index.is_some() {

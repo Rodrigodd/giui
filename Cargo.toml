@@ -25,6 +25,8 @@ copypasta = "0.7"
 # ron = { version = "0.6", optional = true }
 serde = { version = "1", features = ["derive"] }
 crui-derive = { path = "./crui-derive" }
+keyed_priority_queue = "0.3"
+
 
 [patch.crates-io]
 winit = { path = "../winit" }

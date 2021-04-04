@@ -173,7 +173,7 @@ pub(crate) struct Controls {
 impl Controls {
     pub fn get(&self, id: Id) -> Option<&Control> {
         if let Some(control) = self.controls.get(id.index()) {
-            if self.controls[id.index()].generation == id.generation {
+            if control.generation == id.generation {
                 Some(control)
             } else {
                 None
@@ -182,6 +182,19 @@ impl Controls {
             None
         }
     }
+
+    pub fn get_mut(&mut self, id: Id) -> Option<&mut Control> {
+        if let Some(control) = self.controls.get_mut(id.index()) {
+            if control.generation == id.generation {
+                Some(control)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
     pub fn reserve(&mut self) -> Id {
         if let Some(index) = self.dead_controls.pop() {
             debug_assert!(self.controls[index as usize].state == ControlState::Free);

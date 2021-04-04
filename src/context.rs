@@ -1,11 +1,14 @@
-use std::any::Any;
+use std::{
+    any::Any,
+    time::Instant,
+};
 
 use ab_glyph::FontArc;
 use winit::{event::ModifiersState, window::CursorIcon};
 
 use crate::{
     control::ControlBuilderInner, event, graphics::Graphic, Behaviour, ControlBuilder, Controls,
-    Id, Layout, Rect, Gui,
+    Gui, Id, Layout, Rect,
 };
 
 // contains a reference to all the controls, except the behaviour of one control
@@ -50,7 +53,7 @@ impl<'a> Context<'a> {
         gui: &'a mut Gui,
     ) -> Option<(&'a mut dyn Behaviour, Self)> {
         let this_one = unsafe {
-            &mut *(gui.controls[this].behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
+            &mut *(gui.controls.get_mut(this)?.behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
         };
         Some((this_one, Self::new(gui)))
     }
@@ -84,6 +87,20 @@ impl<'a> Context<'a> {
     }
     pub fn send_event_to<T: 'static>(&mut self, id: Id, event: T) {
         self.events_to.push((id, Box::new(event)));
+    }
+
+    pub fn send_event_to_scheduled<T: 'static>(
+        &mut self,
+        id: Id,
+        event: T,
+        instant: Instant,
+    ) -> u64 {
+        self.gui
+            .send_event_to_scheduled(id, Box::new(event), instant)
+    }
+
+    pub fn cancel_scheduled_event(&mut self, event_id: u64) {
+        self.gui.cancel_scheduled_event(event_id);
     }
 
     pub fn set_cursor(&mut self, cursor: CursorIcon) {

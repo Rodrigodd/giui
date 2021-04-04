@@ -2,13 +2,16 @@ use crate::{
     context::{Context, LayoutContext, MinSizeContext},
     control::ControlBuilderInner,
     graphics::Graphic,
+    util::WithPriority,
     Control, ControlBuilder, ControlState, Controls, LayoutDirtyFlags, Rect,
 };
 use ab_glyph::FontArc;
+use keyed_priority_queue::KeyedPriorityQueue;
 use std::{
     any::Any,
     mem,
     num::NonZeroU32,
+    sync::atomic::AtomicU64,
     time::{Duration, Instant},
 };
 use winit::{
@@ -174,6 +177,8 @@ impl Input {
     }
 }
 
+type ScheduledEventTo = WithPriority<(Instant, u64), (Id, Box<dyn Any>)>;
+
 pub struct Gui {
     pub(crate) controls: Controls,
     pub(crate) fonts: Vec<FontArc>,
@@ -182,6 +187,7 @@ pub struct Gui {
     // controls that need to update the layout
     dirty_layouts: Vec<Id>,
     // controls that 'on_start' need be called
+    scheduled_events: KeyedPriorityQueue<u64, ScheduledEventTo>,
     lazy_events: Vec<LazyEvent>,
     change_cursor: Option<CursorIcon>,
     pub(crate) input: Input,
@@ -209,6 +215,7 @@ impl Gui {
             }]
             .into(),
             redraw: true,
+            scheduled_events: KeyedPriorityQueue::default(),
             dirty_layouts: Vec::new(),
             lazy_events: Vec::new(),
             change_cursor: None,
@@ -378,6 +385,27 @@ impl Gui {
         self.change_cursor.take()
     }
 
+    /// Handle if there is some scheduled event to be adressed, and
+    /// return the instant for the next scheduled event
+    pub fn handle_scheduled_event(&mut self) -> Option<Instant> {
+        loop {
+            let now = Instant::now();
+            match self.scheduled_events.peek().map(|x| x.1.priority().0) {
+                Some(time) => {
+                    if now >= time {
+                        let (id, event) = self.scheduled_events.pop().unwrap().1.item;
+                        dbg!(time.elapsed());
+                        self.send_event_to(id, event);
+                        continue;
+                    }
+                    dbg!(time.duration_since(now));
+                    return self.scheduled_events.peek().map(|x| x.1.priority().0);
+                }
+                None => return None,
+            }
+        }
+    }
+
     #[inline]
     pub fn get_context(&mut self) -> Context {
         self.lazy_update();
@@ -453,6 +481,25 @@ impl Gui {
         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
             this.on_event(event, id, &mut ctx);
         }
+    }
+
+    // TODO: there should not be a public function which receive Box<...>
+    // (specially when there is identical funtcion that is generic)
+    pub fn send_event_to_scheduled(
+        &mut self,
+        id: Id,
+        event: Box<dyn Any>,
+        instant: Instant,
+    ) -> u64 {
+        static ORDER_OF_INSERTION: AtomicU64 = AtomicU64::new(0);
+        let event_id = ORDER_OF_INSERTION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let event = WithPriority::new((instant, event_id), (id, event));
+        self.scheduled_events.push(event_id, event);
+        event_id
+    }
+
+    pub fn cancel_scheduled_event(&mut self, event_id: u64) {
+        self.scheduled_events.remove(&event_id);
     }
 
     pub fn call_event<F: FnOnce(&mut dyn Behaviour, Id, &mut Context)>(
@@ -861,7 +908,7 @@ impl Gui {
                         }
                         self.update_layout();
                         println!("activing {}", id);
-                        
+
                         debug_assert!(self.controls[id].really_active);
                         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
                             this.on_active(id, &mut ctx);

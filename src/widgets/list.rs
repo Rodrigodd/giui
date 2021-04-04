@@ -418,7 +418,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
         self.start_y = 0.0;
         self.delta_y = 0.0;
 
-        let mut height = 0.0;
+        let mut height;
         let mut y = view_rect[1];
 
         // create items below, if necessary
@@ -470,7 +470,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
         }
 
         {
-            let first = dbg!(self.created_items.iter().next().unwrap()).1;
+            let first = self.created_items.iter().next().unwrap().1;
             
             let gap = - first.y / first.height;
             debug_assert!((0.0..1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, first.height, first.y);
