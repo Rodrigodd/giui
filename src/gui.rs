@@ -9,7 +9,7 @@ use ab_glyph::FontArc;
 use keyed_priority_queue::KeyedPriorityQueue;
 use std::{
     any::Any,
-    mem,
+    collections::VecDeque,
     num::NonZeroU32,
     sync::atomic::AtomicU64,
     time::{Duration, Instant},
@@ -72,6 +72,7 @@ impl std::fmt::Display for Id {
 }
 
 #[allow(clippy::clippy::enum_variant_names)]
+#[derive(PartialEq, Eq, Debug)]
 enum LazyEvent {
     OnStart(Id),
     OnRemove(Id),
@@ -188,7 +189,7 @@ pub struct Gui {
     dirty_layouts: Vec<Id>,
     // controls that 'on_start' need be called
     scheduled_events: KeyedPriorityQueue<u64, ScheduledEventTo>,
-    lazy_events: Vec<LazyEvent>,
+    lazy_events: VecDeque<LazyEvent>,
     change_cursor: Option<CursorIcon>,
     pub(crate) input: Input,
     current_mouse: Option<Id>,
@@ -217,7 +218,7 @@ impl Gui {
             redraw: true,
             scheduled_events: KeyedPriorityQueue::default(),
             dirty_layouts: Vec::new(),
-            lazy_events: Vec::new(),
+            lazy_events: VecDeque::new(),
             change_cursor: None,
             input: Input::default(),
             current_mouse: None,
@@ -261,7 +262,9 @@ impl Gui {
     }
 
     fn add_control(&mut self, id: Id) -> Id {
-        if self.controls[id].state == ControlState::Building {
+        if let ControlState::BuildingActive | ControlState::BuildingDeactive =
+            self.controls[id].state
+        {
             println!(
                 "add control {:<10} {}",
                 id.to_string(),
@@ -271,22 +274,24 @@ impl Gui {
                     .unwrap_or_default()
             );
             self.dirty_layout(id);
-            self.controls[id].state = ControlState::Started;
             assert_eq!(self.controls[id].generation, id.generation);
             let has_behaviour = self.controls[id].behaviour.is_some();
-            let active = self.controls[id].really_active;
             if has_behaviour {
-                self.lazy_events.push(LazyEvent::OnStart(id));
+                self.lazy_events.push_back(LazyEvent::OnStart(id));
             }
 
-            if active {
-                self.lazy_events.push(LazyEvent::OnActive(id));
+            if self.controls[id].state == ControlState::BuildingActive {
+                self.controls[id].active = true;
+                self.controls[id].really_active = true;
+                self.lazy_events.push_back(LazyEvent::OnActive(id));
             }
 
             for child in self.controls[id].children.clone() {
                 println!("add child {}", child);
                 self.add_control(child);
             }
+
+            self.controls[id].state = ControlState::Started;
         } else {
             println!("double add {}", id);
         }
@@ -314,7 +319,16 @@ impl Gui {
             while let Some(id) = parents.pop() {
                 parents.extend(self.get_active_children(id).iter().rev());
                 self.controls[id].really_active = true;
-                self.lazy_events.push(LazyEvent::OnActive(id));
+                println!("really_active = true for {}", id);
+                // If there was already a deactive event queued, we cancel it
+                if let Some(i) = self
+                    .lazy_events
+                    .iter()
+                    .position(|x| *x == LazyEvent::OnDeactive(id))
+                {
+                    self.lazy_events.remove(i);
+                }
+                self.lazy_events.push_back(LazyEvent::OnActive(id));
             }
         }
         // TODO: uncommenting the line below allow infinity recursion to happen
@@ -335,7 +349,6 @@ impl Gui {
             .map(|x| self.controls[x].really_active)
             .unwrap_or(true)
         {
-            self.controls[id].really_active = false;
             let mut parents = vec![id];
             while let Some(id) = parents.pop() {
                 parents.extend(self.get_active_children(id).iter().rev());
@@ -354,7 +367,16 @@ impl Gui {
                     self.set_focus(None);
                 }
                 self.controls[id].really_active = false;
-                self.lazy_events.push(LazyEvent::OnDeactive(id));
+                println!("really_active = false for {}", id);
+                // If there was already a active event queued, we cancel it
+                if let Some(i) = self
+                    .lazy_events
+                    .iter()
+                    .position(|x| *x == LazyEvent::OnActive(id))
+                {
+                    self.lazy_events.remove(i);
+                }
+                self.lazy_events.push_back(LazyEvent::OnDeactive(id));
             }
         }
         // uncommenting the line below allow infinity recursion to happen
@@ -363,13 +385,13 @@ impl Gui {
 
     /// Remove a control and all of its children
     pub fn remove_control(&mut self, id: Id) {
-        self.lazy_events.push(LazyEvent::OnRemove(id));
+        self.lazy_events.push_back(LazyEvent::OnRemove(id));
     }
 
     /// Remove all control
     pub fn clear_controls(&mut self) {
         self.lazy_update();
-        self.lazy_events.push(LazyEvent::OnRemove(Id::ROOT_ID));
+        self.lazy_events.push_back(LazyEvent::OnRemove(Id::ROOT_ID));
         self.lazy_update();
     }
 
@@ -535,21 +557,25 @@ impl Gui {
 
     pub fn start(&mut self) {
         self.update_all_layouts();
-        fn print_tree(deep: usize, id: Id, gui: &mut Gui) {
-            let childs = gui.controls[id].children.clone();
+        fn print_tree(branchs: String, id: Id, gui: &mut Gui) {
+            let childs = gui.controls.get_active_children(id); //.clone();
             let len = childs.len();
             for (i, child) in childs.iter().enumerate() {
                 println!(
                     "{}{}━━{}",
-                    "┃  ".repeat(deep),
+                    branchs,
                     if i + 1 == len { "┗" } else { "┣" },
                     child
                 );
-                print_tree(deep + 1, *child, gui)
+                if i + 1 == len {
+                    print_tree(branchs.clone() + "   ", *child, gui)
+                } else {
+                    print_tree(branchs.clone() + "┃  ", *child, gui)
+                };
             }
         }
         println!("{:?}", Id::ROOT_ID);
-        print_tree(0, Id::ROOT_ID, self);
+        print_tree("".into(), Id::ROOT_ID, self);
     }
 
     pub fn handle_event(&mut self, event: &WindowEvent) {
@@ -807,8 +833,7 @@ impl Gui {
 
     fn lazy_update(&mut self) {
         loop {
-            let lazy_events = mem::replace(&mut self.lazy_events, Vec::new());
-            for event in lazy_events {
+            while let Some(event) = self.lazy_events.pop_front() {
                 match event {
                     LazyEvent::OnStart(id) => {
                         if self.controls.get(id).is_none() {
@@ -906,10 +931,19 @@ impl Gui {
                             println!("activing {}, but already removed", id);
                             continue;
                         }
+                        debug_assert!(self.controls[id].active, "OnDeactive on deactive: {}", id);
+                        debug_assert!(
+                            self.controls[id].really_active,
+                            "OnDeactive on really_deactive: {}",
+                            id
+                        );
                         self.update_layout();
-                        println!("activing {}", id);
+                        // The update_layout could have deactivated this control
+                        if !self.controls[id].really_active {
+                            return;
+                        }
 
-                        debug_assert!(self.controls[id].really_active);
+                        println!("activing {}", id);
                         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
                             this.on_active(id, &mut ctx);
                         }
@@ -918,7 +952,7 @@ impl Gui {
                         tree.reverse();
                         while let Some(id) = tree.pop() {
                             if !self.controls[id].really_active {
-                                println!("activing {}", id);
+                                println!("active {}", id);
                                 tree.extend(self.controls.get_active_children(id).iter().rev());
                                 self.controls[id].really_active = true;
                                 if let Some((this, mut ctx)) =
@@ -934,7 +968,17 @@ impl Gui {
                             println!("deactiving {}, but already removed", id);
                             continue;
                         }
+
+                        debug_assert!(
+                            !self.controls[id].really_active,
+                            "OnDeactive on really_deactive: {}",
+                            id
+                        );
                         self.update_layout();
+                        // The update_layout could have deactivated this control
+                        if !self.controls[id].really_active {
+                            return;
+                        }
                         println!("deactiving {}", id);
                         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
                             this.on_deactive(id, &mut ctx);

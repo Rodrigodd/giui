@@ -249,19 +249,6 @@ impl<'a> Context<'a> {
         self.dirty_layout(id);
     }
 
-    pub fn set_parent(&mut self, id: Id, new_parent: Id) {
-        if let Some(parent) = self.gui.controls[id].parent.take() {
-            let i = self.gui.controls[parent]
-                .children
-                .iter()
-                .position(|x| *x == id)
-                .expect("Parent/Child desync!");
-            self.gui.controls[parent].children.remove(i);
-        }
-        self.gui.controls[id].parent = Some(new_parent);
-        self.gui.controls[new_parent].children.push(id);
-    }
-
     pub fn get_parent(&self, id: Id) -> Option<Id> {
         self.gui.controls[id].parent
     }

@@ -20,8 +20,7 @@ impl<'a> ControlBuilder<'a> {
             controls[id].state,
             ControlState::Reserved
         );
-        controls[id].state = ControlState::Building;
-        controls[id].active = true;
+        controls[id].state = ControlState::BuildingActive;
         Self {
             inner: Box::new(inner),
             id,
@@ -100,7 +99,11 @@ impl<'a> ControlBuilder<'a> {
         self
     }
     pub fn active(mut self, active: bool) -> Self {
-        self.inner.controls()[self.id].active = active;
+        self.inner.controls()[self.id].state = if active {
+            ControlState::BuildingActive
+        } else {
+            ControlState::BuildingDeactive
+        };
         self
     }
 
@@ -116,12 +119,7 @@ impl<'a> ControlBuilder<'a> {
     where
         F: FnOnce(ControlBuilder) -> ControlBuilder,
     {
-        // let id = self.inner.controls().reserve();
         let parent = self.id;
-
-        // while creating a child, be sure that it see its parent as deactive
-        let active = self.inner.controls()[parent].active;
-        self.inner.controls()[parent].active = false;
 
         {
             struct ChildBuilderInner<'a>(&'a mut Controls);
@@ -135,9 +133,6 @@ impl<'a> ControlBuilder<'a> {
             (create_child)(child_builder).parent(parent).build();
         }
 
-        // restore the parent active
-        self.inner.controls()[parent].active = active;
-
         self
     }
 
@@ -146,18 +141,19 @@ impl<'a> ControlBuilder<'a> {
 
         let controls = inner.controls();
 
+        // sync parent/child hierarchy
         if let Some(parent) = controls[id].parent {
             controls[parent].add_child(id);
         } else {
             controls[id].parent = Some(Id::ROOT_ID);
             controls[Id::ROOT_ID].add_child(id);
         }
-
-        if controls[id].active
+        
+        if controls[id].state == ControlState::BuildingActive
             && controls[id]
                 .parent
                 .map(|x| controls[x].really_active)
-                .unwrap_or(true)
+                .unwrap()
         {
             controls[id].really_active = true;
         }
@@ -350,14 +346,18 @@ impl From<Vec<Control>> for Controls {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub(crate) enum ControlState {
     /// It is free to be created, there is no valid Id pointing to It.
     Free,
     /// reserve() was called, so there is a Id refering it, but the control is not yet alive
     Reserved,
+    /// A ControlBuilder has been created, refering this Control, but the control is not yet alive.
+    /// The control will be active at start.
+    BuildingActive,
     /// A ControlBuilder has been created, refering this Control, but the control is not yet alive
-    Building,
+    /// The control will be deactive at start.
+    BuildingDeactive,
     /// The control is alive, and exist in the Gui tree.
     Started,
 }
@@ -366,7 +366,8 @@ impl std::fmt::Display for ControlState {
         match self {
             ControlState::Free => write!(f, "Free"),
             ControlState::Reserved => write!(f, "Reserved"),
-            ControlState::Building => write!(f, "Building"),
+            ControlState::BuildingActive => write!(f, "BuildingActive"),
+            ControlState::BuildingDeactive => write!(f, "BuildingDeactive"),
             ControlState::Started => write!(f, "Started"),
         }
     }
