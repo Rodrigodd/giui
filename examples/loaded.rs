@@ -371,7 +371,7 @@ impl OptionsGui {
         scroll_view(
             gui,
             this.pages[0],
-            dbg!(page0_cont),
+            page0_cont,
             |cb| {
                 cb.graphic(
                     style
@@ -1112,7 +1112,6 @@ fn scroll_view<'a>(
             style.scroll_handle.clone(),
         ))
         .build();
-    dbg!(v_scroll_bar);
     let v_scroll_bar_handle = gui
         .create_control_reserved(v_scroll_bar_handle)
         .parent(v_scroll_bar)

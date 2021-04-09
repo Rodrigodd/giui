@@ -262,9 +262,7 @@ impl Gui {
     }
 
     fn add_control(&mut self, id: Id) -> Id {
-        if let ControlState::BuildingActive | ControlState::BuildingDeactive =
-            self.controls[id].state
-        {
+        if let ControlState::Building = self.controls[id].state {
             println!(
                 "add control {:<10} {}",
                 id.to_string(),
@@ -280,18 +278,17 @@ impl Gui {
                 self.lazy_events.push_back(LazyEvent::OnStart(id));
             }
 
-            if self.controls[id].state == ControlState::BuildingActive {
-                self.controls[id].active = true;
-                self.controls[id].really_active = true;
+            if self.controls[id].really_active {
+                debug_assert!(self.controls[id].active);
                 self.lazy_events.push_back(LazyEvent::OnActive(id));
             }
+
+            self.controls[id].state = ControlState::Started;
 
             for child in self.controls[id].children.clone() {
                 println!("add child {}", child);
                 self.add_control(child);
             }
-
-            self.controls[id].state = ControlState::Started;
         } else {
             println!("double add {}", id);
         }
@@ -416,11 +413,9 @@ impl Gui {
                 Some(time) => {
                     if now >= time {
                         let (id, event) = self.scheduled_events.pop().unwrap().1.item;
-                        dbg!(time.elapsed());
                         self.send_event_to(id, event);
                         continue;
                     }
-                    dbg!(time.duration_since(now));
                     return self.scheduled_events.peek().map(|x| x.1.priority().0);
                 }
                 None => return None,
@@ -940,7 +935,7 @@ impl Gui {
                         self.update_layout();
                         // The update_layout could have deactivated this control
                         if !self.controls[id].really_active {
-                            return;
+                            continue;
                         }
 
                         println!("activing {}", id);
@@ -977,7 +972,7 @@ impl Gui {
                         self.update_layout();
                         // The update_layout could have deactivated this control
                         if !self.controls[id].really_active {
-                            return;
+                            continue;
                         }
                         println!("deactiving {}", id);
                         if let Some((this, mut ctx)) = Context::new_with_mut_behaviour(id, self) {
