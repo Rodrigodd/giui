@@ -2,123 +2,136 @@
 
 use std::rc::Rc;
 
-use ab_glyph::FontArc;
 use crui::{
     graphics::{Graphic, Icon, Panel, Text, Texture},
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    render::{GuiRender, GuiRenderer},
     style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
     widgets::{
         self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, DropMenu, Dropdown, Hoverable,
         Item, Menu, MenuBar, MenuItem, ScrollBar, ScrollView, Slider, TabButton, TextField, Toggle,
         ViewLayout,
     },
-    Context, ControlBuilder, Id, RectFill, Gui,
+    Context, ControlBuilder, Gui, Id, RectFill,
 };
-use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
-use winit::{
-    dpi::PhysicalSize,
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::{WindowBuilder, WindowId},
-};
+use sprite_render::{GLSpriteRender, SpriteRender};
+use winit::{event::Event, event_loop::{ControlFlow, EventLoop, EventLoopProxy}};
 
-fn resize(
-    gui: &mut Gui,
-    render: &mut GLSpriteRender,
-    camera: &mut Camera,
-    size: PhysicalSize<u32>,
-    window: WindowId,
-) {
-    render.resize(window, size.width, size.height);
-    camera.resize(size.width, size.height);
-    let width = size.width as f32;
-    let height = size.height as f32;
-    gui.resize(width, height);
-    camera.set_width(width);
-    camera.set_height(height);
-    camera.set_position(width / 2.0, height / 2.0);
-}
+mod common;
 
 fn main() {
-    let event_loop = EventLoop::new();
-    let wb = WindowBuilder::new().with_inner_size(PhysicalSize::new(800, 600));
-    let (window, mut render) = GLSpriteRender::new(wb, &event_loop, true);
-    let window_size = window.inner_size();
-    let font_texture = render.new_texture(128, 128, &[], false);
-    let mut gui_render = GuiRender::new(font_texture, [128, 128]);
-    let fonts: Vec<FontArc> = [include_bytes!("../examples/NotoSans-Regular.ttf")]
-        .iter()
-        .map(|&font| FontArc::try_from_slice(font).unwrap())
-        .collect();
-    let mut gui = Gui::new(window_size.width as f32, window_size.height as f32, fonts);
-    let texture = {
-        let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
-        let data = data.to_rgba8();
-        render.new_texture(data.width(), data.height(), data.as_ref(), true)
-    };
-    let tab_texture = {
-        let data = image::open("D:/repos/rust/crui/examples/tab.png").unwrap();
-        let data = data.to_rgba8();
-        render.new_texture(data.width(), data.height(), data.as_ref(), true)
-    };
-    let icon_texture = {
-        let data = image::open("D:/repos/rust/crui/examples/icons.png").unwrap();
-        let data = data.to_rgba8();
-        render.new_texture(data.width(), data.height(), data.as_ref(), true)
-    };
-    let marker_texture = {
-        let data = image::open("D:/repos/rust/crui/examples/check.png").unwrap();
-        let data = data.to_rgba8();
-        render.new_texture(data.width(), data.height(), data.as_ref(), true)
-    };
-    let mut camera = sprite_render::Camera::new(
-        window_size.width,
-        window_size.height,
-        window_size.height as f32,
-    );
-    camera.set_position(
-        window_size.width as f32 / 2.0,
-        window_size.height as f32 / 2.0,
-    );
-    let painel: Graphic = Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into();
-    let white: Graphic = Texture::new(texture, [0.2, 0.2, 0.3, 0.3]).into();
-    let page_painel: Graphic = Panel::new(texture, [0.0, 0.1, 0.5, 0.4], [10.0; 4]).into();
-    let marker_icon: Graphic = Icon::new(marker_texture, [0.0, 0.0, 1.0, 1.0], [18.0; 2]).into();
-    // let marker_icon: Graphic = Texture::new(marker_texture, [0.0, 0.0, 1.0, 1.0]).into();
+    common::run::<(), Main>(800, 600);
+}
 
-    let button_style = Rc::new(ButtonStyle {
-        normal: Graphic::from(Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4])),
-        hover: Graphic::from(Panel::new(texture, [0.5, 0.0, 0.5, 0.5], [10.0; 4])),
-        pressed: Graphic::from(Panel::new(texture, [0.0, 0.5, 0.5, 0.5], [10.0; 4])),
-        focus: Graphic::from(Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4])),
-    });
-    let menu_button_style = Rc::new(ButtonStyle {
-        normal: Graphic::from(Texture::new(texture, [0.1, 0.1, 0.3, 0.3])),
-        hover: Graphic::from(Texture::new(texture, [0.6, 0.1, 0.3, 0.3])),
-        pressed: Graphic::from(Texture::new(texture, [0.1, 0.6, 0.3, 0.3])),
-        focus: Graphic::from(Texture::new(texture, [0.5, 0.5, 0.001, 0.001])),
-    });
-    let menu_style = Rc::new(MenuStyle {
-        button: (*menu_button_style).clone(),
-        arrow: Texture::new(icon_texture, [0.0, 0.0, 1.0, 1.0]).into(),
-        separator: Texture::new(texture, [0.2, 0.2, 0.2, 0.2])
-            .with_color([180, 180, 180, 255])
-            .into(),
-    });
-    let tab_style = Rc::new(TabStyle {
-        hover: Graphic::from(Panel::new(tab_texture, [0.5, 0.0, 0.5, 0.5], [10.0; 4])),
-        pressed: Graphic::from(Panel::new(tab_texture, [0.0, 0.5, 0.5, 0.5], [10.0; 4])),
-        unselected: Graphic::from(Panel::new(tab_texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4])),
-        selected: Graphic::from(Panel::new(tab_texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4])),
-    });
-    let focus_style = Rc::new(OnFocusStyle {
-        normal: Graphic::None,
-        focus: button_style.focus.clone(),
-    });
+struct Main;
+impl common::CruiEventLoop<()> for Main {
+    fn init(gui: &mut Gui, render: &mut GLSpriteRender, event_loop: &EventLoop<()>) -> Self {
+        let texture = {
+            let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
+            let data = data.to_rgba8();
+            render.new_texture(data.width(), data.height(), data.as_ref(), true)
+        };
+        let tab_texture = {
+            let data = image::open("D:/repos/rust/crui/examples/tab.png").unwrap();
+            let data = data.to_rgba8();
+            render.new_texture(data.width(), data.height(), data.as_ref(), true)
+        };
+        let icon_texture = {
+            let data = image::open("D:/repos/rust/crui/examples/icons.png").unwrap();
+            let data = data.to_rgba8();
+            render.new_texture(data.width(), data.height(), data.as_ref(), true)
+        };
+        let marker_texture = {
+            let data = image::open("D:/repos/rust/crui/examples/check.png").unwrap();
+            let data = data.to_rgba8();
+            render.new_texture(data.width(), data.height(), data.as_ref(), true)
+        };
 
+        let painel: Graphic = Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into();
+        let white: Graphic = Texture::new(texture, [0.2, 0.2, 0.2, 0.2]).into();
+        let page_painel: Graphic = Panel::new(texture, [0.0, 0.1, 0.5, 0.4], [10.0; 4]).into();
+        let marker_icon: Graphic =
+            Icon::new(marker_texture, [0.0, 0.0, 1.0, 1.0], [18.0; 2]).into();
+        // let marker_icon: Graphic = Texture::new(marker_texture, [0.0, 0.0, 1.0, 1.0]).into();
+
+        let button_style = Rc::new(ButtonStyle {
+            normal: Graphic::from(Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4])),
+            hover: Graphic::from(Panel::new(texture, [0.5, 0.0, 0.5, 0.5], [10.0; 4])),
+            pressed: Graphic::from(Panel::new(texture, [0.0, 0.5, 0.5, 0.5], [10.0; 4])),
+            focus: Graphic::from(Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4])),
+        });
+        let menu_button_style = Rc::new(ButtonStyle {
+            normal: Graphic::from(Texture::new(texture, [0.1, 0.1, 0.3, 0.3])),
+            hover: Graphic::from(Texture::new(texture, [0.6, 0.1, 0.3, 0.3])),
+            pressed: Graphic::from(Texture::new(texture, [0.1, 0.6, 0.3, 0.3])),
+            focus: Graphic::from(Texture::new(texture, [0.5, 0.5, 0.001, 0.001])),
+        });
+        let menu_style = Rc::new(MenuStyle {
+            button: (*menu_button_style).clone(),
+            arrow: Texture::new(icon_texture, [0.0, 0.0, 1.0, 1.0]).into(),
+            separator: Texture::new(texture, [0.2, 0.2, 0.2, 0.2])
+                .with_color([180, 180, 180, 255])
+                .into(),
+        });
+        let tab_style = Rc::new(TabStyle {
+            hover: Graphic::from(Panel::new(tab_texture, [0.5, 0.0, 0.5, 0.5], [10.0; 4])),
+            pressed: Graphic::from(Panel::new(tab_texture, [0.0, 0.5, 0.5, 0.5], [10.0; 4])),
+            unselected: Graphic::from(Panel::new(tab_texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4])),
+            selected: Graphic::from(Panel::new(tab_texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4])),
+        });
+        let focus_style = Rc::new(OnFocusStyle {
+            normal: Graphic::None,
+            focus: button_style.focus.clone(),
+        });
+        let close_button = Rc::new(ButtonStyle {
+            normal: painel.clone().with_color([255, 0, 0, 255]),
+            hover: painel.clone().with_color([240, 0, 0, 255]),
+            pressed: painel.clone().with_color([230, 0, 0, 255]),
+            focus: painel.clone().with_color([255, 0, 0, 255]),
+        });
+
+        let style = Style {
+            painel,
+            white,
+            page_painel,
+            marker_icon,
+            button_style,
+            menu_button_style,
+            menu_style,
+            tab_style,
+            focus_style,
+            close_button,
+        };
+
+        let proxy = event_loop.create_proxy();
+
+        build_gui(gui, proxy, style);
+
+        Main
+    }
+
+    fn on_event(&mut self, event: &Event<()>, control: &mut ControlFlow) {
+        if let Event::UserEvent(()) = event {
+            *control = ControlFlow::Exit;
+        } 
+    }
+}
+
+struct Style {
+    painel: Graphic,
+    white: Graphic,
+    page_painel: Graphic,
+    marker_icon: Graphic,
+    button_style: Rc<ButtonStyle>,
+    menu_button_style: Rc<ButtonStyle>,
+    menu_style: Rc<MenuStyle>,
+    tab_style: Rc<TabStyle>,
+    focus_style: Rc<OnFocusStyle>,
+    close_button: Rc<ButtonStyle>,
+}
+
+fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
     let (hover, hover_label) = {
-        let graphic = white.clone().with_color([50, 50, 50, 255]);
+        let graphic = style.white.clone().with_color([50, 50, 50, 255]);
         let hover = gui
             .create_control()
             .anchors([0.0, 0.0, 0.0, 0.0])
@@ -159,11 +172,11 @@ fn main() {
             }))
             .build();
         use Item::*;
-        let proxy = event_loop.create_proxy();
+
         gui.create_control_reserved(menu)
-            .graphic(menu_button_style.normal.clone())
+            .graphic(style.menu_button_style.normal.clone())
             .behaviour(MenuBar::new(
-                menu_style.clone(),
+                style.menu_style.clone(),
                 blocker,
                 vec![
                     Rc::new(Menu::new(
@@ -282,14 +295,14 @@ fn main() {
             .create_control()
             .anchors([0.0, 0.0, 0.0, 1.0])
             .margins([0.0, 0.0, 200.0, 0.0])
-            .graphic(page_painel.clone())
+            .graphic(style.page_painel.clone())
             .layout(VBoxLayout::new(5.0, [5.0, 5.0, 5.0, 5.0], -1))
             .parent(page_1)
             .build();
         let right_painel = gui
             .create_control()
             .margins([200.0, 0.0, 0.0, 0.0])
-            .graphic(page_painel.clone())
+            .graphic(style.page_painel.clone())
             .parent(page_1)
             .build();
         let top_text = {
@@ -297,7 +310,7 @@ fn main() {
                 .create_control()
                 .anchors([0.0, 0.0, 1.0, 0.5])
                 .margins([15.0, 15.0, -15.0, -7.5])
-                .graphic(painel.clone().with_color([200, 200, 200, 255]))
+                .graphic(style.painel.clone().with_color([200, 200, 200, 255]))
                 .parent(right_painel)
                 .build();
             let graphic = Text::new(
@@ -317,7 +330,7 @@ fn main() {
                 .create_control()
                 .anchors([0.0, 0.5, 1.0, 1.0])
                 .margins([15.0, 7.5, -15.0, -15.0])
-                .graphic(painel.clone().with_color([200, 200, 200, 255]))
+                .graphic(style.painel.clone().with_color([200, 200, 200, 255]))
                 .parent(right_painel)
                 .build();
             let graphic = Text::new(
@@ -336,9 +349,9 @@ fn main() {
         };
 
         let _my_button = create_button(
-            &mut gui,
+            gui,
             "My Button".to_string(),
-            button_style.clone(),
+            style.button_style.clone(),
             |_, _| println!("clicked my button!"),
         )
         .min_size([0.0, 30.0])
@@ -347,7 +360,7 @@ fn main() {
         // {
         //     let button = gui
         //         .create_control()
-        //         .behaviour(Box::new(Button::new(button_style.clone(), |_, _| {
+        //         .behaviour(Box::new(Button::new(style.button_style.clone(), |_, _| {
         //             println!("clicked my button!")
         //         })))
         //         .min_size([0.0, 30.0])
@@ -376,7 +389,7 @@ fn main() {
                     100,
                     300,
                     250,
-                    focus_style.clone(),
+                    style.focus_style.clone(),
                     move |_, ctx: &mut Context, value: i32| {
                         if let Graphic::Text(text) = ctx.get_graphic_mut(top_text) {
                             text.set_font_size(value as f32 / 10.0);
@@ -388,14 +401,14 @@ fn main() {
                 .create_control_reserved(slide_area)
                 .anchors([0.0, 0.5, 1.0, 0.5])
                 .margins([10.0, -3.0, -10.0, 3.0])
-                .graphic(painel.clone().with_color([170, 170, 170, 255]))
+                .graphic(style.painel.clone().with_color([170, 170, 170, 255]))
                 .parent(slider)
                 .build();
             let _handle = gui
                 .create_control_reserved(handle)
                 .anchors([0.5, 0.5, 0.5, 0.5])
                 .margins([-3.0, -14.0, 3.0, 14.0])
-                .graphic(painel.clone().with_color([200, 200, 200, 255]))
+                .graphic(style.painel.clone().with_color([200, 200, 200, 255]))
                 .parent(slider)
                 .build();
 
@@ -412,8 +425,8 @@ fn main() {
                     background,
                     marker,
                     false,
-                    button_style.clone(),
-                    focus_style,
+                    style.button_style.clone(),
+                    style.focus_style.clone(),
                     move |_, ctx, value| {
                         println!("Toggle changed to {}!", value);
                         if value {
@@ -426,7 +439,7 @@ fn main() {
                 .build();
 
             let background = {
-                let graphic = white.clone().with_color([200, 200, 200, 255]);
+                let graphic = style.white.clone().with_color([200, 200, 200, 255]);
                 gui.create_control_reserved(background)
                     .anchors([0.0, 0.5, 0.0, 0.5])
                     .margins([5.0, -10.0, 25.0, 10.0])
@@ -438,7 +451,7 @@ fn main() {
                 .create_control_reserved(marker)
                 // .anchors([0.5, 0.5, 0.5, 0.5])
                 // .margins([-9.0, -9.0, 9.0, 9.0])
-                .graphic(marker_icon)
+                .graphic(style.marker_icon.clone())
                 .parent(background)
                 .build();
 
@@ -466,9 +479,9 @@ fn main() {
                 let menu = gui
                     .create_control_reserved(menu)
                     .active(false)
-                    .graphic(button_style.normal.clone())
+                    .graphic(style.button_style.normal.clone())
                     .behaviour(DropMenu::<String, _>::new(blocker, {
-                        let menu_button_style = menu_button_style.clone();
+                        let menu_button_style = style.menu_button_style.clone();
                         move |data, this, ctx| {
                             let id = ctx
                                 .create_control()
@@ -514,7 +527,7 @@ fn main() {
                     move |selected, _this, ctx| {
                         ctx.get_graphic_mut(text).set_text(&selected.1);
                     },
-                    button_style.clone(),
+                    style.button_style.clone(),
                 ))
                 .build();
             let _text = gui
@@ -539,7 +552,7 @@ fn main() {
     let page_2 = {
         let page_2 = gui
             .create_control()
-            .graphic(page_painel.clone())
+            .graphic(style.page_painel.clone())
             .parent(page_area)
             .layout(GridLayout::new([10.0, 15.0], [10.0, 10.0, 10.0, 10.0], 3))
             .build();
@@ -549,7 +562,7 @@ fn main() {
                 .parent(page_2)
                 .expand_x(expand[0])
                 .expand_y(expand[1])
-                .graphic(painel.clone().with_color([100, 100, 100, 255]))
+                .graphic(style.painel.clone().with_color([100, 100, 100, 255]))
                 .layout(VBoxLayout::new(5.0, [0.0, 0.0, 0.0, 0.0], align))
                 .build()
         };
@@ -566,7 +579,7 @@ fn main() {
                 .fill_y(fill[1])
                 .expand_x(expand[0])
                 .expand_y(expand[1])
-                .graphic(painel.clone().with_color([200, 200, 200, 255]))
+                .graphic(style.painel.clone().with_color([200, 200, 200, 255]))
                 .behaviour(Hoverable::new(
                     hover,
                     hover_label,
@@ -597,23 +610,23 @@ fn main() {
         };
 
         {
-            let vbox = create_vbox(&mut gui, [true, true], -1);
+            let vbox = create_vbox(gui, [true, true], -1);
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 50.0],
                 [false, false],
                 [RectFill::ShrinkStart, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [75.0, 50.0],
                 [true, true],
                 [RectFill::Fill, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 75.0],
                 [true, true],
                 [RectFill::Fill, RectFill::Fill],
@@ -621,23 +634,23 @@ fn main() {
             );
         }
         {
-            let vbox = create_vbox(&mut gui, [false, true], 0);
+            let vbox = create_vbox(gui, [false, true], 0);
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 50.0],
                 [false, false],
                 [RectFill::ShrinkStart, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [75.0, 50.0],
                 [false, false],
                 [RectFill::ShrinkCenter, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 75.0],
                 [false, false],
                 [RectFill::ShrinkEnd, RectFill::Fill],
@@ -645,23 +658,23 @@ fn main() {
             );
         }
         {
-            let vbox = create_vbox(&mut gui, [false, false], 1);
+            let vbox = create_vbox(gui, [false, false], 1);
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 50.0],
                 [false, false],
                 [RectFill::ShrinkStart, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [75.0, 50.0],
                 [false, false],
                 [RectFill::ShrinkCenter, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 75.0],
                 [false, false],
                 [RectFill::ShrinkEnd, RectFill::Fill],
@@ -670,23 +683,23 @@ fn main() {
         }
 
         {
-            let vbox = create_vbox(&mut gui, [true, false], -1);
+            let vbox = create_vbox(gui, [true, false], -1);
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 50.0],
                 [false, false],
                 [RectFill::ShrinkStart, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [75.0, 50.0],
                 [false, false],
                 [RectFill::ShrinkCenter, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 75.0],
                 [false, false],
                 [RectFill::ShrinkEnd, RectFill::Fill],
@@ -694,23 +707,23 @@ fn main() {
             );
         }
         {
-            let vbox = create_vbox(&mut gui, [false, false], 0);
+            let vbox = create_vbox(gui, [false, false], 0);
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 50.0],
                 [false, false],
                 [RectFill::ShrinkStart, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [75.0, 50.0],
                 [false, false],
                 [RectFill::ShrinkCenter, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 75.0],
                 [false, false],
                 [RectFill::ShrinkEnd, RectFill::Fill],
@@ -718,23 +731,23 @@ fn main() {
             );
         }
         {
-            let vbox = create_vbox(&mut gui, [false, false], 1);
+            let vbox = create_vbox(gui, [false, false], 1);
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 50.0],
                 [false, false],
                 [RectFill::ShrinkStart, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [75.0, 50.0],
                 [false, false],
                 [RectFill::ShrinkCenter, RectFill::Fill],
                 vbox,
             );
             create_rect(
-                &mut gui,
+                gui,
                 [50.0, 75.0],
                 [false, false],
                 [RectFill::ShrinkEnd, RectFill::Fill],
@@ -747,7 +760,7 @@ fn main() {
     let page_3 = {
         let page_3 = gui
             .create_control()
-            .graphic(page_painel.clone())
+            .graphic(style.page_painel.clone())
             .parent(page_area)
             .layout(VBoxLayout::new(5.0, [10.0, 10.0, 10.0, 10.0], -1))
             .build();
@@ -776,18 +789,23 @@ fn main() {
                     caret,
                     input_text,
                     OnFocusStyle {
-                        normal: painel.clone().with_color([200, 200, 200, 255]),
-                        focus: button_style.focus.clone().with_color([200, 200, 200, 255]),
+                        normal: style.painel.clone().with_color([200, 200, 200, 255]),
+                        focus: style
+                            .button_style
+                            .focus
+                            .clone()
+                            .with_color([200, 200, 200, 255]),
                     }
                     .into(),
                     {
-                        let button_style = button_style.clone();
+                        let button_style = style.button_style.clone();
+                        let painel = style.white.clone();
                         move |_this: Id, ctx: &mut Context, text: &mut String| {
                             println!("Submited {}!", text);
                             create_item(
                                 ctx,
                                 list,
-                                texture,
+                                painel.clone(),
                                 text.clone(),
                                 [130, 150, 255, 255],
                                 button_style.clone(),
@@ -801,7 +819,7 @@ fn main() {
             let _caret = gui
                 .create_control_reserved(caret)
                 .anchors([0.0, 0.0, 0.0, 0.0])
-                .graphic(white.clone().with_color([0, 0, 0, 255]))
+                .graphic(style.white.clone().with_color([0, 0, 0, 255]))
                 .parent(input_box)
                 .build();
             let _input_text = gui
@@ -822,38 +840,38 @@ fn main() {
         let h_scroll_bar = gui
             .create_control()
             .min_size([20.0, 20.0])
-            .graphic(white.clone().with_color([150, 150, 150, 255]))
+            .graphic(style.white.clone().with_color([150, 150, 150, 255]))
             .behaviour(ScrollBar::new(
                 h_scroll_bar_handle,
                 scroll_view,
                 false,
-                button_style.clone(),
+                style.button_style.clone(),
             ))
             .parent(scroll_view)
             .build();
         let h_scroll_bar_handle = gui
             .create_control_reserved(h_scroll_bar_handle)
             .min_size([20.0, 20.0])
-            .graphic(white.clone().with_color([220, 220, 220, 255]))
+            .graphic(style.white.clone().with_color([220, 220, 220, 255]))
             .parent(h_scroll_bar)
             .build();
         let v_scroll_bar_handle = gui.reserve_id();
         let v_scroll_bar = gui
             .create_control()
             .min_size([20.0, 20.0])
-            .graphic(white.clone().with_color([150, 150, 150, 255]))
+            .graphic(style.white.clone().with_color([150, 150, 150, 255]))
             .parent(scroll_view)
             .behaviour(ScrollBar::new(
                 v_scroll_bar_handle,
                 scroll_view,
                 true,
-                button_style.clone(),
+                style.button_style.clone(),
             ))
             .build();
         let v_scroll_bar_handle = gui
             .create_control_reserved(v_scroll_bar_handle)
             .min_size([20.0, 20.0])
-            .graphic(white.clone().with_color([220, 220, 220, 255]))
+            .graphic(style.white.clone().with_color([220, 220, 220, 255]))
             .parent(v_scroll_bar)
             .build();
         let list = gui
@@ -864,7 +882,7 @@ fn main() {
 
         let _scroll_view = gui
             .create_control_reserved(scroll_view)
-            .graphic(white.with_color([100, 100, 100, 255]))
+            .graphic(style.white.clone().with_color([100, 100, 100, 255]))
             .expand_y(true)
             .parent(page_3)
             .behaviour_and_layout(ScrollView::new(
@@ -882,7 +900,7 @@ fn main() {
         seed = seed ^ (seed << 64);
         for i in 0..5 {
             let color = (seed.rotate_left(i * 3)) as u32 | 0xff;
-            create_item(&mut gui.get_context(), list, texture, format!("This is the item number {} with the color which hexadecimal representation is #{:0x}", i + 1, color), color.to_be_bytes(),button_style.clone());
+            create_item(&mut gui.get_context(), list, style.painel.clone(), format!("This is the item number {} with the color which hexadecimal representation is #{:0x}", i + 1, color), color.to_be_bytes(),style.button_style.clone());
         }
         page_3
     };
@@ -892,10 +910,11 @@ fn main() {
             .parent(page_area)
             .layout(RatioLayout::new(1.0, (0, 0)))
             .build();
+        let font_texture = 1; // TODO
         let graphic = Texture::new(font_texture, [0.0, 0.0, 1.0, 1.0]).into();
         gui.create_control()
             .graphic(graphic)
-            .behaviour(ContextMenu::new(menu_style, {
+            .behaviour(ContextMenu::new(style.menu_style.clone(), {
                 use Item::*;
                 Rc::new(Menu::new(
                     String::new(),
@@ -941,6 +960,7 @@ fn main() {
     };
     let _tabs = {
         let tab_group = ButtonGroup::new(|_, _| {});
+        let painel = style.painel.clone();
         let create_button = |gui: &mut Gui, page: Id, selected: bool, label: String| {
             let button = gui
                 .create_control()
@@ -952,7 +972,7 @@ fn main() {
                     tab_group.clone(),
                     page,
                     selected,
-                    tab_style.clone(),
+                    style.tab_style.clone(),
                 ))
                 .build();
             let graphic = Text::new([40, 40, 100, 255], label, 16.0, (0, 0)).into();
@@ -963,11 +983,11 @@ fn main() {
                 .build();
             button
         };
-        create_button(&mut gui, page_1, true, "Random Controls".to_owned());
-        create_button(&mut gui, page_2, false, "Grid Layout".to_owned());
-        create_button(&mut gui, page_3, false, "ScrollView".to_owned());
-        create_button(&mut gui, page_4, false, "Font Texture".to_owned());
-        create_button(&mut gui, page_na, false, "To be continued...".to_owned());
+        create_button(gui, page_1, true, "Random Controls".to_owned());
+        create_button(gui, page_2, false, "Grid Layout".to_owned());
+        create_button(gui, page_3, false, "ScrollView".to_owned());
+        create_button(gui, page_4, false, "Font Texture".to_owned());
+        create_button(gui, page_na, false, "To be continued...".to_owned());
     };
     let _window = {
         let window = gui
@@ -976,21 +996,15 @@ fn main() {
             .margins([20.0, 20.0, 20.0, 20.0])
             .behaviour(widgets::Window::new())
             .layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
-            .graphic(painel.clone())
+            .graphic(style.painel.clone())
             .build();
         let header = gui
             .create_control()
-            .graphic(painel.clone().with_color([0, 0, 255, 255]))
+            .graphic(style.painel.clone().with_color([0, 0, 255, 255]))
             .layout(HBoxLayout::new(2.0, [2.0, 2.0, 2.0, 2.0], -1))
             .fill_y(RectFill::ShrinkStart)
             .parent(window)
             .build();
-        let style = Rc::new(ButtonStyle {
-            normal: painel.clone().with_color([255, 0, 0, 255]),
-            hover: painel.clone().with_color([240, 0, 0, 255]),
-            pressed: painel.clone().with_color([230, 0, 0, 255]),
-            focus: painel.clone().with_color([255, 0, 0, 255]),
-        });
         let _title = gui
             .create_control()
             .graphic(Graphic::from(Text::new(
@@ -1005,7 +1019,9 @@ fn main() {
             .build();
         let _close_button = gui
             .create_control()
-            .behaviour(Button::new(style, move |_this, ctx| ctx.deactive(window)))
+            .behaviour(Button::new(style.close_button, move |_this, ctx| {
+                ctx.deactive(window)
+            }))
             .parent(header)
             .min_size([20.0, 20.0])
             .build();
@@ -1035,9 +1051,9 @@ fn main() {
             .expand_y(true)
             .build();
         create_button(
-            &mut gui,
+            gui,
             "OK".to_string(),
-            button_style.clone(),
+            style.button_style,
             move |_this, ctx| ctx.deactive(window),
         )
         .min_size([40.0, 25.0])
@@ -1046,126 +1062,16 @@ fn main() {
         .build();
         window
     };
-    drop(painel);
-    drop(button_style);
-    drop(menu_button_style);
-    drop(page_painel);
-
-    println!("Starting");
-    gui.start();
-    println!("Started");
-
-    // resize everthing to the screen size
-    resize(
-        &mut gui,
-        &mut render,
-        &mut camera,
-        window.inner_size(),
-        window.id(),
-    );
-
-    let mut is_animating = false;
-
-    // winit event loop
-    event_loop.run(move |event, _, control| {
-        match event {
-            Event::NewEvents(_) => {
-                *control = ControlFlow::Wait;
-                if is_animating {
-                    window.request_redraw()
-                }
-            }
-            Event::WindowEvent { event, window_id } if window_id == window.id() => {
-                // gui receive events
-                gui.handle_event(&event);
-                if gui.render_is_dirty() {
-                    window.request_redraw();
-                }
-                if let Some(cursor) = gui.cursor_change() {
-                    window.set_cursor_icon(cursor);
-                }
-                match event {
-                    WindowEvent::CloseRequested => *control = ControlFlow::Exit,
-                    WindowEvent::Resized(size) => {
-                        resize(&mut gui, &mut render, &mut camera, size, window_id);
-                    }
-                    _ => {}
-                }
-            }
-            Event::UserEvent(()) => *control = ControlFlow::Exit,
-            Event::RedrawRequested(window_id) if window_id == window.id() => {
-                struct Render<'a>(&'a mut GLSpriteRender);
-                impl<'a> GuiRenderer for Render<'a> {
-                    fn update_font_texure(
-                        &mut self,
-                        font_texture: u32,
-                        rect: [u32; 4],
-                        data_tex: &[u8],
-                    ) {
-                        let mut data = Vec::with_capacity(data_tex.len() * 4);
-                        for byte in data_tex.iter() {
-                            data.extend([0xff, 0xff, 0xff, *byte].iter());
-                        }
-                        self.0.update_texture(
-                            font_texture,
-                            &data,
-                            Some([rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]]),
-                        );
-                    }
-                    fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]) {
-                        self.0
-                            .resize_texture(font_texture, new_size[0], new_size[1], &[]);
-                    }
-                }
-                let mut ctx = gui.get_context();
-                let (sprites, is_anim) = gui_render.render(&mut ctx, Render(&mut render));
-                is_animating = is_anim;
-                let mut renderer = render.render(window_id);
-                renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
-                renderer.draw_sprites(
-                    &mut camera,
-                    &sprites
-                        .iter()
-                        .map(|x| {
-                            let width = x.rect[2] - x.rect[0];
-                            let height = x.rect[3] - x.rect[1];
-                            SpriteInstance {
-                                scale: [width, height],
-                                angle: 0.0,
-                                uv_rect: x.uv_rect,
-                                color: x.color,
-                                pos: [x.rect[0] + width / 2.0, x.rect[1] + height / 2.0],
-                                texture: x.texture,
-                            }
-                        })
-                        .collect::<Vec<_>>(),
-                );
-
-                if is_animating {
-                    *control = ControlFlow::Poll;
-                }
-
-                renderer.finish();
-            }
-            _ => {}
-        }
-    })
 }
 
 fn create_item(
     ctx: &mut Context,
     list: Id,
-    texture: u32,
+    painel: Graphic,
     text: String,
     color: [u8; 4],
     button_style: Rc<ButtonStyle>,
 ) {
-    let painel: Graphic = Panel::new(
-        texture,
-        [0.0 / 2.0, 0.0 / 2.0, 1.0 / 2.0, 1.0 / 2.0],
-        [10.0; 4],
-    )
-    .into();
     let item = ctx
         .create_control()
         .min_size([100.0, 35.0])

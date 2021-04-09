@@ -45,220 +45,97 @@ use std::{
 //     }
 // }
 
-use ab_glyph::FontArc;
 use crui::{
     event::SetValue,
     graphics::{Graphic, Panel, Text, Texture},
     layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
-    render::{GuiRender, GuiRenderer},
     style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
     widgets::{
         Blocker, Button, ButtonGroup, CloseMenu, DropMenu, Dropdown, Item, Menu, MenuBar, MenuItem,
         ScrollBar, ScrollView, Select, SetMaxValue, SetMinValue, SetSelected, Slider,
         SliderCallback, TabButton, TextField, TextFieldCallback, Toggle, ViewLayout,
     },
-    Context, ControlBuilder, Id, RectFill, Gui,
+    Context, ControlBuilder, Gui, Id, RectFill,
 };
-use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
+use sprite_render::{GLSpriteRender, SpriteRender};
 use winit::{
-    dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopProxy},
-    window::{WindowBuilder, WindowId},
 };
 
-fn resize(
-    gui: &mut Gui,
-    render: &mut GLSpriteRender,
-    camera: &mut Camera,
-    size: PhysicalSize<u32>,
-    window: WindowId,
-) {
-    render.resize(window, size.width, size.height);
-    camera.resize(size.width, size.height);
-    let width = size.width as f32;
-    let height = size.height as f32;
-    gui.resize(width, height);
-    camera.set_width(width);
-    camera.set_height(height);
-    camera.set_position(width / 2.0, height / 2.0);
+mod common;
+use common::CruiEventLoop;
+
+struct Loaded {
+    options: Rc<RefCell<Options>>,
 }
+impl CruiEventLoop<UserEvent> for Loaded {
+    fn init(gui: &mut Gui, render: &mut GLSpriteRender, event_loop: &EventLoop<UserEvent>) -> Self {
+        // load textures
+        let texture = {
+            let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
+            let data = data.to_rgba8();
+            render.new_texture(data.width(), data.height(), data.as_ref(), true)
+        };
+        let icon_texture = {
+            let data = image::open("D:/repos/rust/crui/examples/icons.png").unwrap();
+            let data = data.to_rgba8();
+            render.new_texture(data.width(), data.height(), data.as_ref(), true)
+        };
+        let tab_texture = {
+            let data = image::open("D:/repos/rust/crui/examples/tab.png").unwrap();
+            let data = data.to_rgba8();
+            render.new_texture(data.width(), data.height(), data.as_ref(), true)
+        };
 
-fn main() {
-    // create winit's window and event_loop
-    let event_loop = EventLoop::with_user_event();
-    let window = WindowBuilder::new()
-        .with_inner_size(PhysicalSize::new(250, 300))
-        .with_resizable(false);
+        // populate the gui with controls.
+        let err;
+        let options = match Options::load() {
+            Ok(x) => {
+                err = None;
+                x
+            }
+            Err(x) => {
+                err = Some(x);
+                Options::default()
+            }
+        };
+        let options = Rc::new(RefCell::new(options));
+        let style_sheet = StyleSheet::new(texture, icon_texture, tab_texture);
+        let options_gui = OptionsGui::new(
+            gui,
+            options.clone(),
+            event_loop.create_proxy(),
+            &style_sheet,
+        );
 
-    // create the render and camera, and a texture for the glyphs rendering
-    let (window, mut render) = GLSpriteRender::new(window, &event_loop, true);
-    let mut camera = {
-        let size = window.inner_size();
-        let width = size.width;
-        let height = size.height;
-        Camera::new(width, height, height as f32)
-    };
-    let font_texture = render.new_texture(128, 128, &[], false);
-
-    // load textures
-    let texture = {
-        let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
-        let data = data.to_rgba8();
-        render.new_texture(data.width(), data.height(), data.as_ref(), true)
-    };
-    let icon_texture = {
-        let data = image::open("D:/repos/rust/crui/examples/icons.png").unwrap();
-        let data = data.to_rgba8();
-        render.new_texture(data.width(), data.height(), data.as_ref(), true)
-    };
-    let tab_texture = {
-        let data = image::open("D:/repos/rust/crui/examples/tab.png").unwrap();
-        let data = data.to_rgba8();
-        render.new_texture(data.width(), data.height(), data.as_ref(), true)
-    };
-
-    // load a font
-    let fonts: Vec<FontArc> = [include_bytes!("../examples/NotoSans-Regular.ttf")]
-        .iter()
-        .map(|&font| FontArc::try_from_slice(font).unwrap())
-        .collect();
-
-    // create the gui, and the gui_render
-    let mut gui = Gui::new(0.0, 0.0, fonts);
-    let mut gui_render = GuiRender::new(font_texture, [128, 128]);
-
-    // populate the gui with controls.
-    let err;
-    let options = match Options::load() {
-        Ok(x) => {
-            err = None;
-            x
+        if let Some(e) = err {
+            let mut ctx = gui.get_context();
+            ctx.get_graphic_mut(options_gui.popup_title)
+                .set_text("Load Failed");
+            ctx.get_graphic_mut(options_gui.popup_text).set_text(&e);
+            ctx.active(options_gui.popup);
         }
-        Err(x) => {
-            err = Some(x);
-            Options::default()
-        }
-    };
-    let options = Rc::new(RefCell::new(options));
-    let style_sheet = StyleSheet::new(texture, icon_texture, tab_texture);
-    let options_gui = OptionsGui::new(
-        &mut gui,
-        options.clone(),
-        event_loop.create_proxy(),
-        &style_sheet,
-    );
-
-    if let Some(e) = err {
-        let mut ctx = gui.get_context();
-        ctx.get_graphic_mut(options_gui.popup_title)
-            .set_text("Load Failed");
-        ctx.get_graphic_mut(options_gui.popup_text).set_text(&e);
-        ctx.active(options_gui.popup);
+        Self { options }
     }
 
-    // resize everthing to the screen size
-    resize(
-        &mut gui,
-        &mut render,
-        &mut camera,
-        window.inner_size(),
-        window.id(),
-    );
-
-    let mut is_animating = false;
-
-    // winit event loop
-    event_loop.run(move |event, _, control| {
+    fn on_event(&mut self, event: &Event<UserEvent>, control: &mut ControlFlow) {
         match event {
-            Event::NewEvents(_) => {
-                *control = ControlFlow::Wait;
-                if is_animating {
-                    window.request_redraw()
-                }
-            }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
             }
             | Event::UserEvent(UserEvent::Close) => {
-                options.borrow().save();
+                self.options.borrow().save();
                 *control = ControlFlow::Exit;
-            }
-            Event::WindowEvent {
-                event, window_id, ..
-            } => {
-                // gui receive events
-                gui.handle_event(&event);
-                if gui.render_is_dirty() {
-                    window.request_redraw();
-                }
-                if let Some(cursor) = gui.cursor_change() {
-                    window.set_cursor_icon(cursor);
-                }
-
-                if let WindowEvent::Resized(size) = event {
-                    resize(&mut gui, &mut render, &mut camera, size, window_id);
-                }
-            }
-            Event::RedrawRequested(window_id) => {
-                // render the gui
-                struct Render<'a>(&'a mut GLSpriteRender);
-                impl<'a> GuiRenderer for Render<'a> {
-                    fn update_font_texure(
-                        &mut self,
-                        font_texture: u32,
-                        rect: [u32; 4],
-                        data_tex: &[u8],
-                    ) {
-                        let mut data = Vec::with_capacity(data_tex.len() * 4);
-                        for byte in data_tex.iter() {
-                            data.extend([0xff, 0xff, 0xff, *byte].iter());
-                        }
-                        self.0.update_texture(
-                            font_texture,
-                            &data,
-                            Some([rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]]),
-                        );
-                    }
-                    fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]) {
-                        self.0
-                            .resize_texture(font_texture, new_size[0], new_size[1], &[]);
-                    }
-                }
-                let mut ctx = gui.get_context();
-                let (sprites, is_anim) = gui_render.render(&mut ctx, Render(&mut render));
-                is_animating = is_anim;
-                let mut renderer = render.render(window_id);
-                renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
-                renderer.draw_sprites(
-                    &mut camera,
-                    &sprites
-                        .iter()
-                        .map(|x| {
-                            let width = x.rect[2] - x.rect[0];
-                            let height = x.rect[3] - x.rect[1];
-                            SpriteInstance {
-                                scale: [width, height],
-                                angle: 0.0,
-                                uv_rect: x.uv_rect,
-                                color: x.color,
-                                pos: [x.rect[0] + width / 2.0, x.rect[1] + height / 2.0],
-                                texture: x.texture,
-                            }
-                        })
-                        .collect::<Vec<_>>(),
-                );
-
-                if is_animating {
-                    *control = ControlFlow::Poll;
-                }
-
-                renderer.finish();
             }
             _ => {}
         }
-    });
+    }
+}
+
+fn main() {
+    common::run::<UserEvent, Loaded>(250, 300);
 }
 
 #[derive(Clone)]
@@ -490,23 +367,28 @@ impl OptionsGui {
         this.create_menu_bar(surface, gui, proxy, style);
         let tab_selected = this.options.borrow().tab_selected;
         this.create_tabs(surface, gui, style);
-        let page0_cont = gui
-            .create_control()
-            .graphic(
-                style
-                    .menu
-                    .button
-                    .normal
-                    .clone()
-                    .with_color([230, 230, 230, 255]),
-            )
-            .layout(VBoxLayout::new(2.0, [5.0, 5.0, 5.0, 5.0], -1))
-            .build();
-        scroll_view(gui, this.pages[0], page0_cont, style)
-            .expand_y(true)
-            .parent(surface)
-            .active(false)
-            .build();
+        let page0_cont = gui.reserve_id();
+        scroll_view(
+            gui,
+            this.pages[0],
+            dbg!(page0_cont),
+            |cb| {
+                cb.graphic(
+                    style
+                        .menu
+                        .button
+                        .normal
+                        .clone()
+                        .with_color([230, 230, 230, 255]),
+                )
+                .layout(VBoxLayout::new(2.0, [5.0, 5.0, 5.0, 5.0], -1))
+            },
+            style,
+        )
+        .expand_y(true)
+        .parent(surface)
+        .active(false)
+        .build();
         this.create_page0(gui, page0_cont, style);
         let page1 = gui
             .create_control_reserved(this.pages[1])
@@ -623,16 +505,20 @@ impl OptionsGui {
         .parent(parent)
         .min_size([0.0, 24.0])
         .build();
-        let list = gui
-            .create_control_reserved(list)
-            .graphic(style.list_background.clone())
-            .layout(VBoxLayout::new(2.0, [2.0; 4], -1))
-            .build();
         let id = gui.reserve_id();
-        scroll_view(gui, id, list, style)
-            .expand_y(true)
-            .parent(parent)
-            .build();
+        scroll_view(
+            gui,
+            id,
+            list,
+            |cb| {
+                cb.graphic(style.list_background.clone())
+                    .layout(VBoxLayout::new(2.0, [2.0; 4], -1))
+            },
+            style,
+        )
+        .expand_y(true)
+        .parent(parent)
+        .build();
         let mut ctx = gui.get_context();
         for (i, text) in self.options.borrow().list.iter() {
             create_item(
@@ -1203,6 +1089,7 @@ fn scroll_view<'a>(
     gui: &'a mut Gui,
     id: Id,
     content: Id,
+    content_builder: impl for<'b> FnOnce(ControlBuilder<'b>) -> ControlBuilder<'b>,
     style: &StyleSheet,
 ) -> ControlBuilder<'a> {
     let scroll_view = id;
@@ -1225,12 +1112,13 @@ fn scroll_view<'a>(
             style.scroll_handle.clone(),
         ))
         .build();
+    dbg!(v_scroll_bar);
     let v_scroll_bar_handle = gui
         .create_control_reserved(v_scroll_bar_handle)
         .parent(v_scroll_bar)
         .build();
 
-    gui.get_context().set_parent(content, view);
+    // gui.get_context().set_parent(content, view);
 
     let behaviour = ScrollView::new(
         view,
@@ -1243,4 +1131,5 @@ fn scroll_view<'a>(
     gui.create_control_reserved(scroll_view)
         .behaviour(behaviour_layout.clone())
         .layout(behaviour_layout)
+        .child_reserved(content, content_builder)
 }

@@ -1,16 +1,27 @@
 use ab_glyph::FontArc;
 use crui::{
-    graphics::Text,
     render::{GuiRender, GuiRenderer},
     Gui,
 };
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
-use winit::{
-    dpi::PhysicalSize,
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::{WindowBuilder, WindowId},
-};
+use winit::{dpi::PhysicalSize, event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoop}, window::{WindowBuilder, WindowId}};
+
+#[allow(dead_code)]
+fn main() {
+    struct HelloWord;
+    impl CruiEventLoop<()> for HelloWord {
+        fn init(gui: &mut Gui, _render: &mut GLSpriteRender, _event_loop: &EventLoop<()>) -> Self {
+            use crui::graphics::Text;
+            let _text = gui
+                .create_control()
+                .graphic(Text::new([0, 255, 0, 255], "Hello Word!!".to_string(), 70.0, (0, 0)).into())
+                .build();
+            HelloWord
+        }
+    }
+
+    run::<(), HelloWord>(400, 200);
+}
 
 fn resize(
     gui: &mut Gui,
@@ -29,10 +40,16 @@ fn resize(
     camera.set_position(width / 2.0, height / 2.0);
 }
 
-fn main() {
+pub trait CruiEventLoop<T> {
+    fn init(gui: &mut Gui, render: &mut GLSpriteRender, event_loop: &EventLoop<T>) -> Self;
+    #[allow(unused_variables)]
+    fn on_event(&mut self, event: &Event<T>, control: &mut ControlFlow) {}
+}
+
+pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -> ! {
     // create winit's window and event_loop
-    let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().with_inner_size(PhysicalSize::new(400, 200));
+    let event_loop = EventLoop::with_user_event();
+    let window = WindowBuilder::new().with_inner_size(PhysicalSize::new(width, height));
 
     // create the render and camera, and a texture for the glyphs rendering
     let (window, mut render) = GLSpriteRender::new(window, &event_loop, true);
@@ -54,11 +71,8 @@ fn main() {
     let mut gui = Gui::new(0.0, 0.0, fonts);
     let mut gui_render = GuiRender::new(font_texture, [128, 128]);
 
-    // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
-    let _text = gui
-        .create_control()
-        .graphic(Text::new([0, 255, 0, 255], "Hello Word!!".to_string(), 70.0, (0, 0)).into())
-        .build();
+    // populate the gui with controls.
+    let mut app = T::init(&mut gui, &mut render, &event_loop);
 
     // resize everthing to the screen size
     resize(
@@ -73,6 +87,7 @@ fn main() {
 
     // winit event loop
     event_loop.run(move |event, _, control| {
+        app.on_event(&event, control);
         match event {
             Event::NewEvents(_) => {
                 *control = match gui.handle_scheduled_event() {
