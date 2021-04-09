@@ -45,7 +45,7 @@ impl Layout for ListViewLayout {
 struct CreatedItem {
     id: Id,
     i: usize,
-    // top position relative to the top of the view, when created
+    /// top position relative to the top of the view, when created
     y: f32,
     height: f32,
 }
@@ -646,7 +646,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
         ctx.move_to_front(self.v_scroll_bar);
     }
 
-    fn on_focus_change(&mut self, focus: bool, _this: Id, ctx: &mut Context) {
+    fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
         if focus {
             self.focused = self
                 .created_items
@@ -654,6 +654,16 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 .find(|(_, x)| ctx.is_focus(x.id))
                 .map(|(_, x)| x)
                 .cloned();
+            if let Some(focused) = &self.focused {
+                let view_rect = ctx.get_rect(self.view);
+                let view_height = view_rect[3] - view_rect[1];
+                if focused.y + focused.height >= view_height {
+                    self.delta_y += focused.y + focused.height - view_height + 10.0;
+                } else if focused.y <= 0.0 {
+                    self.delta_y -= -focused.y + 10.0;
+                }
+                ctx.dirty_layout(this);
+            }
         } else {
             self.focused = None;
         }
