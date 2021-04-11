@@ -559,12 +559,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             if delta_y < 0.0 {
                 // create items above
                 let mut i = self.start_y as usize;
-                let start_control = match self.last_created_items.get(&i) {
-                    Some(x) => x,
-                    None => {
-                        panic!("ahhhhh!!");
-                    }
-                };
+                let start_control = self.last_created_items.get(&i).unwrap();
                 let mut y = start_control.y + view_rect[1] - delta_y;
                 while y > view_rect[1] {
                     if i == 0 {
@@ -629,8 +624,9 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
             {
                 let last = self.created_items.iter().rev().next().unwrap().1;
                 
-                let gap = (view_rect[3] - view_rect[1] - last.y) / last.height;
-                debug_assert!((0.0..1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, last.height, last.y);
+                let mut gap = (view_rect[3] - view_rect[1] - last.y) / last.height;
+                debug_assert!((0.0..=1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, last.height, last.y);
+                gap = gap.clamp(0.0, 1.0 - f32::EPSILON);
                 self.end_y = last.i as f32 + gap;
             }
             // println!("start at {}", self.start_y);
