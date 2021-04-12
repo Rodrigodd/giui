@@ -217,6 +217,14 @@ impl<'a> Context<'a> {
         self.gui.controls.get(id).map_or(false, |x| x.active)
     }
 
+    pub fn set_focus(&mut self, id: Id) {
+        self.events.push(Box::new(event::RequestFocus { id }));
+    }
+
+    pub fn get_focus(&mut self) -> Option<Id> {
+        self.gui.current_focus
+    }
+
     pub fn is_focus(&self, id: Id) -> bool {
         self.gui.controls[id].focus
     }

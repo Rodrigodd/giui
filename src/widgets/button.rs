@@ -6,15 +6,17 @@ use std::rc::Rc;
 
 pub struct Button<F: FnMut(Id, &mut Context)> {
     normal: bool,
+    focusable: bool,
     focus: bool,
     on_click: F,
     style: Rc<ButtonStyle>,
 }
 impl<F: FnMut(Id, &mut Context)> Button<F> {
-    pub fn new(style: Rc<ButtonStyle>, on_click: F) -> Self {
+    pub fn new(style: Rc<ButtonStyle>, focusable: bool, on_click: F) -> Self {
         Self {
             normal: true,
             focus: false,
+            focusable,
             on_click,
             style,
         }
@@ -26,7 +28,11 @@ impl<F: FnMut(Id, &mut Context)> Behaviour for Button<F> {
     }
 
     fn input_flags(&self) -> InputFlags {
-        InputFlags::MOUSE | InputFlags::FOCUS
+        let mut flags = InputFlags::MOUSE;
+        if self.focusable {
+            flags |= InputFlags::FOCUS
+        }
+        flags
     }
 
     fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {

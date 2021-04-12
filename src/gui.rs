@@ -194,7 +194,7 @@ pub struct Gui {
     pub(crate) input: Input,
     current_mouse: Option<Id>,
     current_scroll: Option<Id>,
-    current_focus: Option<Id>,
+    pub(crate) current_focus: Option<Id>,
     over_is_locked: bool,
 }
 impl Gui {

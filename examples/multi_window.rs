@@ -313,7 +313,7 @@ fn create_gui(
 
     let button = gui
         .create_control()
-        .behaviour(Button::new(button_style.clone(), {
+        .behaviour(Button::new(button_style.clone(), true, {
             let proxy = proxy.clone();
             let button_style = button_style.clone();
             let owner = owner.clone();
@@ -365,7 +365,7 @@ fn create_gui(
 
     let button = gui
         .create_control()
-        .behaviour(Button::new(button_style.clone(), move |_, _| {
+        .behaviour(Button::new(button_style.clone(), true, move |_, _| {
             let window_builder = WindowBuilder::new().with_inner_size(PhysicalSize::new(200, 200));
 
             let _ = proxy.send_event(UserEvent::CreateNewWindow {

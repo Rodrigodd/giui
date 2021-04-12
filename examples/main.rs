@@ -1019,7 +1019,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .build();
         let _close_button = gui
             .create_control()
-            .behaviour(Button::new(style.close_button, move |_this, ctx| {
+            .behaviour(Button::new(style.close_button, true, move |_this, ctx| {
                 ctx.deactive(window)
             }))
             .parent(header)
@@ -1090,7 +1090,7 @@ fn create_item(
         .create_control()
         .parent(item)
         .graphic(painel)
-        .behaviour(Button::new(button_style, move |_, ctx| {
+        .behaviour(Button::new(button_style, true, move |_, ctx| {
             ctx.remove(item);
         }))
         .min_size([15.0, 15.0])
@@ -1112,6 +1112,6 @@ fn create_button<F: Fn(Id, &mut Context) + 'static>(
             x.graphic(Text::new([40, 40, 100, 255], text, 16.0, (0, 0)).into())
                 .layout(FitText)
         })
-        .behaviour(Button::new(button_style, on_click))
+        .behaviour(Button::new(button_style, true, on_click))
     // .layout(Box::new(MarginLayout::new([7.0, 7.0, 7.0, 7.0])))
 }

@@ -871,7 +871,7 @@ impl OptionsGui {
             .build();
         let ok_button = gui
             .create_control()
-            .behaviour(Button::new(style.button.clone(), move |_, ctx| {
+            .behaviour(Button::new(style.button.clone(), true, move |_, ctx| {
                 ctx.deactive(popup)
             }))
             .min_size([75.0, 20.0])
@@ -1071,7 +1071,7 @@ fn create_item(
     let _button = ctx
         .create_control()
         .parent(item)
-        .behaviour(Button::new(button_style, move |_, ctx| {
+        .behaviour(Button::new(button_style, true, move |_, ctx| {
             ctx.remove(item);
             let list = &mut options.borrow_mut().list;
             let i = list
