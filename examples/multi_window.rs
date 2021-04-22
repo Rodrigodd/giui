@@ -265,7 +265,7 @@ fn main() {
                             .resize_texture(font_texture, new_size[0], new_size[1], &[]);
                     }
                 }
-                let mut ctx = gui.get_context();
+                let mut ctx = gui.get_render_context();
                 let (sprites, is_anim) = gui_render.render(&mut ctx, Render(&mut render));
                 let mut renderer = render.render(window_id);
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);

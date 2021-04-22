@@ -4,7 +4,12 @@ use crui::{
     Gui,
 };
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
-use winit::{dpi::PhysicalSize, event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoop}, window::{WindowBuilder, WindowId}};
+use winit::{
+    dpi::PhysicalSize,
+    event::{Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    window::{WindowBuilder, WindowId},
+};
 
 #[allow(dead_code)]
 fn main() {
@@ -14,7 +19,9 @@ fn main() {
             use crui::graphics::Text;
             let _text = gui
                 .create_control()
-                .graphic(Text::new([0, 255, 0, 255], "Hello Word!!".to_string(), 70.0, (0, 0)).into())
+                .graphic(
+                    Text::new([0, 255, 0, 255], "Hello Word!!".to_string(), 70.0, (0, 0)).into(),
+                )
                 .build();
             HelloWord
         }
@@ -151,7 +158,7 @@ pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -
                             .resize_texture(font_texture, new_size[0], new_size[1], &[]);
                     }
                 }
-                let mut ctx = gui.get_context();
+                let mut ctx = gui.get_render_context();
                 let (sprites, is_anim) = gui_render.render(&mut ctx, Render(&mut render));
                 is_animating = is_anim;
                 let mut renderer = render.render(window_id);

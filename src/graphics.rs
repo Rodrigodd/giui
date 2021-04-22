@@ -1,5 +1,6 @@
 use crate::{
-    text::{FontGlyph, TextInfo},
+    render::FontGlyph,
+    text_layout::{TextLayout, TextStyle},
     Rect, RenderDirtyFlags,
 };
 use ab_glyph::{Font, FontArc};
@@ -391,7 +392,7 @@ pub struct Text {
     font_size: f32,
     align: (i8, i8),
     glyphs: Vec<FontGlyph>,
-    text_info: Option<TextInfo>,
+    layout: Option<TextLayout>,
     last_pos: [f32; 2],
     min_size: Option<[f32; 2]>,
 }
@@ -405,7 +406,7 @@ impl Default for Text {
             font_size: Default::default(),
             align: Default::default(),
             glyphs: Default::default(),
-            text_info: Default::default(),
+            layout: None,
             last_pos: Default::default(),
             min_size: Default::default(),
         }
@@ -430,7 +431,7 @@ impl Text {
     pub fn dirty(&mut self) {
         self.text_dirty = true;
         self.min_size = None;
-        self.text_info = None;
+        self.layout = None;
     }
 
     pub fn get_font_size(&mut self) -> f32 {
@@ -464,37 +465,48 @@ impl Text {
     }
 
     fn update_glyphs<F: Font>(&mut self, rect: &mut Rect, fonts: &[F]) {
+        use crate::text_layout::{HorizontalAlign::*, LayoutSettings, VerticalAlign::*};
         self.last_pos = self.get_align_anchor(*rect.get_rect());
-        let (glyphs, text_info) = crate::text::text_glyphs_and_info(
-            &self.text,
-            0,
-            self.font_size,
-            &fonts,
-            *rect.get_rect(),
-            self.align,
-        );
-        self.glyphs = glyphs;
-        self.text_info = Some(text_info);
+        let mut layout = TextLayout::new();
+        let rect = rect.get_rect();
+        layout.reset(&LayoutSettings {
+            max_width: Some(rect[2] - rect[0]),
+            max_height: Some(rect[3] - rect[1]),
+            horizontal_align: [Left, Center, Right][(self.align.0 + 1) as usize],
+            vertical_align: [Top, Middle, Bottom][(self.align.1 + 1) as usize],
+            ..Default::default()
+        });
+        layout.append(fonts, &TextStyle::new(&self.text, self.font_size, 0));
+        self.glyphs = layout
+            .glyphs()
+            .iter()
+            .map(|x| {
+                let mut glyph = x.glyph.clone();
+                glyph.position.x += rect[0];
+                glyph.position.y += rect[1];
+                FontGlyph {
+                    glyph,
+                    font_id: x.font_id,
+                }
+            })
+            .collect();
+        self.layout = Some(layout);
     }
 
-    pub fn get_text_info<F: Font>(&mut self, fonts: &[F], rect: &mut Rect) -> &TextInfo {
-        if self.text_info.is_none() {
+    pub fn get_layout<F: Font>(&mut self, fonts: &[F], rect: &mut Rect) -> &TextLayout {
+        if self.layout.is_none() {
             self.update_glyphs(rect, fonts);
         }
-        self.text_info.as_ref().unwrap()
+        self.layout.as_ref().unwrap()
     }
 
-    pub fn get_glyphs<F: Font>(
-        &mut self,
-        rect: &mut Rect,
-        fonts: &[F],
-    ) -> &[crate::text::FontGlyph] {
+    pub fn get_glyphs<F: Font>(&mut self, rect: &mut Rect, fonts: &[F]) -> &[FontGlyph] {
         let dirty_flags = rect.get_render_dirty_flags();
         let width_change = dirty_flags.contains(RenderDirtyFlags::WIDTH)
             && self.min_size.map_or(true, |x| rect.get_width() < x[0]);
-        if self.text_dirty || width_change {
+        if self.layout.is_none() || self.text_dirty || width_change {
             self.update_glyphs(rect, fonts);
-        } else if dirty_flags.contains(RenderDirtyFlags::RECT) && !width_change {
+        } else if dirty_flags.contains(RenderDirtyFlags::RECT) {
             let rect = *rect.get_rect();
             let anchor = self.get_align_anchor(rect);
             let delta = [anchor[0] - self.last_pos[0], anchor[1] - self.last_pos[1]];
@@ -504,24 +516,15 @@ impl Text {
                 glyph.glyph.position.x += delta[0];
                 glyph.glyph.position.y += delta[1];
             }
-            if let Some(ref mut text_info) = self.text_info {
-                text_info.move_by(delta);
-            }
         }
         &self.glyphs
     }
 
     pub fn compute_min_size<F: Font>(&mut self, fonts: &[F]) -> Option<[f32; 2]> {
         if self.min_size.is_none() {
-            let (_, text_info) = crate::text::text_glyphs_and_info(
-                &self.text,
-                0,
-                self.font_size,
-                &fonts,
-                [0.0, 0.0, f32::INFINITY, f32::INFINITY],
-                (-1, -1),
-            );
-            self.min_size = Some(text_info.get_size());
+            let mut layout = TextLayout::new();
+            layout.append(fonts, &TextStyle::new(&self.text, self.font_size, 0));
+            self.min_size = Some(layout.min_size());
         }
         self.min_size
     }

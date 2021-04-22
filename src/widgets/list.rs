@@ -436,10 +436,16 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
 
         {
             let last = self.created_items.iter().rev().next().unwrap().1;
-            
+
             let y = view_rect[1] + last.y;
             let gap = (view_rect[3] - y) / last.height;
-            debug_assert!((0.0..1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, last.height, last.y);
+            debug_assert!(
+                (0.0..1.0).contains(&gap),
+                "gap: {}, height: {}, y: {}",
+                gap,
+                last.height,
+                last.y
+            );
             self.end_y = last.i as f32 + gap;
             // println!("end at {}", self.end_y);
         }
@@ -471,9 +477,15 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
 
         {
             let first = self.created_items.iter().next().unwrap().1;
-            
-            let gap = - first.y / first.height;
-            debug_assert!((0.0..1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, first.height, first.y);
+
+            let gap = -first.y / first.height;
+            debug_assert!(
+                (0.0..1.0).contains(&gap),
+                "gap: {}, height: {}, y: {}",
+                gap,
+                first.height,
+                first.y
+            );
             self.start_y = first.i as f32 + gap;
         }
     }
@@ -519,10 +531,16 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
 
         {
             let last = self.created_items.iter().rev().next().unwrap().1;
-            
+
             let y = view_rect[1] + last.y;
             let gap = (view_rect[3] - y) / last.height;
-            debug_assert!((0.0..1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, last.height, last.y);
+            debug_assert!(
+                (0.0..1.0).contains(&gap),
+                "gap: {}, height: {}, y: {}",
+                gap,
+                last.height,
+                last.y
+            );
             self.end_y = last.i as f32 + gap;
             // println!("end at {}", self.end_y);
         }
@@ -616,16 +634,28 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
 
             {
                 let first = self.created_items.iter().next().unwrap().1;
-                
-                let gap = - first.y / first.height;
-                debug_assert!((0.0..1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, first.height, first.y);
+
+                let gap = -first.y / first.height;
+                debug_assert!(
+                    (0.0..1.0).contains(&gap),
+                    "gap: {}, height: {}, y: {}",
+                    gap,
+                    first.height,
+                    first.y
+                );
                 self.start_y = first.i as f32 + gap;
             }
             {
                 let last = self.created_items.iter().rev().next().unwrap().1;
-                
+
                 let mut gap = (view_rect[3] - view_rect[1] - last.y) / last.height;
-                debug_assert!((0.0..=1.0).contains(&gap), "gap: {}, height: {}, y: {}", gap, last.height, last.y);
+                debug_assert!(
+                    (0.0..=1.0).contains(&gap),
+                    "gap: {}, height: {}, y: {}",
+                    gap,
+                    last.height,
+                    last.y
+                );
                 gap = gap.clamp(0.0, 1.0 - f32::EPSILON);
                 self.end_y = last.i as f32 + gap;
             }

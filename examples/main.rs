@@ -14,7 +14,10 @@ use crui::{
     Context, ControlBuilder, Gui, Id, RectFill,
 };
 use sprite_render::{GLSpriteRender, SpriteRender};
-use winit::{event::Event, event_loop::{ControlFlow, EventLoop, EventLoopProxy}};
+use winit::{
+    event::Event,
+    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
+};
 
 mod common;
 
@@ -112,7 +115,7 @@ impl common::CruiEventLoop<()> for Main {
     fn on_event(&mut self, event: &Event<()>, control: &mut ControlFlow) {
         if let Event::UserEvent(()) = event {
             *control = ControlFlow::Exit;
-        } 
+        }
     }
 }
 

@@ -2,7 +2,7 @@ use core::f32;
 
 use crui::{
     layouts::{GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    Behaviour, Context, Id, InputFlags, MouseEvent, MouseInfo, Gui,
+    Behaviour, Context, Gui, Id, InputFlags, MouseEvent, MouseInfo,
 };
 use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
 

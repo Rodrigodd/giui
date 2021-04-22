@@ -216,6 +216,12 @@ impl Rect {
 
     #[inline]
     pub fn set_min_size(&mut self, min_size: [f32; 2]) {
+        self.user_min_size = min_size;
+        let min_size = [
+            self.min_size[0].max(min_size[0]),
+            self.min_size[1].max(min_size[1]),
+        ];
+
         if !cmp_float(self.min_size[0], min_size[0]) {
             self.layout_dirty_flags.insert(LayoutDirtyFlags::MIN_WIDTH);
             self.min_size[0] = min_size[0];

@@ -3,7 +3,7 @@ use crate::{Behaviour, Context, Id, KeyboardEvent};
 pub struct OnKeyboardEvent<F>(pub F)
 where
     F: FnMut(KeyboardEvent, Id, &mut Context) -> bool;
- 
+
 impl<F> Behaviour for OnKeyboardEvent<F>
 where
     F: FnMut(KeyboardEvent, Id, &mut Context) -> bool,

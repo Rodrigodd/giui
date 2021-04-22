@@ -426,6 +426,12 @@ impl Gui {
     #[inline]
     pub fn get_context(&mut self) -> Context {
         self.lazy_update();
+        Context::new(self)
+    }
+
+    #[inline]
+    pub fn get_render_context(&mut self) -> Context {
+        self.lazy_update();
         //TODO: Context -> RenderContext
         self.redraw = false;
         Context::new(self)
@@ -1211,12 +1217,6 @@ pub trait Layout {
             let mut new_rect = [0.0; 4];
             for i in 0..4 {
                 new_rect[i] = pos[i % 2] + size[i % 2] * rect.anchors[i] + rect.margins[i];
-            }
-            if new_rect[2] - new_rect[0] < rect.get_min_size()[0] {
-                new_rect[2] = new_rect[0] + rect.get_min_size()[0];
-            }
-            if new_rect[3] - new_rect[1] < rect.get_min_size()[1] {
-                new_rect[3] = new_rect[1] + rect.get_min_size()[1];
             }
             ctx.set_designed_rect(child, new_rect);
         }

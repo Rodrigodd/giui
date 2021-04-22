@@ -2,7 +2,7 @@ use crate::{
     event::{self, SetValue},
     graphics::Graphic,
     style::OnFocusStyle,
-    text::TextInfo,
+    text_layout::{LineMetrics, TextLayout},
     Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseButton, MouseEvent, MouseInfo,
 };
 
@@ -46,11 +46,14 @@ pub struct TextField<C: TextFieldCallback> {
     label: Id,
     text: String,
     previous_text: String,
+    /// Index of glyph where the caret is positioned
     caret_index: usize,
     selection_index: Option<usize>,
-    text_info: TextInfo,
+    text_layout: TextLayout,
     text_width: f32,
     this_width: f32,
+    /// The amount in pixels that the text is scrolled to the left.
+    /// When there is no scroll, its value is -MARGIN.
     x_scroll: f32,
     on_focus: bool,
     mouse_x: f32,
@@ -72,7 +75,7 @@ impl<C: TextFieldCallback> TextField<C> {
             text,
             caret_index: 0,
             selection_index: None,
-            text_info: TextInfo::default(),
+            text_layout: TextLayout::new(),
             text_width: 0.0,
             this_width: 0.0,
             x_scroll: 0.0,
@@ -88,19 +91,96 @@ impl<C: TextFieldCallback> TextField<C> {
 
     fn update_text(&mut self, this: Id, ctx: &mut Context) {
         let fonts = ctx.get_fonts();
-        if let Some((ref mut rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {
-            let display_text = self.text.clone();
+        if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {
+            let display_text = self.text.clone() + "\u{0004}";
             text.set_text(&display_text);
             let min_size = text.compute_min_size(fonts).unwrap_or([0.0, 0.0]);
             self.text_width = min_size[0];
             rect.set_min_size(min_size);
-            self.text_info = text.get_text_info(fonts, rect).clone();
+            self.text_layout = text.get_layout(fonts, rect).clone();
+            let glyphs = self.text_layout.glyphs();
+            if self.caret_index + 1 >= glyphs.len() {
+                self.caret_index = glyphs.len().saturating_sub(1);
+            }
             self.update_carret(this, ctx, true);
         }
     }
 
+    /// Get the position of the glyph under right to the carret, relative to the top-left
+    /// corner of the text control.
+    fn get_glyph_pos(&mut self, caret: usize) -> [f32; 2] {
+        let glyphs = self.text_layout.glyphs();
+        if glyphs.is_empty() {
+            unreachable!()
+        }
+        match glyphs.get(caret) {
+            Some(glyph) => {
+                let pos = glyph.glyph.position;
+                [pos.x, pos.y]
+            }
+            None => panic!("index is {}, but len is {}", caret, glyphs.len()),
+        }
+    }
+
+    fn get_line(&self, caret: usize) -> &LineMetrics {
+        let lines = self.text_layout.line_metrics();
+        let i = lines
+            .binary_search_by(|x| crate::util::cmp_range(caret, x.start_glyph..x.end_glyph))
+            .unwrap_or(0);
+        &lines[i]
+    }
+
+    /// Get the position of the base of the caret, and its height.
+    /// The bottom of the caret is in the descent of the line, and its top is in the ascent.
+    fn get_caret_pos_and_height(&mut self, caret: usize) -> [f32; 3] {
+        let line = self.get_line(caret).clone();
+        let pos = self.get_glyph_pos(caret);
+        [pos[0], pos[1] - line.descent, line.ascent - line.descent]
+    }
+
+    /// Get the byte index in the text for a caret position
+    fn get_indice(&mut self, caret: usize) -> usize {
+        match self.text_layout.glyphs().get(caret) {
+            Some(glyph) => glyph.byte_range.start,
+            None => self.text.len(),
+        }
+    }
+
+    /// Get the index of the glyph located at certain line and x position
+    fn get_caret_index_at_pos(&mut self, line: usize, x_pos: f32) -> usize {
+        let lines = self.text_layout.line_metrics();
+        let line = lines[line.max(lines.len() - 1)].clone();
+        let range = line.start_glyph..line.end_glyph;
+        if range.is_empty() {
+            return line.start_glyph;
+        }
+        let line_glyphs = &self.text_layout.glyphs()[range];
+        match line_glyphs.binary_search_by(|x| x.glyph.position.x.partial_cmp(&x_pos).unwrap()) {
+            Ok(i) => line.start_glyph + i,
+            Err(i) => {
+                if i == 0 {
+                    line.start_glyph
+                } else {
+                    (line.start_glyph + i - 1).min(line.end_glyph - 1)
+                }
+            }
+        }
+    }
+
+    /// Get the caret located at certain byte index in the string
+    fn get_caret_index(&mut self, indice: usize) -> usize {
+        let glyphs = self.text_layout.glyphs();
+        if glyphs.is_empty() {
+            return 0;
+        }
+        match glyphs.binary_search_by(|x| crate::util::cmp_range(indice, x.byte_range.clone())) {
+            Ok(x) => x,
+            Err(x) => x.saturating_sub(1),
+        }
+    }
+
     fn update_carret(&mut self, this: Id, ctx: &mut Context, focus_caret: bool) {
-        let mut caret_pos = self.text_info.get_caret_pos(self.caret_index);
+        let mut caret_pos = self.get_caret_pos_and_height(self.caret_index);
         if let Some(event_id) = self.blink_event {
             ctx.cancel_scheduled_event(event_id);
         } else {
@@ -112,21 +192,26 @@ impl<C: TextFieldCallback> TextField<C> {
         let this_rect = *ctx.get_rect(this);
         self.this_width = this_rect[2] - this_rect[0];
 
-        if self.this_width > self.text_width {
+        if self.this_width - MARGIN * 2.0 > self.text_width {
             self.x_scroll = -MARGIN;
-        } else if focus_caret {
-            if caret_pos[0] - self.x_scroll > self.this_width - MARGIN {
-                self.x_scroll = caret_pos[0] - (self.this_width - MARGIN);
-            }
-            if caret_pos[0] - self.x_scroll < MARGIN {
-                self.x_scroll = caret_pos[0] - MARGIN;
-            }
         } else {
-            if self.text_width - self.x_scroll < self.this_width - MARGIN {
-                self.x_scroll = self.text_width - (self.this_width - MARGIN);
-            }
-            if self.x_scroll < -MARGIN {
-                self.x_scroll = -MARGIN;
+            self.x_scroll = self
+                .x_scroll
+                .min(self.text_width - self.this_width + MARGIN);
+            if focus_caret {
+                if caret_pos[0] - self.x_scroll > self.this_width - MARGIN {
+                    self.x_scroll = caret_pos[0] - (self.this_width - MARGIN);
+                }
+                if caret_pos[0] - self.x_scroll < MARGIN {
+                    self.x_scroll = caret_pos[0] - MARGIN;
+                }
+            } else {
+                if self.text_width - self.x_scroll < self.this_width - MARGIN {
+                    self.x_scroll = self.text_width - (self.this_width - MARGIN);
+                }
+                if self.x_scroll < -MARGIN {
+                    self.x_scroll = -MARGIN;
+                }
             }
         }
 
@@ -137,11 +222,11 @@ impl<C: TextFieldCallback> TextField<C> {
         if let Some(selection_index) = self.selection_index {
             ctx.get_graphic_mut(self.caret)
                 .set_color([51, 153, 255, 255]);
-            let mut selection_pos = self.text_info.get_caret_pos(selection_index);
+            let mut selection_pos = self.get_glyph_pos(selection_index);
             selection_pos[0] -= self.x_scroll;
             let mut margins = [
                 caret_pos[0],
-                caret_pos[1] - self.text_info.get_line_heigth(),
+                caret_pos[1] - caret_pos[2],
                 selection_pos[0],
                 caret_pos[1],
             ];
@@ -166,7 +251,7 @@ impl<C: TextFieldCallback> TextField<C> {
                     self.caret,
                     [
                         caret_pos[0],
-                        caret_pos[1] - self.text_info.get_line_heigth(),
+                        caret_pos[1] - caret_pos[2],
                         caret_pos[0] + 1.0,
                         caret_pos[1],
                     ],
@@ -202,8 +287,8 @@ impl<C: TextFieldCallback> TextField<C> {
 
     fn delete_selection(&mut self, this: Id, ctx: &mut Context) {
         let selection_index = self.selection_index.unwrap();
-        let a = self.text_info.get_indice(self.caret_index);
-        let b = self.text_info.get_indice(selection_index);
+        let a = self.get_indice(self.caret_index);
+        let b = self.get_indice(selection_index);
         let range = if a > b { b..a } else { a..b };
         if self.caret_index > selection_index {
             self.caret_index = selection_index;
@@ -215,8 +300,8 @@ impl<C: TextFieldCallback> TextField<C> {
     }
 
     fn insert_char(&mut self, ch: char, this: Id, ctx: &mut Context) {
-        self.text
-            .insert(self.text_info.get_indice(self.caret_index), ch);
+        let indice = self.get_indice(self.caret_index);
+        self.text.insert(indice, ch);
         self.caret_index += 1;
         self.update_text(this, ctx);
         self.callback.on_change(this, ctx, &self.text)
@@ -225,7 +310,8 @@ impl<C: TextFieldCallback> TextField<C> {
     fn get_word_start(&mut self, mut caret: usize) -> usize {
         let mut s = false;
         while caret != 0 {
-            let whitespace = match self.text[self.text_info.get_indice(caret)..].chars().next() {
+            let indice = self.get_indice(caret);
+            let whitespace = match self.text[indice..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => false,
             };
@@ -243,10 +329,11 @@ impl<C: TextFieldCallback> TextField<C> {
     fn get_next_word_start(&mut self, mut caret: usize) -> usize {
         let mut s = false;
         loop {
-            let whitespace = match self.text[self.text_info.get_indice(caret)..].chars().next() {
+            let indice = self.get_indice(caret);
+            let whitespace = match self.text[indice..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => {
-                    caret = self.text_info.len() - 1;
+                    caret = self.text_layout.glyphs().len() - 1;
                     break;
                 }
             };
@@ -261,12 +348,14 @@ impl<C: TextFieldCallback> TextField<C> {
     }
 
     fn get_token_start(&mut self, mut caret: usize) -> usize {
-        let start = match self.text[self.text_info.get_indice(caret)..].chars().next() {
+        let indice = self.get_indice(caret);
+        let start = match self.text[indice..].chars().next() {
             Some(x) => x.is_whitespace(),
             None => false,
         };
         loop {
-            let whitespace = match self.text[self.text_info.get_indice(caret)..].chars().next() {
+            let indice = self.get_indice(caret);
+            let whitespace = match self.text[indice..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => false,
             };
@@ -283,17 +372,19 @@ impl<C: TextFieldCallback> TextField<C> {
     }
 
     fn get_token_end(&mut self, mut caret: usize) -> usize {
-        let start = match self.text[self.text_info.get_indice(caret)..].chars().next() {
+        let indice = self.get_indice(caret);
+        let start = match self.text[indice..].chars().next() {
             Some(x) => x.is_whitespace(),
             None => {
-                return self.text_info.len() - 1;
+                return self.text_layout.glyphs().len().saturating_sub(1);
             }
         };
         loop {
-            let whitespace = match self.text[self.text_info.get_indice(caret)..].chars().next() {
+            let indice = self.get_indice(caret);
+            let whitespace = match self.text[indice..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => {
-                    caret = self.text_info.len() - 1;
+                    caret = self.text_layout.glyphs().len().saturating_sub(1);
                     break;
                 }
             };
@@ -307,10 +398,7 @@ impl<C: TextFieldCallback> TextField<C> {
 
     fn select_all(&mut self, this: Id, ctx: &mut Context) {
         let start = 0;
-        let end = self
-            .text_info
-            .get_line_range(self.caret_index)
-            .map_or(0, |x| x.end.saturating_sub(1));
+        let end = self.get_line(self.caret_index).end_glyph.saturating_sub(1);
         self.selection_index = Some(start);
         self.caret_index = end;
         self.update_carret(this, ctx, false);
@@ -325,17 +413,17 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
 
     fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
         if let Some(SetValue(text)) = event.downcast_ref::<SetValue<String>>() {
-            let x = self.text_info.get_caret_pos(self.caret_index)[0];
+            let x = self.get_glyph_pos(self.caret_index)[0];
             self.text.clone_from(text);
             self.previous_text.clone_from(text);
             self.update_text(this, ctx);
             self.selection_index = None;
-            self.caret_index = self.text_info.get_caret_index_at_pos(0, x);
+            self.caret_index = self.get_caret_index_at_pos(0, x);
             self.update_carret(this, ctx, true);
             self.callback.on_change(this, ctx, &self.text);
         } else if event.is::<BlinkCaret>() {
             self.blink = !self.blink;
-            self.update_carret(this, ctx, true);
+            self.update_carret(this, ctx, false);
         }
     }
 
@@ -368,9 +456,16 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 ctx.set_cursor(CursorIcon::Default);
             }
             MouseEvent::Down(Left) => {
+                if let Some(event_id) = self.blink_event.take() {
+                    ctx.cancel_scheduled_event(event_id);
+                }
+                if self.blink {
+                    self.update_carret(this, ctx, false);
+                }
+
                 let left = ctx.get_rect(this)[0] - self.x_scroll;
                 let x = self.mouse_x - left;
-                let caret = self.text_info.get_caret_index_at_pos(0, x);
+                let caret = self.get_caret_index_at_pos(0, x);
                 if caret == self.drag_start {
                     match mouse.click_count {
                         0 => unreachable!(),
@@ -413,7 +508,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     1 => {
                         let left = ctx.get_rect(this)[0] - self.x_scroll;
                         let x = self.mouse_x - left;
-                        let caret_index = self.text_info.get_caret_index_at_pos(0, x);
+                        let caret_index = self.get_caret_index_at_pos(0, x);
                         if caret_index == self.caret_index {
                             return;
                         }
@@ -430,7 +525,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     2..=u8::MAX => {
                         let left = ctx.get_rect(this)[0] - self.x_scroll;
                         let x = self.mouse_x - left;
-                        let caret_index = self.text_info.get_caret_index_at_pos(0, x);
+                        let caret_index = self.get_caret_index_at_pos(0, x);
                         let selection_index = self.selection_index.unwrap_or(caret_index);
                         let caret_index = if selection_index > caret_index {
                             self.selection_index = Some(self.get_token_end(self.drag_start));
@@ -457,14 +552,14 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
         } else {
             ctx.set_graphic(this, self.style.normal.clone());
 
-            let x = self.text_info.get_caret_pos(self.caret_index)[0];
+            let x = self.get_glyph_pos(self.caret_index)[0];
             if self.callback.on_unfocus(this, ctx, &mut self.text) {
                 self.previous_text.clone_from(&self.text);
             } else {
                 self.text.clone_from(&self.previous_text);
             }
             self.selection_index = None;
-            self.caret_index = self.text_info.get_caret_index_at_pos(0, x);
+            self.caret_index = self.get_caret_index_at_pos(0, x);
             self.update_text(this, ctx);
         }
         self.update_carret(this, ctx, true);
@@ -474,9 +569,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
         if let Some(event_id) = self.blink_event.take() {
             ctx.cancel_scheduled_event(event_id);
         }
-        if self.blink {
-            self.update_carret(this, ctx, false);
-        }
+        self.update_carret(this, ctx, false);
         match event {
             KeyboardEvent::Char(ch) => {
                 if self.selection_index.is_some() {
@@ -489,8 +582,8 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 VirtualKeyCode::C | VirtualKeyCode::X => {
                     if ctx.modifiers().ctrl() {
                         if let Some(selection_index) = self.selection_index {
-                            let a = self.text_info.get_indice(selection_index);
-                            let b = self.text_info.get_indice(self.caret_index);
+                            let a = self.get_indice(selection_index);
+                            let b = self.get_indice(self.caret_index);
                             let range = if a < b { a..b } else { b..a };
                             let mut cliptobard = ClipboardContext::new().unwrap();
                             let _ = cliptobard.set_contents(self.text[range].to_owned());
@@ -505,22 +598,20 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                         let mut clipboard = ClipboardContext::new().unwrap();
                         if let Ok(text) = clipboard.get_contents() {
                             let text = text.replace(|x: char| x.is_control(), "");
-                            let indice = self.text_info.get_indice(self.caret_index);
+                            let indice = self.get_indice(self.caret_index);
                             if let Some(selection_index) = self.selection_index {
-                                let a = self.text_info.get_indice(selection_index);
+                                let a = self.get_indice(selection_index);
                                 let b = indice;
                                 let range = if a < b { a..b } else { b..a };
                                 self.text.replace_range(range.clone(), &text);
                                 self.selection_index = None;
                                 self.update_text(this, ctx); // TODO: is is not working?
-                                self.caret_index =
-                                    self.text_info.get_caret_index(range.start + text.len());
+                                self.caret_index = self.get_caret_index(range.start + text.len());
                                 self.callback.on_change(this, ctx, &self.text)
                             } else {
                                 self.text.insert_str(indice, &text);
                                 self.update_text(this, ctx);
-                                self.caret_index =
-                                    self.text_info.get_caret_index(indice + text.len());
+                                self.caret_index = self.get_caret_index(indice + text.len());
                                 self.callback.on_change(this, ctx, &self.text)
                             }
                             self.update_carret(this, ctx, true);
@@ -533,7 +624,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     }
                 }
                 VirtualKeyCode::Return => {
-                    let x = self.text_info.get_caret_pos(self.caret_index)[0];
+                    let x = self.get_glyph_pos(self.caret_index)[0];
                     if self.callback.on_submit(this, ctx, &mut self.text) {
                         self.previous_text.clone_from(&self.text);
                     } else {
@@ -541,7 +632,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     }
                     self.update_text(this, ctx);
                     self.selection_index = None;
-                    self.caret_index = self.text_info.get_caret_index_at_pos(0, x);
+                    self.caret_index = self.get_caret_index_at_pos(0, x);
                     self.update_carret(this, ctx, true);
                 }
                 VirtualKeyCode::Back | VirtualKeyCode::Delete if self.selection_index.is_some() => {
@@ -552,15 +643,15 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                         return true;
                     }
                     self.caret_index -= 1;
-                    self.text
-                        .remove(self.text_info.get_indice(self.caret_index));
+                    let indice = self.get_indice(self.caret_index);
+                    self.text.remove(indice);
                     self.update_text(this, ctx);
                     self.callback.on_change(this, ctx, &self.text);
                 }
                 VirtualKeyCode::Delete => {
-                    if self.caret_index + 1 < self.text_info.len() {
-                        self.text
-                            .remove(self.text_info.get_indice(self.caret_index));
+                    if self.caret_index + 1 < self.text_layout.glyphs().len() {
+                        let indice = self.get_indice(self.caret_index);
+                        self.text.remove(indice);
                         self.update_text(this, ctx);
                     }
                 }
@@ -576,7 +667,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     self.update_carret(this, ctx, true);
                 }
                 VirtualKeyCode::Right => {
-                    if self.caret_index + 1 >= self.text_info.len() {
+                    if self.caret_index + 1 >= self.text_layout.glyphs().len() {
                         self.move_caret(self.caret_index, ctx);
                     } else if ctx.modifiers().ctrl() {
                         let caret = self.get_next_word_start(self.caret_index);
@@ -592,9 +683,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 }
                 VirtualKeyCode::End => {
                     self.move_caret(
-                        self.text_info
-                            .get_line_range(self.caret_index)
-                            .map_or(0, |x| x.end.saturating_sub(1)),
+                        self.get_line(self.caret_index).end_glyph.saturating_sub(1),
                         ctx,
                     );
                     self.update_carret(this, ctx, true);

@@ -5,8 +5,10 @@ extern crate crui_derive;
 #[doc(hidden)]
 pub use crui_derive::*;
 
-mod text;
+mod text_layout;
 mod util;
+
+mod unicode;
 
 mod context;
 mod control;

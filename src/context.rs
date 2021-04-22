@@ -1,7 +1,4 @@
-use std::{
-    any::Any,
-    time::Instant,
-};
+use std::{any::Any, time::Instant};
 
 use ab_glyph::FontArc;
 use winit::{event::ModifiersState, window::CursorIcon};
@@ -209,6 +206,7 @@ impl<'a> Context<'a> {
         if let Graphic::None = control.graphic {
             None
         } else {
+            self.render_dirty = true;
             Some((&mut control.rect, &mut control.graphic))
         }
     }

@@ -6,6 +6,13 @@ use crate::{
 use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
 use std::{ops::Range, time::Instant};
 
+#[derive(Debug)]
+/// A glyph and a font_id
+pub struct FontGlyph {
+    pub glyph: ab_glyph::Glyph,
+    pub font_id: usize,
+}
+
 pub trait GuiRenderer {
     fn update_font_texure(&mut self, font_texture: u32, rect: [u32; 4], data: &[u8]);
     fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]);
@@ -100,7 +107,7 @@ impl GuiRender {
                     let glyphs = text.get_glyphs(rect, fonts);
                     for glyph in glyphs {
                         self.draw_cache
-                            .queue_glyph(glyph.font_id.0, glyph.glyph.clone());
+                            .queue_glyph(glyph.font_id, glyph.glyph.clone());
                     }
                 }
             }
@@ -244,7 +251,7 @@ impl GuiRender {
 
                             for glyph in glyphs {
                                 if let Some((tex_coords, pixel_coords)) =
-                                    self.draw_cache.rect_for(glyph.font_id.0, &glyph.glyph)
+                                    self.draw_cache.rect_for(glyph.font_id, &glyph.glyph)
                                 {
                                     if pixel_coords.min.x as f32 > mask[2]
                                         || pixel_coords.min.y as f32 > mask[3]
