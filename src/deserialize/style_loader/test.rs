@@ -250,10 +250,13 @@ fn deserialize_text() {
         format!(
             "{:?}",
             Graphic::from(Text::new(
-                [255, 255, 255, 255],
                 "Hello World".into(),
-                16.0,
-                (0, 0)
+                (0, 0),
+                TextStyle {
+                    color: [255, 255, 255, 255],
+                    font_size: 16.0,
+                    font_id: 0,
+                }
             ))
         )
     );

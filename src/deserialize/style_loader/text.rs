@@ -106,7 +106,13 @@ impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for TextVisitor<'a, 'b> {
         let font_size = font_size.ok_or_else(|| de::Error::missing_field("font_size"))?;
         let align = align.ok_or_else(|| de::Error::missing_field("align"))?;
         let color = color.unwrap_or([255; 4]);
-        Ok(Text::new(color, text, font_size, align))
+        let style = TextStyle {
+            font_size,
+            // TODO: this should not always be zero, of course
+            font_id: 0,
+            color,
+        };
+        Ok(Text::new(text, align, style))
     }
 }
 

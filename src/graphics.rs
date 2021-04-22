@@ -1,6 +1,6 @@
 use crate::{
     render::FontGlyph,
-    text_layout::{TextLayout, TextStyle},
+    text_layout::{TextLayout, TextLayoutStyle},
     Rect, RenderDirtyFlags,
 };
 use ab_glyph::{Font, FontArc};
@@ -65,7 +65,10 @@ impl Graphic {
             | Graphic::Texture(Texture { color, .. })
             | Graphic::Icon(Icon { color, .. })
             | Graphic::AnimatedIcon(AnimatedIcon { color, .. })
-            | Graphic::Text(Text { color, .. }) => *color,
+            | Graphic::Text(Text {
+                style: TextStyle { color, .. },
+                ..
+            }) => *color,
             Graphic::None => [255, 255, 255, 255],
         }
     }
@@ -85,7 +88,9 @@ impl Graphic {
                 color, color_dirty, ..
             })
             | Graphic::Text(Text {
-                color, color_dirty, ..
+                style: TextStyle { color, .. },
+                color_dirty,
+                ..
             }) => {
                 *color = new_color;
                 *color_dirty = true;
@@ -108,7 +113,9 @@ impl Graphic {
                 color, color_dirty, ..
             })
             | Graphic::Text(Text {
-                color, color_dirty, ..
+                style: TextStyle { color, .. },
+                color_dirty,
+                ..
             }) => {
                 color[3] = new_alpha;
                 *color_dirty = true;
@@ -383,46 +390,59 @@ impl Panel {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct TextStyle {
+    pub color: [u8; 4],
+    pub font_size: f32,
+    pub font_id: usize,
+}
+impl Default for TextStyle {
+    fn default() -> Self {
+        Self {
+            font_size: 16.0,
+            font_id: 0,
+            color: [0, 0, 0, 255],
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Text {
-    pub color: [u8; 4],
-    color_dirty: bool,
     text: String,
     text_dirty: bool,
-    font_size: f32,
-    align: (i8, i8),
     glyphs: Vec<FontGlyph>,
     layout: Option<TextLayout>,
-    last_pos: [f32; 2],
     min_size: Option<[f32; 2]>,
+    last_pos: [f32; 2],
+    align: (i8, i8),
+    color_dirty: bool,
+    style: TextStyle,
 }
 impl Default for Text {
     fn default() -> Self {
         Self {
-            color: Default::default(),
             color_dirty: true,
             text: Default::default(),
             text_dirty: true,
-            font_size: Default::default(),
             align: Default::default(),
             glyphs: Default::default(),
             layout: None,
             last_pos: Default::default(),
             min_size: Default::default(),
+            style: TextStyle::default(),
         }
     }
 }
 impl Clone for Text {
     fn clone(&self) -> Self {
-        Self::new(self.color, self.text.clone(), self.font_size, self.align)
+        Self::new(self.text.clone(), self.align, self.style.clone())
     }
 }
 impl Text {
-    pub fn new(color: [u8; 4], text: String, font_size: f32, align: (i8, i8)) -> Text {
+    pub fn new(text: String, align: (i8, i8), style: TextStyle) -> Text {
         Self {
-            color,
+            style,
             text,
-            font_size,
             align,
             ..Default::default()
         }
@@ -435,11 +455,11 @@ impl Text {
     }
 
     pub fn get_font_size(&mut self) -> f32 {
-        self.font_size
+        self.style.font_size
     }
 
     pub fn set_font_size(&mut self, font_size: f32) {
-        self.font_size = font_size;
+        self.style.font_size = font_size;
         self.dirty();
     }
 
@@ -476,7 +496,10 @@ impl Text {
             vertical_align: [Top, Middle, Bottom][(self.align.1 + 1) as usize],
             ..Default::default()
         });
-        layout.append(fonts, &TextStyle::new(&self.text, self.font_size, 0));
+        layout.append(
+            fonts,
+            &TextLayoutStyle::new(&self.text, self.style.font_size, self.style.font_id),
+        );
         self.glyphs = layout
             .glyphs()
             .iter()
@@ -523,9 +546,16 @@ impl Text {
     pub fn compute_min_size<F: Font>(&mut self, fonts: &[F]) -> Option<[f32; 2]> {
         if self.min_size.is_none() {
             let mut layout = TextLayout::new();
-            layout.append(fonts, &TextStyle::new(&self.text, self.font_size, 0));
+            layout.append(
+                fonts,
+                &TextLayoutStyle::new(&self.text, self.style.font_size, self.style.font_id),
+            );
             self.min_size = Some(layout.min_size());
         }
         self.min_size
+    }
+
+    pub fn color(&self) -> [u8; 4] {
+        self.style.color
     }
 }

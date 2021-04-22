@@ -1,6 +1,6 @@
 use ab_glyph::FontArc;
 use crui::{
-    graphics::Text,
+    graphics::{Text, TextStyle},
     render::{GuiRender, GuiRenderer},
     Gui,
 };
@@ -57,7 +57,18 @@ fn main() {
     // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
     let _text = gui
         .create_control()
-        .graphic(Text::new([0, 255, 0, 255], "Hello Word!!".to_string(), 70.0, (0, 0)).into())
+        .graphic(
+            Text::new(
+                "Hello Word!!".to_string(),
+                (0, 0),
+                TextStyle {
+                    color: [0, 255, 0, 255],
+                    font_size: 70.0,
+                    font_id: 0,
+                },
+            )
+            .into(),
+        )
         .build();
 
     // resize everthing to the screen size

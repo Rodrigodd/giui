@@ -13,16 +13,7 @@
 //The above copyright notice and this permission notice shall be included in all
 //copies or substantial portions of the Software.
 
-// pub use crate::unicode::CharacterData;
-
 use crate::unicode::{linebreak_property, read_utf8, wrap_mask, LINEBREAK_HARD, LINEBREAK_NONE};
-// use crate::Font;
-// use crate::{
-//     platform::{ceil, floor},
-//     Metrics,
-// };
-// use alloc::vec::*;
-// use std::borrow::Borrow;
 use std::ops::Range;
 
 use ab_glyph::{Font, Glyph, GlyphId, ScaleFont};
@@ -112,7 +103,7 @@ pub struct GlyphPosition {
 }
 
 /// A style description for a segment of text.
-pub struct TextStyle<'a> {
+pub struct TextLayoutStyle<'a> {
     /// The text to layout.
     pub text: &'a str,
     /// The scale of the text in pixel units.
@@ -121,9 +112,9 @@ pub struct TextStyle<'a> {
     pub font_index: usize,
 }
 
-impl<'a> TextStyle<'a> {
-    pub fn new(text: &'a str, px: f32, font_index: usize) -> TextStyle<'a> {
-        TextStyle {
+impl<'a> TextLayoutStyle<'a> {
+    pub fn new(text: &'a str, px: f32, font_index: usize) -> TextLayoutStyle<'a> {
+        TextLayoutStyle {
             text,
             px,
             font_index,
@@ -318,7 +309,7 @@ impl TextLayout {
     /// Characters from the input string can only be omitted from the output, they are never
     /// reordered. The output buffer will always contain characters in the order they were defined
     /// in the styles.
-    pub fn append<T: Font>(&mut self, fonts: &[T], style: &TextStyle) {
+    pub fn append<T: Font>(&mut self, fonts: &[T], style: &TextLayoutStyle) {
         let mut byte_offset = self.text.len();
         self.text += style.text;
         let font = &fonts[style.font_index].as_scaled(style.px);

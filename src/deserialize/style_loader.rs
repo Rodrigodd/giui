@@ -1,4 +1,4 @@
-use crate::graphics::{AnimatedIcon, Graphic, Icon, Panel, Text, Texture};
+use crate::graphics::{AnimatedIcon, Graphic, Icon, Panel, Text, TextStyle, Texture};
 use serde::{
     de::{
         self, Deserialize, DeserializeSeed, EnumAccess, Error, MapAccess, Unexpected,

@@ -45,18 +45,11 @@ use std::{
 //     }
 // }
 
-use crui::{
-    event::SetValue,
-    graphics::{Graphic, Panel, Text, Texture},
-    layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
-    style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
-    widgets::{
+use crui::{Context, ControlBuilder, Gui, Id, RectFill, event::SetValue, graphics::{Graphic, Panel, Text, TextStyle, Texture}, layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout}, style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle}, widgets::{
         Blocker, Button, ButtonGroup, CloseMenu, DropMenu, Dropdown, Item, Menu, MenuBar, MenuItem,
         ScrollBar, ScrollView, Select, SetMaxValue, SetMinValue, SetSelected, Slider,
         SliderCallback, TabButton, TextField, TextFieldCallback, Toggle, ViewLayout,
-    },
-    Context, ControlBuilder, Gui, Id, RectFill,
-};
+    }};
 use sprite_render::{GLSpriteRender, SpriteRender};
 use winit::{
     event::{Event, WindowEvent},
@@ -644,7 +637,16 @@ impl OptionsGui {
         style: &StyleSheet,
     ) -> ControlBuilder<'a> {
         let button = id;
-        let graphic = Text::new([40, 40, 100, 255], label, 16.0, (0, 0)).into();
+        let graphic = Text::new(
+            label,
+            (0, 0),
+            TextStyle {
+                color: [40, 40, 100, 255],
+                font_size: 16.0,
+                font_id: 0,
+            },
+        )
+        .into();
         gui.create_control()
             .graphic(graphic)
             .parent(button)
@@ -677,7 +679,18 @@ impl OptionsGui {
             .build();
         let _text = gui
             .create_control()
-            .graphic(Text::new([0, 0, 0, 255], name, 18.0, (-1, 0)).into())
+            .graphic(
+                Text::new(
+                    name,
+                    (-1, 0),
+                    TextStyle {
+                        color: [0, 0, 0, 255],
+                        font_size: 18.0,
+                        font_id: 0,
+                    },
+                )
+                .into(),
+            )
             .layout(FitText)
             .expand_x(true)
             .parent(line)
@@ -696,7 +709,18 @@ impl OptionsGui {
         let label = gui
             .create_control()
             .min_size([0.0, 24.0])
-            .graphic(Text::new([0, 0, 0, 255], initial_value.to_string(), 18.0, (0, 0)).into())
+            .graphic(
+                Text::new(
+                    initial_value.to_string(),
+                    (0, 0),
+                    TextStyle {
+                        color: [0, 0, 0, 255],
+                        font_size: 18.0,
+                        font_id: 0,
+                    },
+                )
+                .into(),
+            )
             .parent(parent)
             .build();
         let line = gui
@@ -785,7 +809,16 @@ impl OptionsGui {
             .parent(parent)
             .build();
 
-        let graphic = Text::new([40, 40, 100, 255], name, 16.0, (-1, 0)).into();
+        let graphic = Text::new(
+            name,
+            (-1, 0),
+            TextStyle {
+                color: [40, 40, 100, 255],
+                font_size: 16.0,
+                font_id: 0,
+            },
+        )
+        .into();
         gui.create_control()
             .anchors([0.0, 0.0, 1.0, 1.0])
             .margins([30.0, 0.0, 0.0, 0.0])
@@ -802,7 +835,18 @@ impl OptionsGui {
             .build();
         let _text = gui
             .create_control()
-            .graphic(Text::new([0, 0, 0, 255], "Dropdown".into(), 18.0, (-1, 0)).into())
+            .graphic(
+                Text::new(
+                    "Dropdown".into(),
+                    (-1, 0),
+                    TextStyle {
+                        color: [0, 0, 0, 255],
+                        font_size: 18.0,
+                        font_id: 0,
+                    },
+                )
+                .into(),
+            )
             .layout(FitText)
             .expand_x(true)
             .parent(line)
@@ -848,16 +892,30 @@ impl OptionsGui {
             .parent(popup_window)
             .build();
         gui.create_control_reserved(self.popup_title)
-            .graphic(Text::new([0, 0, 0, 255], "PopUp Title".into(), 16.0, (-1, 0)).into())
+            .graphic(
+                Text::new(
+                    "PopUp Title".into(),
+                    (-1, 0),
+                    TextStyle {
+                        color: [0, 0, 0, 255],
+                        font_size: 16.0,
+                        font_id: 0,
+                    },
+                )
+                .into(),
+            )
             .parent(popup_header)
             .build();
         gui.create_control_reserved(self.popup_text)
             .graphic(
                 Text::new(
-                    [0, 0, 0, 255],
                     "Somthing has happend!".into(),
-                    16.0,
                     (-1, 0),
+                    TextStyle {
+                        color: [0, 0, 0, 255],
+                        font_size: 16.0,
+                        font_id: 0,
+                    },
                 )
                 .into(),
             )
@@ -881,7 +939,18 @@ impl OptionsGui {
             .build();
         let _ok_button_text = gui
             .create_control()
-            .graphic(Text::new([0, 0, 0, 255], "Ok".into(), 14.0, (0, 0)).into())
+            .graphic(
+                Text::new(
+                    "Ok".into(),
+                    (0, 0),
+                    TextStyle {
+                        color: [0, 0, 0, 255],
+                        font_size: 14.0,
+                        font_id: 0,
+                    },
+                )
+                .into(),
+            )
             .parent(ok_button)
             .build();
     }
@@ -902,7 +971,18 @@ impl OptionsGui {
             .build();
         let input_text = gui
             .create_control()
-            .graphic(Text::new([0, 0, 0, 255], String::new(), 18.0, (-1, 0)).into())
+            .graphic(
+                Text::new(
+                    String::new(),
+                    (-1, 0),
+                    TextStyle {
+                        color: [0, 0, 0, 255],
+                        font_size: 18.0,
+                        font_id: 0,
+                    },
+                )
+                .into(),
+            )
             .parent(input_box)
             .build();
         gui.create_control_reserved(input_box)
@@ -999,8 +1079,16 @@ impl OptionsGui {
                             .create_control()
                             .margins([10.0, 0.0, -10.0, 0.0])
                             .graphic(
-                                Text::new([40, 40, 100, 255], data.to_string(), 16.0, (-1, 0))
-                                    .into(),
+                                Text::new(
+                                    data.to_string(),
+                                    (-1, 0),
+                                    TextStyle {
+                                        color: [40, 40, 100, 255],
+                                        font_size: 16.0,
+                                        font_id: 0,
+                                    },
+                                )
+                                .into(),
                             )
                             .layout(FitText)
                             .parent(id)
@@ -1018,10 +1106,13 @@ impl OptionsGui {
             .margins([10.0, 0.0, -10.0, 0.0])
             .graphic(
                 Text::new(
-                    [40, 40, 100, 255],
                     itens[initial_value].clone(),
-                    16.0,
                     (-1, 0),
+                    TextStyle {
+                        color: [40, 40, 100, 255],
+                        font_size: 16.0,
+                        font_id: 0,
+                    },
                 )
                 .into(),
             )
@@ -1064,7 +1155,18 @@ fn create_item(
     let _text = ctx
         .create_control()
         .parent(item)
-        .graphic(Text::new([0, 0, 0, 255], text, 16.0, (-1, 0)).into())
+        .graphic(
+            Text::new(
+                text,
+                (-1, 0),
+                TextStyle {
+                    color: [0, 0, 0, 255],
+                    font_size: 16.0,
+                    font_id: 0,
+                },
+            )
+            .into(),
+        )
         .layout(FitText)
         .expand_x(true)
         .build();

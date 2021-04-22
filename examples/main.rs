@@ -2,17 +2,11 @@
 
 use std::rc::Rc;
 
-use crui::{
-    graphics::{Graphic, Icon, Panel, Text, Texture},
-    layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
-    widgets::{
+use crui::{Context, ControlBuilder, Gui, Id, RectFill, graphics::{Graphic, Icon, Panel, Text, TextStyle, Texture}, layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout}, style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle}, widgets::{
         self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, DropMenu, Dropdown, Hoverable,
         Item, Menu, MenuBar, MenuItem, ScrollBar, ScrollView, Slider, TabButton, TextField, Toggle,
         ViewLayout,
-    },
-    Context, ControlBuilder, Gui, Id, RectFill,
-};
+    }};
 use sprite_render::{GLSpriteRender, SpriteRender};
 use winit::{
     event::Event,
@@ -143,10 +137,13 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .layout(MarginLayout::new([3.0, 3.0, 3.0, 3.0]))
             .build();
         let graphic = Text::new(
-            [255, 255, 255, 255],
             "This is a Hover".to_owned(),
-            12.0,
             (-1, 0),
+            TextStyle {
+                color: [255, 255, 255, 255],
+                font_size: 12.0,
+                font_id: 0,
+            },
         )
         .into();
         let label = gui
@@ -316,12 +313,17 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .graphic(style.painel.clone().with_color([200, 200, 200, 255]))
                 .parent(right_painel)
                 .build();
+            let text = "This is a example text. Please, don't mind me. Continue doing what you need to do. If you cannot ignore this text, I don't mind.".to_owned();
             let graphic = Text::new(
-            [0, 0, 0, 255],
-            "This is a example text. Please, don't mind me. Continue doing what you need to do. If you cannot ignore this text, I don't mind.".to_owned(),
-            20.0,
-            (0, -1),
-        ).into();
+                text,
+                (0, -1),
+                TextStyle {
+                    color: [0, 0, 0, 255],
+                    font_size: 20.0,
+                    font_id: 1,
+                },
+            )
+            .into();
             gui.create_control()
                 .anchors([0.0, 0.0, 1.0, 1.0])
                 .graphic(graphic)
@@ -336,12 +338,17 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .graphic(style.painel.clone().with_color([200, 200, 200, 255]))
                 .parent(right_painel)
                 .build();
+            let text = "This is another example text. Please, also don't mind me. Continue doing what you was doing. If you cannot ignore this text, I don't mind either.".to_owned();
             let graphic = Text::new(
-            [0, 0, 0, 255],
-            "This is another example text. Please, also don't mind me. Continue doing what you was doing. If you cannot ignore this text, I don't mind either.".to_owned(),
-            20.0,
-            (-1, 0),
-        ).into();
+                text,
+                (-1, 0),
+                TextStyle {
+                    color: [0, 0, 0, 255],
+                    font_size: 20.0,
+                    font_id: 0,
+                },
+            )
+            .into();
             gui.create_control()
                 .anchors([0.0, 0.0, 1.0, 1.0])
                 .margins([5.0, 5.0, -5.0, -5.0])
@@ -458,8 +465,16 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .parent(background)
                 .build();
 
-            let graphic =
-                Text::new([40, 40, 100, 255], "Bottom Text".to_owned(), 16.0, (-1, 0)).into();
+            let graphic = Text::new(
+                "Bottom Text".to_owned(),
+                (-1, 0),
+                TextStyle {
+                    color: [40, 40, 100, 255],
+                    font_size: 16.0,
+                    font_id: 0,
+                },
+            )
+            .into();
             gui.create_control()
                 .anchors([0.0, 0.0, 1.0, 1.0])
                 .margins([30.0, 0.0, 0.0, 0.0])
@@ -497,8 +512,16 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                                 .create_control()
                                 .margins([10.0, 0.0, -10.0, 0.0])
                                 .graphic(
-                                    Text::new([40, 40, 100, 255], data.to_string(), 16.0, (-1, 0))
-                                        .into(),
+                                    Text::new(
+                                        data.to_string(),
+                                        (-1, 0),
+                                        TextStyle {
+                                            color: [40, 40, 100, 255],
+                                            font_size: 16.0,
+                                            font_id: 0,
+                                        },
+                                    )
+                                    .into(),
                                 )
                                 .layout(FitText)
                                 .parent(id)
@@ -538,10 +561,13 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .margins([10.0, 0.0, -10.0, 0.0])
                 .graphic(
                     Text::new(
-                        [40, 40, 100, 255],
                         "Select one, please".to_owned(),
-                        16.0,
                         (-1, 0),
+                        TextStyle {
+                            color: [40, 40, 100, 255],
+                            font_size: 16.0,
+                            font_id: 0,
+                        },
                     )
                     .into(),
                 )
@@ -602,10 +628,13 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .parent(parent)
                 .build();
             let graphic = Text::new(
-                [40, 40, 100, 255],
                 format!("{}x{}", min_size[0], min_size[1]),
-                12.0,
                 (0, 0),
+                TextStyle {
+                    color: [40, 40, 100, 255],
+                    font_size: 12.0,
+                    font_id: 0,
+                },
             )
             .into();
             gui.create_control().graphic(graphic).parent(rect).build();
@@ -776,7 +805,18 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .build();
             let _label = gui
                 .create_control()
-                .graphic(Text::new([0, 0, 0, 255], "Add new: ".to_owned(), 16.0, (-1, 0)).into())
+                .graphic(
+                    Text::new(
+                        "Add new: ".to_owned(),
+                        (-1, 0),
+                        TextStyle {
+                            color: [0, 0, 0, 255],
+                            font_size: 16.0,
+                            font_id: 0,
+                        },
+                    )
+                    .into(),
+                )
                 .layout(FitText)
                 .parent(hbox)
                 .build();
@@ -827,7 +867,18 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .build();
             let _input_text = gui
                 .create_control_reserved(input_text)
-                .graphic(Text::new([0, 0, 0, 255], String::new(), 16.0, (-1, 0)).into())
+                .graphic(
+                    Text::new(
+                        String::new(),
+                        (-1, 0),
+                        TextStyle {
+                            color: [0, 0, 0, 255],
+                            font_size: 16.0,
+                            font_id: 0,
+                        },
+                    )
+                    .into(),
+                )
                 .parent(input_box)
                 .build();
             input_box
@@ -948,12 +999,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
     };
     let page_na = {
         let page_na = gui.create_control().parent(page_area).build();
-        let graphic = Text::new(
-        [255, 255, 255, 255],
-        "This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(),
-        20.0,
-        (0, -1),
-    ).into();
+        let graphic = Text::new("This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(), (0, -1), TextStyle { color: [255, 255, 255, 255], font_size: 20.0, font_id: 0 }).into();
         gui.create_control()
             .margins([15.0, 15.0, -15.0, -15.0])
             .graphic(graphic)
@@ -978,7 +1024,16 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     style.tab_style.clone(),
                 ))
                 .build();
-            let graphic = Text::new([40, 40, 100, 255], label, 16.0, (0, 0)).into();
+            let graphic = Text::new(
+                label,
+                (0, 0),
+                TextStyle {
+                    color: [40, 40, 100, 255],
+                    font_size: 16.0,
+                    font_id: 0,
+                },
+            )
+            .into();
             gui.create_control()
                 .graphic(graphic)
                 .parent(button)
@@ -1011,10 +1066,13 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
         let _title = gui
             .create_control()
             .graphic(Graphic::from(Text::new(
-                [255, 255, 255, 255],
                 "This is a Window".to_string(),
-                20.0,
                 (-1, 0),
+                TextStyle {
+                    color: [255, 255, 255, 255],
+                    font_size: 20.0,
+                    font_id: 0,
+                },
             )))
             .layout(FitText)
             .parent(header)
@@ -1044,10 +1102,13 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
         let _text = gui
             .create_control()
             .graphic(Graphic::from(Text::new(
-                [0, 0, 0, 255],
                 "This is the content of a window.\nPlease be aware of it.".to_string(),
-                20.0,
                 (0, 0),
+                TextStyle {
+                    color: [0, 0, 0, 255],
+                    font_size: 20.0,
+                    font_id: 0,
+                },
             )))
             .layout(FitText)
             .parent(content)
@@ -1085,7 +1146,18 @@ fn create_item(
     let _text = ctx
         .create_control()
         .parent(item)
-        .graphic(Text::new([0, 0, 0, 255], text, 16.0, (-1, 0)).into())
+        .graphic(
+            Text::new(
+                text,
+                (-1, 0),
+                TextStyle {
+                    color: [0, 0, 0, 255],
+                    font_size: 16.0,
+                    font_id: 0,
+                },
+            )
+            .into(),
+        )
         .layout(FitText)
         .expand_x(true)
         .build();
@@ -1112,8 +1184,19 @@ fn create_button<F: Fn(Id, &mut Context) + 'static>(
     gui.create_control_reserved(button_id)
         .child(|x| {
             // text
-            x.graphic(Text::new([40, 40, 100, 255], text, 16.0, (0, 0)).into())
-                .layout(FitText)
+            x.graphic(
+                Text::new(
+                    text,
+                    (0, 0),
+                    TextStyle {
+                        color: [40, 40, 100, 255],
+                        font_size: 16.0,
+                        font_id: 0,
+                    },
+                )
+                .into(),
+            )
+            .layout(FitText)
         })
         .behaviour(Button::new(button_style, true, on_click))
     // .layout(Box::new(MarginLayout::new([7.0, 7.0, 7.0, 7.0])))

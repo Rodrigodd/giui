@@ -358,7 +358,18 @@ fn create_gui(
         .build();
     let _text = gui
         .create_control()
-        .graphic(Text::new([0, 0, 0, 255], "Open A Modal Window!".into(), 16.0, (0, 0)).into())
+        .graphic(
+            Text::new(
+                "Open A Modal Window!".into(),
+                (0, 0),
+                crui::graphics::TextStyle {
+                    color: [0, 0, 0, 255],
+                    font_size: 16.0,
+                    font_id: 0,
+                },
+            )
+            .into(),
+        )
         .layout(FitText)
         .parent(button)
         .build();
@@ -406,10 +417,13 @@ fn create_gui(
         .create_control()
         .graphic(
             Text::new(
-                [0, 0, 0, 255],
                 "Open A Non-Modal Window!".into(),
-                16.0,
                 (0, 0),
+                crui::graphics::TextStyle {
+                    color: [0, 0, 0, 255],
+                    font_size: 16.0,
+                    font_id: 0,
+                },
             )
             .into(),
         )

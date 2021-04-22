@@ -246,7 +246,7 @@ impl GuiRender {
                             }
                         }
                         Graphic::Text(ref mut text) => {
-                            let color = text.color;
+                            let color = text.color();
                             let glyphs = text.get_glyphs(rect, fonts);
 
                             for glyph in glyphs {

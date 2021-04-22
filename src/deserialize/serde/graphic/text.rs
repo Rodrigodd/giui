@@ -81,7 +81,13 @@ impl<'de> serde::de::Visitor<'de> for TextVisitor {
         let color = seq
             .next_element()?
             .ok_or_else(|| de::Error::invalid_length(0, &EXPECT))?;
-        Ok(Text::new(color, text, font_size, align))
+        let style = crate::graphics::TextStyle {
+            font_size,
+            // TODO: this should not always be zero, of course
+            font_id: 0,
+            color,
+        };
+        Ok(Text::new(text, align, style))
     }
     #[inline]
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
@@ -124,7 +130,13 @@ impl<'de> serde::de::Visitor<'de> for TextVisitor {
         let font_size = font_size.ok_or_else(|| de::Error::missing_field("font_size"))?;
         let align = align.ok_or_else(|| de::Error::missing_field("align"))?;
         let color = color.ok_or_else(|| de::Error::missing_field("color"))?;
-        Ok(Text::new(color, text, font_size, align))
+        let style = crate::graphics::TextStyle {
+            font_size,
+            // TODO: this should not always be zero, of course
+            font_id: 0,
+            color,
+        };
+        Ok(Text::new(text, align, style))
     }
 }
 

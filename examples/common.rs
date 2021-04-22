@@ -16,11 +16,20 @@ fn main() {
     struct HelloWord;
     impl CruiEventLoop<()> for HelloWord {
         fn init(gui: &mut Gui, _render: &mut GLSpriteRender, _event_loop: &EventLoop<()>) -> Self {
-            use crui::graphics::Text;
+            use crui::graphics::{Text, TextStyle};
             let _text = gui
                 .create_control()
                 .graphic(
-                    Text::new([0, 255, 0, 255], "Hello Word!!".to_string(), 70.0, (0, 0)).into(),
+                    Text::new(
+                        "Hello Word!!".to_string(),
+                        (0, 0),
+                        TextStyle {
+                            color: [0, 255, 0, 255],
+                            font_size: 70.0,
+                            font_id: 0,
+                        },
+                    )
+                    .into(),
                 )
                 .build();
             HelloWord
@@ -69,10 +78,13 @@ pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -
     let font_texture = render.new_texture(128, 128, &[], false);
 
     // load a font
-    let fonts: Vec<FontArc> = [include_bytes!("../examples/NotoSans-Regular.ttf")]
-        .iter()
-        .map(|&font| FontArc::try_from_slice(font).unwrap())
-        .collect();
+    let fonts: Vec<FontArc> = [
+        include_bytes!("../examples/NotoSans-Regular.ttf").as_ref(),
+        include_bytes!("../examples/cour.ttf"),
+    ]
+    .iter()
+    .map(|&font| FontArc::try_from_slice(font).unwrap())
+    .collect();
 
     // create the gui, and the gui_render
     let mut gui = Gui::new(0.0, 0.0, fonts);

@@ -66,6 +66,17 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
             .graphic(style.normal.clone().with_color([0, 0, 0, 255]))
     })
     .child_reserved(input_text, |cb| {
-        cb.graphic(Text::new([0, 0, 0, 255], String::new(), 24.0, (-1, 0)).into())
+        cb.graphic(
+            Text::new(
+                String::new(),
+                (-1, 0),
+                crui::graphics::TextStyle {
+                    color: [0, 0, 0, 255],
+                    font_size: 24.0,
+                    font_id: 0,
+                },
+            )
+            .into(),
+        )
     })
 }
