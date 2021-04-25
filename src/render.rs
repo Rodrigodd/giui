@@ -1,5 +1,6 @@
 use crate::{
     context::Context,
+    font::FontId,
     graphics::{Graphic, Sprite},
     Id, RenderDirtyFlags,
 };
@@ -10,7 +11,7 @@ use std::{ops::Range, time::Instant};
 /// A glyph and a font_id
 pub struct FontGlyph {
     pub glyph: ab_glyph::Glyph,
-    pub font_id: usize,
+    pub font_id: FontId,
 }
 
 pub trait GuiRenderer {
@@ -107,14 +108,14 @@ impl GuiRender {
                     let glyphs = text.get_glyphs(rect, fonts);
                     for glyph in glyphs {
                         self.draw_cache
-                            .queue_glyph(glyph.font_id, glyph.glyph.clone());
+                            .queue_glyph(glyph.font_id.index(), glyph.glyph.clone());
                     }
                 }
             }
 
             // update the font_texture
             let font_texture = self.font_texture;
-            match self.draw_cache.cache_queued(fonts, |r, d| {
+            match self.draw_cache.cache_queued(fonts.as_slice(), |r, d| {
                 renderer.update_font_texure(
                     font_texture,
                     [r.min[0], r.min[1], r.max[0], r.max[1]],
@@ -250,8 +251,9 @@ impl GuiRender {
                             let glyphs = text.get_glyphs(rect, fonts);
 
                             for glyph in glyphs {
-                                if let Some((tex_coords, pixel_coords)) =
-                                    self.draw_cache.rect_for(glyph.font_id, &glyph.glyph)
+                                if let Some((tex_coords, pixel_coords)) = self
+                                    .draw_cache
+                                    .rect_for(glyph.font_id.index(), &glyph.glyph)
                                 {
                                     if pixel_coords.min.x as f32 > mask[2]
                                         || pixel_coords.min.y as f32 > mask[3]

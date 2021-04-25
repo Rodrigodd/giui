@@ -1,9 +1,9 @@
 use crate::{
+    font::{FontId, Fonts},
     render::FontGlyph,
     text_layout::{TextLayout, TextLayoutStyle},
     Rect, RenderDirtyFlags,
 };
-use ab_glyph::{Font, FontArc};
 
 #[derive(Clone)]
 pub struct Sprite {
@@ -170,7 +170,7 @@ impl Graphic {
         }
     }
 
-    pub fn compute_min_size(&mut self, fonts: &[FontArc]) -> Option<[f32; 2]> {
+    pub fn compute_min_size(&mut self, fonts: &Fonts) -> Option<[f32; 2]> {
         if let Graphic::Text(text) = self {
             text.compute_min_size(fonts)
         } else {
@@ -394,17 +394,17 @@ impl Panel {
 pub struct TextStyle {
     pub color: [u8; 4],
     pub font_size: f32,
-    pub font_id: usize,
+    pub font_id: FontId,
 }
-impl Default for TextStyle {
-    fn default() -> Self {
-        Self {
-            font_size: 16.0,
-            font_id: 0,
-            color: [0, 0, 0, 255],
-        }
-    }
-}
+// impl Default for TextStyle {
+//     fn default() -> Self {
+//         Self {
+//             font_size: 16.0,
+//             font_id: 0,
+//             color: [0, 0, 0, 255],
+//         }
+//     }
+// }
 
 #[derive(Debug)]
 pub struct Text {
@@ -418,21 +418,21 @@ pub struct Text {
     color_dirty: bool,
     style: TextStyle,
 }
-impl Default for Text {
-    fn default() -> Self {
-        Self {
-            color_dirty: true,
-            text: Default::default(),
-            text_dirty: true,
-            align: Default::default(),
-            glyphs: Default::default(),
-            layout: None,
-            last_pos: Default::default(),
-            min_size: Default::default(),
-            style: TextStyle::default(),
-        }
-    }
-}
+// impl Default for Text {
+//     fn default() -> Self {
+//         Self {
+//             color_dirty: true,
+//             text: Default::default(),
+//             text_dirty: true,
+//             align: Default::default(),
+//             glyphs: Default::default(),
+//             layout: None,
+//             last_pos: Default::default(),
+//             min_size: Default::default(),
+//             style: TextStyle::default(),
+//         }
+//     }
+// }
 impl Clone for Text {
     fn clone(&self) -> Self {
         Self::new(self.text.clone(), self.align, self.style.clone())
@@ -444,7 +444,12 @@ impl Text {
             style,
             text,
             align,
-            ..Default::default()
+            color_dirty: true,
+            text_dirty: true,
+            glyphs: Default::default(),
+            layout: None,
+            last_pos: Default::default(),
+            min_size: Default::default(),
         }
     }
 
@@ -484,7 +489,7 @@ impl Text {
         anchor
     }
 
-    fn update_glyphs<F: Font>(&mut self, rect: &mut Rect, fonts: &[F]) {
+    fn update_glyphs(&mut self, rect: &mut Rect, fonts: &Fonts) {
         use crate::text_layout::{HorizontalAlign::*, LayoutSettings, VerticalAlign::*};
         self.last_pos = self.get_align_anchor(*rect.get_rect());
         let mut layout = TextLayout::new();
@@ -516,14 +521,14 @@ impl Text {
         self.layout = Some(layout);
     }
 
-    pub fn get_layout<F: Font>(&mut self, fonts: &[F], rect: &mut Rect) -> &TextLayout {
+    pub fn get_layout(&mut self, fonts: &Fonts, rect: &mut Rect) -> &TextLayout {
         if self.layout.is_none() {
             self.update_glyphs(rect, fonts);
         }
         self.layout.as_ref().unwrap()
     }
 
-    pub fn get_glyphs<F: Font>(&mut self, rect: &mut Rect, fonts: &[F]) -> &[FontGlyph] {
+    pub fn get_glyphs(&mut self, rect: &mut Rect, fonts: &Fonts) -> &[FontGlyph] {
         let dirty_flags = rect.get_render_dirty_flags();
         let width_change = dirty_flags.contains(RenderDirtyFlags::WIDTH)
             && self.min_size.map_or(true, |x| rect.get_width() < x[0]);
@@ -543,7 +548,7 @@ impl Text {
         &self.glyphs
     }
 
-    pub fn compute_min_size<F: Font>(&mut self, fonts: &[F]) -> Option<[f32; 2]> {
+    pub fn compute_min_size(&mut self, fonts: &Fonts) -> Option<[f32; 2]> {
         if self.min_size.is_none() {
             let mut layout = TextLayout::new();
             layout.append(

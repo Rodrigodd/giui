@@ -45,11 +45,18 @@ use std::{
 //     }
 // }
 
-use crui::{Context, ControlBuilder, Gui, Id, RectFill, event::SetValue, graphics::{Graphic, Panel, Text, TextStyle, Texture}, layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout}, style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle}, widgets::{
+use crui::{
+    event::SetValue,
+    graphics::{Graphic, Panel, Text, TextStyle, Texture},
+    layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
+    style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
+    widgets::{
         Blocker, Button, ButtonGroup, CloseMenu, DropMenu, Dropdown, Item, Menu, MenuBar, MenuItem,
         ScrollBar, ScrollView, Select, SetMaxValue, SetMinValue, SetSelected, Slider,
         SliderCallback, TabButton, TextField, TextFieldCallback, Toggle, ViewLayout,
-    }};
+    },
+    Context, ControlBuilder, Gui, Id, RectFill,
+};
 use sprite_render::{GLSpriteRender, SpriteRender};
 use winit::{
     event::{Event, WindowEvent},
@@ -57,13 +64,18 @@ use winit::{
 };
 
 mod common;
-use common::CruiEventLoop;
+use common::{CruiEventLoop, MyFonts};
 
 struct Loaded {
     options: Rc<RefCell<Options>>,
 }
 impl CruiEventLoop<UserEvent> for Loaded {
-    fn init(gui: &mut Gui, render: &mut GLSpriteRender, event_loop: &EventLoop<UserEvent>) -> Self {
+    fn init(
+        gui: &mut Gui,
+        render: &mut GLSpriteRender,
+        fonts: MyFonts,
+        event_loop: &EventLoop<UserEvent>,
+    ) -> Self {
         // load textures
         let texture = {
             let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
@@ -94,7 +106,7 @@ impl CruiEventLoop<UserEvent> for Loaded {
             }
         };
         let options = Rc::new(RefCell::new(options));
-        let style_sheet = StyleSheet::new(texture, icon_texture, tab_texture);
+        let style_sheet = StyleSheet::new(texture, icon_texture, tab_texture, fonts);
         let options_gui = OptionsGui::new(
             gui,
             options.clone(),
@@ -133,6 +145,8 @@ fn main() {
 
 #[derive(Clone)]
 struct StyleSheet {
+    // fonts: MyFonts,
+    text_style: TextStyle,
     menu: Rc<MenuStyle>,
     text_field: Rc<OnFocusStyle>,
     button: Rc<ButtonStyle>,
@@ -146,9 +160,15 @@ struct StyleSheet {
     scroll_handle: Rc<ButtonStyle>,
 }
 impl StyleSheet {
-    fn new(texture: u32, icon_texture: u32, tab_texture: u32) -> Self {
+    fn new(texture: u32, icon_texture: u32, tab_texture: u32, fonts: MyFonts) -> Self {
         let white = Texture::new(texture, [0.1, 0.1, 0.3, 0.3]);
         Self {
+            // fonts: fonts.clone(),
+            text_style: TextStyle {
+                color: [40, 40, 100, 255],
+                font_size: 16.0,
+                font_id: fonts.notosans,
+            },
             menu: MenuStyle {
                 button: ButtonStyle {
                     normal: white.clone().into(),
@@ -160,6 +180,11 @@ impl StyleSheet {
                 separator: Texture::new(texture, [0.2, 0.2, 0.2, 0.2])
                     .with_color([180, 180, 180, 255])
                     .into(),
+                text: TextStyle {
+                    color: [0, 0, 0, 255],
+                    font_size: 16.0,
+                    font_id: fonts.notosans,
+                },
             }
             .into(),
             text_field: OnFocusStyle {
@@ -318,6 +343,7 @@ impl OptionsGui {
                 self.list,
                 text.clone(),
                 style.list_background.clone(),
+                style.text_style.clone(),
                 style.button.clone(),
                 self.options.clone(),
                 *i,
@@ -475,6 +501,7 @@ impl OptionsGui {
             let button_style = style.button.clone();
             let background = style.list_background.clone();
             let options = self.options.clone();
+            let text_style = style.text_style.clone();
             move |_this: Id, ctx: &mut Context, text: &mut String| {
                 if !text.chars().any(|c| !c.is_whitespace()) {
                     return true;
@@ -487,6 +514,7 @@ impl OptionsGui {
                     list,
                     text.clone(),
                     background.clone(),
+                    text_style.clone(),
                     button_style.clone(),
                     options.clone(),
                     i,
@@ -519,6 +547,7 @@ impl OptionsGui {
                 list,
                 text.clone(),
                 style.list_background.clone(),
+                style.text_style.clone(),
                 style.button.clone(),
                 self.options.clone(),
                 *i,
@@ -637,16 +666,7 @@ impl OptionsGui {
         style: &StyleSheet,
     ) -> ControlBuilder<'a> {
         let button = id;
-        let graphic = Text::new(
-            label,
-            (0, 0),
-            TextStyle {
-                color: [40, 40, 100, 255],
-                font_size: 16.0,
-                font_id: 0,
-            },
-        )
-        .into();
+        let graphic = Text::new(label, (0, 0), style.text_style.clone()).into();
         gui.create_control()
             .graphic(graphic)
             .parent(button)
@@ -679,18 +699,7 @@ impl OptionsGui {
             .build();
         let _text = gui
             .create_control()
-            .graphic(
-                Text::new(
-                    name,
-                    (-1, 0),
-                    TextStyle {
-                        color: [0, 0, 0, 255],
-                        font_size: 18.0,
-                        font_id: 0,
-                    },
-                )
-                .into(),
-            )
+            .graphic(Text::new(name, (-1, 0), style.text_style.clone()).into())
             .layout(FitText)
             .expand_x(true)
             .parent(line)
@@ -709,18 +718,7 @@ impl OptionsGui {
         let label = gui
             .create_control()
             .min_size([0.0, 24.0])
-            .graphic(
-                Text::new(
-                    initial_value.to_string(),
-                    (0, 0),
-                    TextStyle {
-                        color: [0, 0, 0, 255],
-                        font_size: 18.0,
-                        font_id: 0,
-                    },
-                )
-                .into(),
-            )
+            .graphic(Text::new(initial_value.to_string(), (0, 0), style.text_style.clone()).into())
             .parent(parent)
             .build();
         let line = gui
@@ -809,16 +807,7 @@ impl OptionsGui {
             .parent(parent)
             .build();
 
-        let graphic = Text::new(
-            name,
-            (-1, 0),
-            TextStyle {
-                color: [40, 40, 100, 255],
-                font_size: 16.0,
-                font_id: 0,
-            },
-        )
-        .into();
+        let graphic = Text::new(name, (-1, 0), style.text_style.clone()).into();
         gui.create_control()
             .anchors([0.0, 0.0, 1.0, 1.0])
             .margins([30.0, 0.0, 0.0, 0.0])
@@ -835,18 +824,7 @@ impl OptionsGui {
             .build();
         let _text = gui
             .create_control()
-            .graphic(
-                Text::new(
-                    "Dropdown".into(),
-                    (-1, 0),
-                    TextStyle {
-                        color: [0, 0, 0, 255],
-                        font_size: 18.0,
-                        font_id: 0,
-                    },
-                )
-                .into(),
-            )
+            .graphic(Text::new("Dropdown".into(), (-1, 0), style.text_style.clone()).into())
             .layout(FitText)
             .expand_x(true)
             .parent(line)
@@ -892,18 +870,7 @@ impl OptionsGui {
             .parent(popup_window)
             .build();
         gui.create_control_reserved(self.popup_title)
-            .graphic(
-                Text::new(
-                    "PopUp Title".into(),
-                    (-1, 0),
-                    TextStyle {
-                        color: [0, 0, 0, 255],
-                        font_size: 16.0,
-                        font_id: 0,
-                    },
-                )
-                .into(),
-            )
+            .graphic(Text::new("PopUp Title".into(), (-1, 0), style.text_style.clone()).into())
             .parent(popup_header)
             .build();
         gui.create_control_reserved(self.popup_text)
@@ -911,11 +878,7 @@ impl OptionsGui {
                 Text::new(
                     "Somthing has happend!".into(),
                     (-1, 0),
-                    TextStyle {
-                        color: [0, 0, 0, 255],
-                        font_size: 16.0,
-                        font_id: 0,
-                    },
+                    style.text_style.clone(),
                 )
                 .into(),
             )
@@ -939,18 +902,7 @@ impl OptionsGui {
             .build();
         let _ok_button_text = gui
             .create_control()
-            .graphic(
-                Text::new(
-                    "Ok".into(),
-                    (0, 0),
-                    TextStyle {
-                        color: [0, 0, 0, 255],
-                        font_size: 14.0,
-                        font_id: 0,
-                    },
-                )
-                .into(),
-            )
+            .graphic(Text::new("Ok".into(), (0, 0), style.text_style.clone()).into())
             .parent(ok_button)
             .build();
     }
@@ -971,18 +923,7 @@ impl OptionsGui {
             .build();
         let input_text = gui
             .create_control()
-            .graphic(
-                Text::new(
-                    String::new(),
-                    (-1, 0),
-                    TextStyle {
-                        color: [0, 0, 0, 255],
-                        font_size: 18.0,
-                        font_id: 0,
-                    },
-                )
-                .into(),
-            )
+            .graphic(Text::new(String::new(), (-1, 0), style.text_style.clone()).into())
             .parent(input_box)
             .build();
         gui.create_control_reserved(input_box)
@@ -1067,6 +1008,7 @@ impl OptionsGui {
                 .graphic(style.button.normal.clone())
                 .behaviour(DropMenu::<String, _>::new(blocker, {
                     let menu_button_style = Rc::new(style.menu.button.clone());
+                    let text_style = style.text_style.clone();
                     move |data, this, ctx| {
                         let id = ctx
                             .create_control()
@@ -1079,16 +1021,7 @@ impl OptionsGui {
                             .create_control()
                             .margins([10.0, 0.0, -10.0, 0.0])
                             .graphic(
-                                Text::new(
-                                    data.to_string(),
-                                    (-1, 0),
-                                    TextStyle {
-                                        color: [40, 40, 100, 255],
-                                        font_size: 16.0,
-                                        font_id: 0,
-                                    },
-                                )
-                                .into(),
+                                Text::new(data.to_string(), (-1, 0), text_style.clone()).into(),
                             )
                             .layout(FitText)
                             .parent(id)
@@ -1108,11 +1041,7 @@ impl OptionsGui {
                 Text::new(
                     itens[initial_value].clone(),
                     (-1, 0),
-                    TextStyle {
-                        color: [40, 40, 100, 255],
-                        font_size: 16.0,
-                        font_id: 0,
-                    },
+                    style.text_style.clone(),
                 )
                 .into(),
             )
@@ -1133,11 +1062,13 @@ impl OptionsGui {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_item(
     ctx: &mut Context,
     list: Id,
     text: String,
     background: Graphic,
+    text_style: TextStyle,
     button_style: Rc<ButtonStyle>,
     options: Rc<RefCell<Options>>,
     i: u32,
@@ -1155,18 +1086,7 @@ fn create_item(
     let _text = ctx
         .create_control()
         .parent(item)
-        .graphic(
-            Text::new(
-                text,
-                (-1, 0),
-                TextStyle {
-                    color: [0, 0, 0, 255],
-                    font_size: 16.0,
-                    font_id: 0,
-                },
-            )
-            .into(),
-        )
+        .graphic(Text::new(text, (-1, 0), text_style).into())
         .layout(FitText)
         .expand_x(true)
         .build();

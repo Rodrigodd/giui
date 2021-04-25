@@ -1,8 +1,10 @@
 mod common;
+use common::MyFonts;
 use std::rc::Rc;
 
 use common::*;
 use crui::{
+    font::FontId,
     graphics::{Panel, Text},
     layouts::MarginLayout,
     style::OnFocusStyle,
@@ -15,7 +17,12 @@ use winit::event_loop::EventLoop;
 fn main() {
     struct TextField;
     impl CruiEventLoop<()> for TextField {
-        fn init(gui: &mut Gui, render: &mut GLSpriteRender, _event_loop: &EventLoop<()>) -> Self {
+        fn init(
+            gui: &mut Gui,
+            render: &mut GLSpriteRender,
+            fonts: MyFonts,
+            _event_loop: &EventLoop<()>,
+        ) -> Self {
             let texture = {
                 let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
                 let data = data.to_rgba8();
@@ -32,6 +39,7 @@ fn main() {
                     normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
                     focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4]).into(),
                 },
+                fonts.notosans,
                 (),
             )
             .parent(surface)
@@ -47,6 +55,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
     mut cb: ControlBuilder<'a>,
     initial_value: String,
     style: OnFocusStyle,
+    font_id: FontId,
     callback: C,
 ) -> ControlBuilder<'a> {
     let caret = cb.reserve();
@@ -73,7 +82,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
                 crui::graphics::TextStyle {
                     color: [0, 0, 0, 255],
                     font_size: 24.0,
-                    font_id: 0,
+                    font_id,
                 },
             )
             .into(),

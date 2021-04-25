@@ -13,7 +13,10 @@
 //The above copyright notice and this permission notice shall be included in all
 //copies or substantial portions of the Software.
 
-use crate::unicode::{linebreak_property, read_utf8, wrap_mask, LINEBREAK_HARD, LINEBREAK_NONE};
+use crate::{
+    font::{FontId, Fonts},
+    unicode::{linebreak_property, read_utf8, wrap_mask, LINEBREAK_HARD, LINEBREAK_NONE},
+};
 use std::ops::Range;
 
 use ab_glyph::{Font, Glyph, GlyphId, ScaleFont};
@@ -95,7 +98,7 @@ pub struct GlyphPosition {
     /// The glyph itself, with position and scale
     pub glyph: Glyph,
     /// The index of the font of this glyph
-    pub font_id: usize,
+    pub font_id: FontId,
     /// The range of the slice of the string used to generate this glyph
     pub byte_range: Range<usize>,
     /// The width of the glyph. This does not take the kerning to next glyph into account.
@@ -109,16 +112,12 @@ pub struct TextLayoutStyle<'a> {
     /// The scale of the text in pixel units.
     pub px: f32,
     /// The font to layout the text in.
-    pub font_index: usize,
+    pub font_id: FontId,
 }
 
 impl<'a> TextLayoutStyle<'a> {
-    pub fn new(text: &'a str, px: f32, font_index: usize) -> TextLayoutStyle<'a> {
-        TextLayoutStyle {
-            text,
-            px,
-            font_index,
-        }
+    pub fn new(text: &'a str, px: f32, font_id: FontId) -> TextLayoutStyle<'a> {
+        TextLayoutStyle { text, px, font_id }
     }
 }
 
@@ -309,10 +308,10 @@ impl TextLayout {
     /// Characters from the input string can only be omitted from the output, they are never
     /// reordered. The output buffer will always contain characters in the order they were defined
     /// in the styles.
-    pub fn append<T: Font>(&mut self, fonts: &[T], style: &TextLayoutStyle) {
+    pub fn append(&mut self, fonts: &Fonts, style: &TextLayoutStyle) {
         let mut byte_offset = self.text.len();
         self.text += style.text;
-        let font = &fonts[style.font_index].as_scaled(style.px);
+        let font = &fonts.get(style.font_id).expect("FontId is out of bounds").as_scaled(style.px);
 
         self.current_ascent = font.ascent().ceil();
         self.current_descent = font.descent().ceil();
@@ -394,7 +393,7 @@ impl TextLayout {
             glyph.position.y = 0.0;
             self.glyphs.push(GlyphPosition {
                 glyph,
-                font_id: style.font_index,
+                font_id: style.font_id,
                 byte_range: cur_character_offset..byte_offset,
                 width: advance,
             });

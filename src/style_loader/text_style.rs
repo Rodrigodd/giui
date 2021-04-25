@@ -1,10 +1,10 @@
 use super::*;
 
-pub const FIELDS: &[&str] = &["texture", "uv_rect", "color"];
+pub const FIELDS: &[&str] = &["font_id", "font_size", "size"];
 #[allow(non_camel_case_types)]
 enum Field {
-    Texture,
-    UvRect,
+    FontId,
+    FontSize,
     Color,
 }
 struct FieldVisitor;
@@ -18,8 +18,8 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
         E: serde::de::Error,
     {
         match value {
-            0u64 => Ok(Field::Texture),
-            1u64 => Ok(Field::UvRect),
+            0u64 => Ok(Field::FontId),
+            1u64 => Ok(Field::FontSize),
             3u64 => Ok(Field::Color),
             _ => Err(serde::de::Error::invalid_value(
                 serde::de::Unexpected::Unsigned(value),
@@ -32,8 +32,8 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
         E: serde::de::Error,
     {
         match value {
-            "texture" => Ok(Field::Texture),
-            "uv_rect" => Ok(Field::UvRect),
+            "font_id" => Ok(Field::FontId),
+            "font_size" => Ok(Field::FontSize),
             "color" => Ok(Field::Color),
             _ => Err(de::Error::unknown_field(value, FIELDS)),
         }
@@ -54,35 +54,37 @@ impl<'de> serde::Deserialize<'de> for Field {
         serde::Deserializer::deserialize_identifier(deserializer, FieldVisitor)
     }
 }
-pub struct TextureVisitor<'a, 'b> {
+pub struct TextStyleVisitor<'a, 'b> {
     pub loader: &'a mut StyleLoader<'b>,
 }
-impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for TextureVisitor<'a, 'b> {
-    type Value = Texture;
+impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for TextStyleVisitor<'a, 'b> {
+    type Value = TextStyle;
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Formatter::write_str(formatter, "struct Texture")
+        fmt::Formatter::write_str(formatter, "struct TextStyle")
     }
     #[inline]
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
         A: MapAccess<'de>,
     {
-        let mut texture: Option<String> = None;
-        let mut uv_rect: Option<[i32; 4]> = None;
+        let mut font_id: Option<FontId> = None;
+        let mut font_size: Option<f32> = None;
         let mut color = None;
         while let Some(key) = MapAccess::next_key::<Field>(&mut map)? {
             match key {
-                Field::Texture => {
-                    if Option::is_some(&texture) {
-                        return Err(de::Error::duplicate_field("texture"));
+                Field::FontId => {
+                    if Option::is_some(&font_id) {
+                        return Err(de::Error::duplicate_field("font_id"));
                     }
-                    texture = Some(map.next_value()?);
+                    font_id = Some(map.next_value_seed(font_id::FontIdLoader {
+                        loader: self.loader,
+                    })?);
                 }
-                Field::UvRect => {
-                    if Option::is_some(&uv_rect) {
-                        return Err(de::Error::duplicate_field("uv_rect"));
+                Field::FontSize => {
+                    if Option::is_some(&font_size) {
+                        return Err(de::Error::duplicate_field("font_size"));
                     }
-                    uv_rect = Some(map.next_value()?);
+                    font_size = Some(map.next_value()?);
                 }
                 Field::Color => {
                     if Option::is_some(&color) {
@@ -92,46 +94,38 @@ impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for TextureVisitor<'a, 'b> {
                 }
             }
         }
-        let texture = texture.ok_or_else(|| de::Error::missing_field("texture"))?;
-        let (texture, width, height) = self.loader.load_texture(texture);
-        let uv_rect = uv_rect.ok_or_else(|| de::Error::missing_field("uv_rect"))?;
-        let uv_rect = [
-            uv_rect[0] as f32 / width as f32,
-            uv_rect[1] as f32 / height as f32,
-            uv_rect[2] as f32 / width as f32,
-            uv_rect[3] as f32 / height as f32,
-        ];
+        let font_id = font_id.ok_or_else(|| de::Error::missing_field("font_id"))?;
+        let font_size = font_size.ok_or_else(|| de::Error::missing_field("font_size"))?;
         let color = color.unwrap_or([255; 4]);
-        Ok(Texture {
-            texture,
-            uv_rect,
+        Ok(TextStyle {
+            font_id,
+            font_size,
             color,
-            color_dirty: true,
         })
     }
 }
 
-impl<'a, 'b: 'a> LoadStyle<'a, 'b> for Texture {
-    type Loader = TextureLoader<'a, 'b>;
+impl<'a, 'b: 'a> LoadStyle<'a, 'b> for TextStyle {
+    type Loader = TextStyleLoader<'a, 'b>;
     fn new_loader(loader: &'a mut StyleLoader<'b>) -> Self::Loader {
-        TextureLoader { loader }
+        TextStyleLoader { loader }
     }
 }
 
-pub struct TextureLoader<'a, 'b> {
-    loader: &'a mut StyleLoader<'b>,
+pub struct TextStyleLoader<'a, 'b> {
+    pub loader: &'a mut StyleLoader<'b>,
 }
-impl<'de, 'a, 'b> DeserializeSeed<'de> for TextureLoader<'a, 'b> {
-    type Value = Texture;
+impl<'de, 'a, 'b> DeserializeSeed<'de> for TextStyleLoader<'a, 'b> {
+    type Value = TextStyle;
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         serde::Deserializer::deserialize_struct(
             deserializer,
-            "Texture",
+            "TextStyle",
             FIELDS,
-            TextureVisitor {
+            TextStyleVisitor {
                 loader: self.loader,
             },
         )

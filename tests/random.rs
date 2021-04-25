@@ -119,7 +119,7 @@ fn from_seed(seed: u64) {
     let rng = &mut rng;
     let width = rexp(rng, 10000.0) as f32;
     let height = rexp(rng, 10000.0) as f32;
-    let mut gui = Gui::new(width, height, Vec::new());
+    let mut gui = Gui::new(width, height, Default::default());
     let ids = build_random_gui(&mut gui, rng);
 
     let mut mouse_x = rng.gen::<f32>() * width;

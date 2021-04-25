@@ -1,11 +1,11 @@
 use crate::{
     context::{Context, LayoutContext, MinSizeContext},
     control::ControlBuilderInner,
+    font::Fonts,
     graphics::Graphic,
     util::WithPriority,
     Control, ControlBuilder, ControlState, Controls, LayoutDirtyFlags, Rect,
 };
-use ab_glyph::FontArc;
 use keyed_priority_queue::KeyedPriorityQueue;
 use std::{
     any::Any,
@@ -56,7 +56,7 @@ impl Id {
         index: 0,
         generation: unsafe { NonZeroU32::new_unchecked(1) },
     };
-    /// Get the index of the control in the controls vector inside Gui<R>
+    /// Get the index of the control in the controls vector inside Gui
     pub fn index(&self) -> usize {
         self.index as usize
     }
@@ -182,7 +182,7 @@ type ScheduledEventTo = WithPriority<(Instant, u64), (Id, Box<dyn Any>)>;
 
 pub struct Gui {
     pub(crate) controls: Controls,
-    pub(crate) fonts: Vec<FontArc>,
+    pub(crate) fonts: Fonts,
     pub(crate) modifiers: ModifiersState,
     redraw: bool,
     // controls that need to update the layout
@@ -198,7 +198,7 @@ pub struct Gui {
     over_is_locked: bool,
 }
 impl Gui {
-    pub fn new(width: f32, height: f32, fonts: Vec<FontArc>) -> Self {
+    pub fn new(width: f32, height: f32, fonts: Fonts) -> Self {
         Self {
             modifiers: ModifiersState::empty(),
             controls: vec![Control {
@@ -390,10 +390,6 @@ impl Gui {
         self.lazy_update();
         self.lazy_events.push_back(LazyEvent::OnRemove(Id::ROOT_ID));
         self.lazy_update();
-    }
-
-    pub fn get_fonts(&mut self) -> Vec<FontArc> {
-        self.fonts.clone()
     }
 
     pub fn render_is_dirty(&self) -> bool {

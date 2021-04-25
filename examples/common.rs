@@ -1,5 +1,6 @@
-use ab_glyph::FontArc;
+use ab_glyph::FontVec;
 use crui::{
+    font::{FontId, Fonts},
     render::{GuiRender, GuiRenderer},
     Gui,
 };
@@ -15,7 +16,12 @@ use winit::{
 fn main() {
     struct HelloWord;
     impl CruiEventLoop<()> for HelloWord {
-        fn init(gui: &mut Gui, _render: &mut GLSpriteRender, _event_loop: &EventLoop<()>) -> Self {
+        fn init(
+            gui: &mut Gui,
+            _render: &mut GLSpriteRender,
+            fonts: MyFonts,
+            _event_loop: &EventLoop<()>,
+        ) -> Self {
             use crui::graphics::{Text, TextStyle};
             let _text = gui
                 .create_control()
@@ -26,7 +32,7 @@ fn main() {
                         TextStyle {
                             color: [0, 255, 0, 255],
                             font_size: 70.0,
-                            font_id: 0,
+                            font_id: fonts.notosans,
                         },
                     )
                     .into(),
@@ -37,6 +43,11 @@ fn main() {
     }
 
     run::<(), HelloWord>(400, 200);
+}
+
+pub struct MyFonts {
+    pub notosans: FontId,
+    pub consolas: FontId,
 }
 
 fn resize(
@@ -57,14 +68,19 @@ fn resize(
 }
 
 pub trait CruiEventLoop<T> {
-    fn init(gui: &mut Gui, render: &mut GLSpriteRender, event_loop: &EventLoop<T>) -> Self;
+    fn init(
+        gui: &mut Gui,
+        _render: &mut GLSpriteRender,
+        fonts: MyFonts,
+        _event_loop: &EventLoop<T>,
+    ) -> Self;
     #[allow(unused_variables)]
     fn on_event(&mut self, event: &Event<T>, control: &mut ControlFlow) {}
 }
 
 pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -> ! {
     // create winit's window and event_loop
-    let event_loop = EventLoop::with_user_event();
+    let event_loop = EventLoop::<U>::with_user_event();
     let window = WindowBuilder::new().with_inner_size(PhysicalSize::new(width, height));
 
     // create the render and camera, and a texture for the glyphs rendering
@@ -78,20 +94,22 @@ pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -
     let font_texture = render.new_texture(128, 128, &[], false);
 
     // load a font
-    let fonts: Vec<FontArc> = [
-        include_bytes!("../examples/NotoSans-Regular.ttf").as_ref(),
-        include_bytes!("../examples/cour.ttf"),
-    ]
-    .iter()
-    .map(|&font| FontArc::try_from_slice(font).unwrap())
-    .collect();
+    let mut fonts = Fonts::new();
+    let my_fonts = MyFonts {
+        notosans: fonts.add(
+            FontVec::try_from_vec(include_bytes!("../examples/NotoSans-Regular.ttf").to_vec())
+                .unwrap(),
+        ),
+        consolas: fonts
+            .add(FontVec::try_from_vec(include_bytes!("../examples/cour.ttf").to_vec()).unwrap()),
+    };
 
     // create the gui, and the gui_render
     let mut gui = Gui::new(0.0, 0.0, fonts);
     let mut gui_render = GuiRender::new(font_texture, [128, 128]);
 
     // populate the gui with controls.
-    let mut app = T::init(&mut gui, &mut render, &event_loop);
+    let mut app = T::init(&mut gui, &mut render, my_fonts, &event_loop);
 
     // resize everthing to the screen size
     resize(

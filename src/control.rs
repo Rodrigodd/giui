@@ -330,14 +330,22 @@ impl std::ops::Index<Id> for Controls {
     type Output = Control;
     fn index(&self, id: Id) -> &Self::Output {
         debug_assert!(
-            self.controls[id.index()].generation == id.generation, "The Control in index {} and generation {} is not alive anymore. Current generation is {}", id.index(), id.generation(), self.controls[id.index()].generation);
+            self.controls[id.index()].generation == id.generation, "The Control in index {} and generation {} is not alive anymore. Current generation is {}",
+            id.index(),
+            id.generation(),
+            self.controls[id.index()].generation
+        );
         &self.controls[id.index()]
     }
 }
 impl std::ops::IndexMut<Id> for Controls {
     fn index_mut(&mut self, id: Id) -> &mut Self::Output {
         debug_assert!(
-            self.controls[id.index()].generation == id.generation, "The Control in index {} and generation {} is not alive anymore. Current generation is {}", id.index(), id.generation(), self.controls[id.index()].generation);
+            self.controls[id.index()].generation == id.generation, "The Control in index {} and generation {} is not alive anymore. Current generation is {}",
+            id.index(),
+            id.generation(),
+            self.controls[id.index()].generation
+        );
         &mut self.controls[id.index()]
     }
 }

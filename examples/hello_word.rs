@@ -1,5 +1,6 @@
-use ab_glyph::FontArc;
+use ab_glyph::FontVec;
 use crui::{
+    font::Fonts,
     graphics::{Text, TextStyle},
     render::{GuiRender, GuiRenderer},
     Gui,
@@ -45,10 +46,10 @@ fn main() {
     let font_texture = render.new_texture(128, 128, &[], false);
 
     // load a font
-    let fonts: Vec<FontArc> = [include_bytes!("../examples/NotoSans-Regular.ttf")]
-        .iter()
-        .map(|&font| FontArc::try_from_slice(font).unwrap())
-        .collect();
+    let mut fonts = Fonts::new();
+    let my_font = fonts.add(
+        FontVec::try_from_vec(include_bytes!("../examples/NotoSans-Regular.ttf").to_vec()).unwrap(),
+    );
 
     // create the gui, and the gui_render
     let mut gui = Gui::new(0.0, 0.0, fonts);
@@ -64,7 +65,7 @@ fn main() {
                 TextStyle {
                     color: [0, 255, 0, 255],
                     font_size: 70.0,
-                    font_id: 0,
+                    font_id: my_font,
                 },
             )
             .into(),

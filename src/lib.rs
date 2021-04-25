@@ -5,6 +5,7 @@ extern crate crui_derive;
 #[doc(hidden)]
 pub use crui_derive::*;
 
+pub mod font;
 mod text_layout;
 mod util;
 
@@ -20,8 +21,7 @@ pub mod render;
 pub mod style;
 pub mod widgets;
 
-mod deserialize;
-pub use deserialize::style_loader;
+pub mod style_loader;
 
 pub use context::*;
 pub use control::*;

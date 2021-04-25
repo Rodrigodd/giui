@@ -3,8 +3,9 @@ use std::{
     rc::Rc,
 };
 
-use ab_glyph::FontArc;
+use ab_glyph::FontVec;
 use crui::{
+    font::{FontId, Fonts},
     graphics::{Panel, Text},
     layouts::{FitText, MarginLayout, VBoxLayout},
     render::{GuiRender, GuiRenderer},
@@ -55,6 +56,14 @@ fn resize(
     camera.set_position(width / 2.0, height / 2.0);
 }
 
+// TODO: I shouldn't need to create a copy of the font for each gui instance
+fn fonts() -> Fonts {
+    const FONT: &[u8] = include_bytes!("../examples/NotoSans-Regular.ttf");
+    let mut fonts = Fonts::new();
+    fonts.add(FontVec::try_from_vec(FONT.to_vec()).unwrap());
+    fonts
+}
+
 fn main() {
     // create winit's window and event_loop
     let event_loop = EventLoop::with_user_event();
@@ -75,14 +84,10 @@ fn main() {
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
 
-    // load a font
-    let fonts: Vec<FontArc> = [include_bytes!("../examples/NotoSans-Regular.ttf")]
-        .iter()
-        .map(|&font| FontArc::try_from_slice(font).unwrap())
-        .collect();
-
     // create the gui, and the gui_render
-    let mut gui = Gui::new(0.0, 0.0, fonts.clone());
+    // TODO: I should not be cloning the fonts for each gui instance.
+    let my_font = FontId::new(0); // this is not cool.
+    let mut gui = Gui::new(0.0, 0.0, fonts());
     let gui_render = GuiRender::new(font_texture, [128, 128]);
 
     // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
@@ -99,6 +104,7 @@ fn main() {
         &mut gui,
         event_loop.create_proxy(),
         button_style,
+        my_font,
         window.clone(),
     );
 
@@ -156,7 +162,7 @@ fn main() {
                 let size = window.inner_size();
                 let width = size.width;
                 let height = size.height;
-                let mut gui = Gui::new(width as f32, height as f32, fonts.clone());
+                let mut gui = Gui::new(width as f32, height as f32, fonts());
                 let gui_render = GuiRender::new(font_texture, [128, 128]);
                 let mut camera = Camera::new(width, height, height as f32);
 
@@ -304,6 +310,7 @@ fn create_gui(
     gui: &mut Gui,
     proxy: EventLoopProxy<UserEvent>,
     button_style: Rc<ButtonStyle>,
+    font_id: FontId,
     owner: Rc<Window>,
 ) {
     let surface = gui
@@ -344,7 +351,7 @@ fn create_gui(
                             x = x.max(owner_rect[0] + 20);
                             y = y.max(owner_rect[1] + 20);
                             window.set_outer_position(PhysicalPosition::new(x, y));
-                            create_gui(gui, proxy, button_style, window);
+                            create_gui(gui, proxy, button_style, font_id, window);
                         })
                     },
                 });
@@ -365,7 +372,7 @@ fn create_gui(
                 crui::graphics::TextStyle {
                     color: [0, 0, 0, 255],
                     font_size: 16.0,
-                    font_id: 0,
+                    font_id,
                 },
             )
             .into(),
@@ -402,7 +409,7 @@ fn create_gui(
                         x = x.max(owner_rect[0] + 20);
                         y = y.max(owner_rect[1] + 20);
                         window.set_outer_position(PhysicalPosition::new(x, y));
-                        create_gui(gui, proxy, button_style, window);
+                        create_gui(gui, proxy, button_style, font_id, window);
                     })
                 },
             });
@@ -422,7 +429,7 @@ fn create_gui(
                 crui::graphics::TextStyle {
                     color: [0, 0, 0, 255],
                     font_size: 16.0,
-                    font_id: 0,
+                    font_id,
                 },
             )
             .into(),

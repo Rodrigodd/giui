@@ -1,5 +1,5 @@
 use crate::{
-    graphics::{Text, TextStyle},
+    graphics::Text,
     layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
     style::MenuStyle,
     widgets::CloseMenu,
@@ -104,18 +104,7 @@ impl Behaviour for MenuBehaviour {
                     let _text = ctx
                         .create_control()
                         .parent(item)
-                        .graphic(
-                            Text::new(
-                                text.clone(),
-                                (-1, 0),
-                                TextStyle {
-                                    color: [0, 0, 0, 255],
-                                    font_size: 16.0,
-                                    font_id: 0,
-                                },
-                            )
-                            .into(),
-                        )
+                        .graphic(Text::new(text.clone(), (-1, 0), self.style.text.clone()).into())
                         .layout(FitText)
                         .build();
                 }
@@ -129,16 +118,7 @@ impl Behaviour for MenuBehaviour {
                         .create_control()
                         .parent(item)
                         .graphic(
-                            Text::new(
-                                menu.name.clone(),
-                                (-1, 0),
-                                TextStyle {
-                                    color: [0, 0, 0, 255],
-                                    font_size: 16.0,
-                                    font_id: 0,
-                                },
-                            )
-                            .into(),
+                            Text::new(menu.name.clone(), (-1, 0), self.style.text.clone()).into(),
                         )
                         .layout(FitText)
                         .expand_x(true)
@@ -298,18 +278,7 @@ impl Behaviour for MenuBar {
                 .build();
             ctx.create_control()
                 .parent(item)
-                .graphic(
-                    Text::new(
-                        menu.name.clone(),
-                        (0, 0),
-                        TextStyle {
-                            color: [0, 0, 0, 255],
-                            font_size: 16.0,
-                            font_id: 0,
-                        },
-                    )
-                    .into(),
-                )
+                .graphic(Text::new(menu.name.clone(), (0, 0), self.style.text.clone()).into())
                 .layout(FitText)
                 .build();
         }

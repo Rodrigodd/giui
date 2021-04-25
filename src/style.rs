@@ -1,4 +1,4 @@
-use crate::graphics::Graphic;
+use crate::graphics::{Graphic, TextStyle};
 
 #[derive(Clone, Debug, LoadStyle)]
 #[crui(crate = "crate")]
@@ -31,4 +31,5 @@ pub struct MenuStyle {
     pub button: ButtonStyle,
     pub separator: Graphic,
     pub arrow: Graphic,
+    pub text: TextStyle,
 }

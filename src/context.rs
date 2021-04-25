@@ -1,11 +1,10 @@
 use std::{any::Any, time::Instant};
 
-use ab_glyph::FontArc;
 use winit::{event::ModifiersState, window::CursorIcon};
 
 use crate::{
-    control::ControlBuilderInner, event, graphics::Graphic, Behaviour, ControlBuilder, Controls,
-    Gui, Id, Layout, Rect,
+    control::ControlBuilderInner, event, font::Fonts, graphics::Graphic, Behaviour, ControlBuilder,
+    Controls, Gui, Id, Layout, Rect,
 };
 
 // contains a reference to all the controls, except the behaviour of one control
@@ -13,7 +12,7 @@ pub struct Context<'a> {
     gui: &'a mut Gui,
     // modifiers: ModifiersState,
     // controls: &'a mut Controls,
-    fonts: &'a [FontArc],
+    fonts: &'a Fonts,
     pub(crate) events: Vec<Box<dyn Any>>,
     pub(crate) events_to: Vec<(Id, Box<dyn Any>)>,
     pub(crate) dirtys: Vec<Id>,
@@ -34,7 +33,7 @@ impl<'a> Drop for Context<'a> {
 }
 impl<'a> Context<'a> {
     pub(crate) fn new(gui: &'a mut Gui) -> Self {
-        let fonts = unsafe { std::mem::transmute(gui.fonts.as_slice()) };
+        let fonts = unsafe { std::mem::transmute(&gui.fonts) };
         Self {
             gui,
             fonts,
@@ -75,7 +74,7 @@ impl<'a> Context<'a> {
         self.gui.modifiers
     }
 
-    pub fn get_fonts(&self) -> &'a [FontArc] {
+    pub fn get_fonts(&self) -> &'a Fonts {
         self.fonts
     }
 
@@ -267,13 +266,13 @@ impl<'a> Context<'a> {
 pub struct MinSizeContext<'a> {
     this: Id,
     controls: &'a mut Controls,
-    fonts: &'a [FontArc],
+    fonts: &'a Fonts,
 }
 impl<'a> MinSizeContext<'a> {
     pub(crate) fn new(
         this: Id,
         controls: &'a mut Controls,
-        fonts: &'a [FontArc],
+        fonts: &'a Fonts,
     ) -> (&'a mut dyn Layout, Self) {
         let this_one = unsafe { &mut *(controls[this].layout.as_mut() as *mut dyn Layout) };
         (
@@ -286,7 +285,7 @@ impl<'a> MinSizeContext<'a> {
         )
     }
 
-    pub fn get_fonts(&mut self) -> &'a [FontArc] {
+    pub fn get_fonts(&mut self) -> &'a Fonts {
         self.fonts
     }
 
@@ -339,7 +338,7 @@ impl<'a> MinSizeContext<'a> {
 pub struct LayoutContext<'a> {
     this: Id,
     controls: &'a mut Controls,
-    fonts: &'a [FontArc],
+    fonts: &'a Fonts,
     pub(crate) dirtys: Vec<Id>,
     pub(crate) events: Vec<Box<dyn Any>>,
 }
@@ -347,7 +346,7 @@ impl<'a> LayoutContext<'a> {
     pub(crate) fn new(
         this: Id,
         controls: &'a mut Controls,
-        fonts: &'a [FontArc],
+        fonts: &'a Fonts,
     ) -> (&'a mut dyn Layout, Self) {
         let this_one = unsafe { &mut *(controls[this].layout.as_mut() as *mut dyn Layout) };
         (
