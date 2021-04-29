@@ -98,10 +98,10 @@ pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -
     let my_fonts = MyFonts {
         notosans: fonts.add(
             FontVec::try_from_vec(include_bytes!("../examples/NotoSans-Regular.ttf").to_vec())
-                .unwrap(),
+                .unwrap().into(),
         ),
         consolas: fonts
-            .add(FontVec::try_from_vec(include_bytes!("../examples/cour.ttf").to_vec()).unwrap()),
+            .add(FontVec::try_from_vec(include_bytes!("../examples/cour.ttf").to_vec()).unwrap().into()),
     };
 
     // create the gui, and the gui_render

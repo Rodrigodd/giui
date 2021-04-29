@@ -60,7 +60,7 @@ fn resize(
 fn fonts() -> Fonts {
     const FONT: &[u8] = include_bytes!("../examples/NotoSans-Regular.ttf");
     let mut fonts = Fonts::new();
-    fonts.add(FontVec::try_from_vec(FONT.to_vec()).unwrap());
+    fonts.add(FontVec::try_from_vec(FONT.to_vec()).unwrap().into());
     fonts
 }
 

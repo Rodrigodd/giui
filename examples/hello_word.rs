@@ -1,6 +1,6 @@
 use ab_glyph::FontVec;
 use crui::{
-    font::Fonts,
+    font::{Font, Fonts},
     graphics::{Text, TextStyle},
     render::{GuiRender, GuiRenderer},
     Gui,
@@ -47,9 +47,12 @@ fn main() {
 
     // load a font
     let mut fonts = Fonts::new();
-    let my_font = fonts.add(
-        FontVec::try_from_vec(include_bytes!("../examples/NotoSans-Regular.ttf").to_vec()).unwrap(),
-    );
+    let my_font = {
+        let font =
+            FontVec::try_from_vec(include_bytes!("../examples/NotoSans-Regular.ttf").to_vec())
+                .unwrap();
+        fonts.add(Font::new(font))
+    };
 
     // create the gui, and the gui_render
     let mut gui = Gui::new(0.0, 0.0, fonts);

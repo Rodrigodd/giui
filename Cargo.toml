@@ -21,12 +21,9 @@ xi-unicode = "0.3"
 winit = "0.24"
 bitflags = "1"
 copypasta = "0.7"
-# serde = { version = "1", features = ["derive"], optional = true }
-# ron = { version = "0.6", optional = true }
 serde = { version = "1", features = ["derive"] }
 crui-derive = { path = "./crui-derive" }
 keyed_priority_queue = "0.3"
-
 
 [patch.crates-io]
 winit = { path = "../winit" }

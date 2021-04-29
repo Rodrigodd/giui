@@ -311,7 +311,10 @@ impl TextLayout {
     pub fn append(&mut self, fonts: &Fonts, style: &TextLayoutStyle) {
         let mut byte_offset = self.text.len();
         self.text += style.text;
-        let font = &fonts.get(style.font_id).expect("FontId is out of bounds").as_scaled(style.px);
+        let font = fonts
+            .get(style.font_id)
+            .expect("FontId is out of bounds")
+            .as_scaled(style.px);
 
         self.current_ascent = font.ascent().ceil();
         self.current_descent = font.descent().ceil();
@@ -332,7 +335,18 @@ impl TextLayout {
         while byte_offset < self.text.len() {
             let cur_character_offset = byte_offset;
             let c = unsafe { read_utf8(&self.text, &mut byte_offset) };
+            println!("{:?}", c);
+            let mut font = font;
             let mut glyph = font.scaled_glyph(c);
+            if glyph.id.0 == 0 {
+                while let Some(fallback) = font.font.fallback {
+                    font = fonts.get(fallback).unwrap().as_scaled(style.px);
+                    glyph = font.scaled_glyph(c);
+                    if glyph.id.0 != 0 {
+                        break;
+                    }
+                }
+            }
 
             let linebreak = linebreak_property(&mut self.linebreak_state, c) & self.wrap_mask;
             if linebreak >= self.linebreak_prev {
@@ -393,7 +407,7 @@ impl TextLayout {
             glyph.position.y = 0.0;
             self.glyphs.push(GlyphPosition {
                 glyph,
-                font_id: style.font_id,
+                font_id: font.font.id(),
                 byte_range: cur_character_offset..byte_offset,
                 width: advance,
             });
