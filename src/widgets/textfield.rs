@@ -92,7 +92,8 @@ impl<C: TextFieldCallback> TextField<C> {
     fn update_text(&mut self, this: Id, ctx: &mut Context) {
         let fonts = ctx.get_fonts();
         if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {
-            let display_text = self.text.clone() + "\u{0004}";
+            // add a extra char for the sake of the carret at end position.
+            let display_text = self.text.clone() + " ";
             text.set_text(&display_text);
             let min_size = text.compute_min_size(fonts).unwrap_or([0.0, 0.0]);
             self.text_width = min_size[0];
@@ -138,11 +139,11 @@ impl<C: TextFieldCallback> TextField<C> {
         [pos[0], pos[1] - line.descent, line.ascent - line.descent]
     }
 
-    /// Get the byte index in the text for a caret position
-    fn get_indice(&mut self, caret: usize) -> usize {
+    /// Get the byte range in the text for a caret position
+    fn get_byte_range(&mut self, caret: usize) -> std::ops::Range<usize> {
         match self.text_layout.glyphs().get(caret) {
-            Some(glyph) => glyph.byte_range.start,
-            None => self.text.len(),
+            Some(glyph) => glyph.byte_range.clone(),
+            None => self.text.len()..self.text.len(),
         }
     }
 
@@ -287,9 +288,13 @@ impl<C: TextFieldCallback> TextField<C> {
 
     fn delete_selection(&mut self, this: Id, ctx: &mut Context) {
         let selection_index = self.selection_index.unwrap();
-        let a = self.get_indice(self.caret_index);
-        let b = self.get_indice(selection_index);
-        let range = if a > b { b..a } else { a..b };
+        let a = self.get_byte_range(self.caret_index);
+        let b = self.get_byte_range(selection_index);
+        let range = if a.start > b.start {
+            b.start..a.start
+        } else {
+            a.start..b.start
+        };
         if self.caret_index > selection_index {
             self.caret_index = selection_index;
         }
@@ -300,7 +305,7 @@ impl<C: TextFieldCallback> TextField<C> {
     }
 
     fn insert_char(&mut self, ch: char, this: Id, ctx: &mut Context) {
-        let indice = self.get_indice(self.caret_index);
+        let indice = self.get_byte_range(self.caret_index).start;
         self.text.insert(indice, ch);
         self.caret_index += 1;
         self.update_text(this, ctx);
@@ -310,7 +315,7 @@ impl<C: TextFieldCallback> TextField<C> {
     fn get_word_start(&mut self, mut caret: usize) -> usize {
         let mut s = false;
         while caret != 0 {
-            let indice = self.get_indice(caret);
+            let indice = self.get_byte_range(caret).start;
             let whitespace = match self.text[indice..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => false,
@@ -329,7 +334,7 @@ impl<C: TextFieldCallback> TextField<C> {
     fn get_next_word_start(&mut self, mut caret: usize) -> usize {
         let mut s = false;
         loop {
-            let indice = self.get_indice(caret);
+            let indice = self.get_byte_range(caret).start;
             let whitespace = match self.text[indice..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => {
@@ -348,13 +353,13 @@ impl<C: TextFieldCallback> TextField<C> {
     }
 
     fn get_token_start(&mut self, mut caret: usize) -> usize {
-        let indice = self.get_indice(caret);
+        let indice = self.get_byte_range(caret).start;
         let start = match self.text[indice..].chars().next() {
             Some(x) => x.is_whitespace(),
             None => false,
         };
         loop {
-            let indice = self.get_indice(caret);
+            let indice = self.get_byte_range(caret).start;
             let whitespace = match self.text[indice..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => false,
@@ -372,7 +377,7 @@ impl<C: TextFieldCallback> TextField<C> {
     }
 
     fn get_token_end(&mut self, mut caret: usize) -> usize {
-        let indice = self.get_indice(caret);
+        let indice = self.get_byte_range(caret).start;
         let start = match self.text[indice..].chars().next() {
             Some(x) => x.is_whitespace(),
             None => {
@@ -380,7 +385,7 @@ impl<C: TextFieldCallback> TextField<C> {
             }
         };
         loop {
-            let indice = self.get_indice(caret);
+            let indice = self.get_byte_range(caret).start;
             let whitespace = match self.text[indice..].chars().next() {
                 Some(x) => x.is_whitespace(),
                 None => {
@@ -582,8 +587,8 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 VirtualKeyCode::C | VirtualKeyCode::X => {
                     if ctx.modifiers().ctrl() {
                         if let Some(selection_index) = self.selection_index {
-                            let a = self.get_indice(selection_index);
-                            let b = self.get_indice(self.caret_index);
+                            let a = self.get_byte_range(selection_index).start;
+                            let b = self.get_byte_range(self.caret_index).start;
                             let range = if a < b { a..b } else { b..a };
                             let mut cliptobard = ClipboardContext::new().unwrap();
                             let _ = cliptobard.set_contents(self.text[range].to_owned());
@@ -598,20 +603,24 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                         let mut clipboard = ClipboardContext::new().unwrap();
                         if let Ok(text) = clipboard.get_contents() {
                             let text = text.replace(|x: char| x.is_control(), "");
-                            let indice = self.get_indice(self.caret_index);
+                            let range = self.get_byte_range(self.caret_index);
                             if let Some(selection_index) = self.selection_index {
-                                let a = self.get_indice(selection_index);
-                                let b = indice;
-                                let range = if a < b { a..b } else { b..a };
+                                let a = self.get_byte_range(selection_index);
+                                let b = range;
+                                let range = if a.start < b.start {
+                                    a.start..b.start
+                                } else {
+                                    b.start..a.start
+                                };
                                 self.text.replace_range(range.clone(), &text);
                                 self.selection_index = None;
                                 self.update_text(this, ctx); // TODO: is is not working?
                                 self.caret_index = self.get_caret_index(range.start + text.len());
                                 self.callback.on_change(this, ctx, &self.text)
                             } else {
-                                self.text.insert_str(indice, &text);
+                                self.text.insert_str(range.start, &text);
                                 self.update_text(this, ctx);
-                                self.caret_index = self.get_caret_index(indice + text.len());
+                                self.caret_index = self.get_caret_index(range.start + text.len());
                                 self.callback.on_change(this, ctx, &self.text)
                             }
                             self.update_carret(this, ctx, true);
@@ -643,15 +652,15 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                         return true;
                     }
                     self.caret_index -= 1;
-                    let indice = self.get_indice(self.caret_index);
-                    self.text.remove(indice);
+                    let range = self.get_byte_range(self.caret_index);
+                    self.text.replace_range(range, "");
                     self.update_text(this, ctx);
                     self.callback.on_change(this, ctx, &self.text);
                 }
                 VirtualKeyCode::Delete => {
                     if self.caret_index + 1 < self.text_layout.glyphs().len() {
-                        let indice = self.get_indice(self.caret_index);
-                        self.text.remove(indice);
+                        let range = self.get_byte_range(self.caret_index);
+                        self.text.replace_range(range, "");
                         self.update_text(this, ctx);
                     }
                 }

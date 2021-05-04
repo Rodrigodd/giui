@@ -15,11 +15,21 @@
 
 use crate::{
     font::{FontId, Fonts},
-    unicode::{linebreak_property, read_utf8, wrap_mask, LINEBREAK_HARD, LINEBREAK_NONE},
+    unicode::{linebreak_property, wrap_mask, LINEBREAK_HARD, LINEBREAK_NONE},
 };
 use std::ops::Range;
 
-use ab_glyph::{Font, Glyph, GlyphId, ScaleFont};
+// #[cfg_attr(shaping, path = "text_layout/shaping_harfbuzz.rs")]
+// #[cfg_attr(not(shaping), path = "text_layout/shaping_simple.rs")]
+// mod shaping;
+
+mod shaping_harfbuzz;
+#[allow(dead_code)]
+mod shaping_simple;
+
+use shaping_harfbuzz as shaping;
+
+use ab_glyph::{Font, Glyph, ScaleFont};
 
 /// Horizontal alignment options for text when a max_width is provided.
 #[derive(Copy, Clone, PartialEq)]
@@ -309,7 +319,6 @@ impl TextLayout {
     /// reordered. The output buffer will always contain characters in the order they were defined
     /// in the styles.
     pub fn append(&mut self, fonts: &Fonts, style: &TextLayoutStyle) {
-        let mut byte_offset = self.text.len();
         self.text += style.text;
         let font = fonts
             .get(style.font_id)
@@ -331,22 +340,9 @@ impl TextLayout {
             }
         }
 
-        let mut last_glyph = GlyphId(0);
-        while byte_offset < self.text.len() {
-            let cur_character_offset = byte_offset;
-            let c = unsafe { read_utf8(&self.text, &mut byte_offset) };
-            println!("{:?}", c);
-            let mut font = font;
-            let mut glyph = font.scaled_glyph(c);
-            if glyph.id.0 == 0 {
-                while let Some(fallback) = font.font.fallback {
-                    font = fonts.get(fallback).unwrap().as_scaled(style.px);
-                    glyph = font.scaled_glyph(c);
-                    if glyph.id.0 != 0 {
-                        break;
-                    }
-                }
-            }
+        let glyphs = shaping::shape(fonts, style);
+        for mut glyph in glyphs {
+            let c = style.text[glyph.byte_range.start..].chars().next().unwrap();
 
             let linebreak = linebreak_property(&mut self.linebreak_state, c) & self.wrap_mask;
             if linebreak >= self.linebreak_prev {
@@ -355,17 +351,16 @@ impl TextLayout {
                 self.linebreak_idx = self.glyphs.len();
             }
 
-            let mut advance = font.h_advance(glyph.id);
-            self.current_pos += font.kern(last_glyph, glyph.id);
-            last_glyph = glyph.id;
-
             if c.is_control() {
-                advance = 0.0;
-                glyph.id = font.glyph_id(' ');
+                glyph.glyph.id = font.glyph_id(' ');
             }
 
             // dont consider trailing whitespace char before a line break
-            let c_advance = if c.is_whitespace() { 0.0 } else { advance };
+            let c_advance = if c.is_whitespace() && !c.is_control() {
+                0.0
+            } else {
+                glyph.width
+            };
             let line_width = self.current_pos + c_advance - self.start_pos;
             if linebreak == LINEBREAK_HARD || line_width > self.max_width {
                 self.linebreak_prev = LINEBREAK_NONE;
@@ -376,7 +371,8 @@ impl TextLayout {
                         let glyph = &self.glyphs[line.end_glyph - 1];
                         let range = glyph.byte_range.clone();
                         // dont consider trailing whitespace char before a line break
-                        if self.text[range].chars().next().unwrap().is_whitespace() {
+                        let c = self.text[range].chars().next().unwrap();
+                        if c.is_whitespace() && c != '\u{0004}' {
                             line.line_width -= glyph.width;
                         }
                     }
@@ -403,15 +399,10 @@ impl TextLayout {
                     end_glyph: 0,
                 });
             }
-            glyph.position.x = self.current_pos;
-            glyph.position.y = 0.0;
-            self.glyphs.push(GlyphPosition {
-                glyph,
-                font_id: font.font.id(),
-                byte_range: cur_character_offset..byte_offset,
-                width: advance,
-            });
-            self.current_pos += advance;
+            glyph.glyph.position.x += self.current_pos;
+            // glyph.glyph.position.y += 0.0;
+            self.current_pos += glyph.width;
+            self.glyphs.push(glyph);
         }
         if let Some(line) = self.line_metrics.last_mut() {
             line.line_width = self.current_pos - self.start_pos;

@@ -3,9 +3,8 @@ use std::{
     rc::Rc,
 };
 
-use ab_glyph::FontVec;
 use crui::{
-    font::{FontId, Fonts},
+    font::{Font, FontId, Fonts},
     graphics::{Panel, Text},
     layouts::{FitText, MarginLayout, VBoxLayout},
     render::{GuiRender, GuiRenderer},
@@ -58,9 +57,10 @@ fn resize(
 
 // TODO: I shouldn't need to create a copy of the font for each gui instance
 fn fonts() -> Fonts {
-    const FONT: &[u8] = include_bytes!("../examples/NotoSans-Regular.ttf");
     let mut fonts = Fonts::new();
-    fonts.add(FontVec::try_from_vec(FONT.to_vec()).unwrap().into());
+    fonts.add(Font::new(include_bytes!(
+        "../examples/NotoSans-Regular.ttf"
+    )));
     fonts
 }
 

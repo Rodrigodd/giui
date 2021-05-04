@@ -17,16 +17,22 @@ impl FontId {
 }
 
 pub struct Font {
+    // TODO: keeping a FontVec and data is redundant.
+    pub data: Vec<u8>,
     id: FontId,
     inner: FontVec,
     pub fallback: Option<FontId>,
 }
 impl Font {
-    pub fn new(font: FontVec) -> Self {
+    pub fn new(data: &[u8]) -> Self {
+        let inner = FontVec::try_from_vec(data.to_vec()).unwrap();
         Self {
-            id: FontId { index: u32::max_value() },
-            inner: font,
-            fallback: None
+            data: data.to_vec(),
+            id: FontId {
+                index: u32::max_value(),
+            },
+            inner,
+            fallback: None,
         }
     }
 
@@ -37,11 +43,6 @@ impl Font {
 
     pub fn id(&self) -> FontId {
         self.id
-    }
-}
-impl From<FontVec> for Font {
-    fn from(font: FontVec) -> Self {
-        Self::new(font)
     }
 }
 impl AbFont for Font {

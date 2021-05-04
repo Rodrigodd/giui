@@ -1,6 +1,5 @@
-use ab_glyph::FontVec;
 use crui::{
-    font::{FontId, Fonts},
+    font::{Font, FontId, Fonts},
     render::{GuiRender, GuiRenderer},
     Gui,
 };
@@ -96,12 +95,10 @@ pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -
     // load a font
     let mut fonts = Fonts::new();
     let my_fonts = MyFonts {
-        notosans: fonts.add(
-            FontVec::try_from_vec(include_bytes!("../examples/NotoSans-Regular.ttf").to_vec())
-                .unwrap().into(),
-        ),
-        consolas: fonts
-            .add(FontVec::try_from_vec(include_bytes!("../examples/cour.ttf").to_vec()).unwrap().into()),
+        notosans: fonts.add(Font::new(include_bytes!(
+            "../examples/NotoSans-Regular.ttf"
+        ))),
+        consolas: fonts.add(Font::new(include_bytes!("../examples/cour.ttf"))),
     };
 
     // create the gui, and the gui_render
@@ -132,7 +129,6 @@ pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -
                     None => ControlFlow::Wait,
                 };
                 if gui.render_is_dirty() {
-                    println!("Is dirty!");
                     window.request_redraw();
                 }
                 if let Some(cursor) = gui.cursor_change() {

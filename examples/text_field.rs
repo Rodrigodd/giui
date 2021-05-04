@@ -34,7 +34,7 @@ fn main() {
                 .build();
             text_field(
                 gui.create_control(),
-                String::new(),
+                "Hello Word!".to_string(),
                 OnFocusStyle {
                     normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
                     focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4]).into(),
@@ -81,7 +81,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
                 (-1, 0),
                 crui::graphics::TextStyle {
                     color: [0, 0, 0, 255],
-                    font_size: 24.0,
+                    font_size: 72.0,
                     font_id,
                 },
             )
