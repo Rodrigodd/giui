@@ -6,7 +6,7 @@ pub struct FontId {
 }
 impl FontId {
     /// Create a new FontId from a index. This is discouraged, use the FontId
-    /// return by [Fonts::Add](crate::font::Fonts::add) instead.
+    /// return by [Fonts::add](crate::font::Fonts::add) instead.
     pub fn new(index: u32) -> Self {
         Self { index }
     }
@@ -96,6 +96,14 @@ impl AbFont for Font {
 
     fn codepoint_ids(&self) -> ab_glyph::CodepointIdIter<'_> {
         self.inner.codepoint_ids()
+    }
+
+    fn glyph_raster_image(
+        &self,
+        glyph_id: ab_glyph::GlyphId,
+        pixel_size: u16,
+    ) -> Option<ab_glyph::GlyphImage<'_>> {
+        self.inner.glyph_raster_image(glyph_id, pixel_size)
     }
 }
 
