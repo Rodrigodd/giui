@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::{any::Any, time::Instant};
 
 use winit::{event::ModifiersState, window::CursorIcon};
@@ -52,6 +53,24 @@ impl<'a> Context<'a> {
             &mut *(gui.controls.get_mut(this)?.behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
         };
         Some((this_one, Self::new(gui)))
+    }
+
+    /// Set the value of the type T that is owned by the Gui. Any value set before will be dropped
+    /// and replaced.
+    pub fn set<T: Any + 'static>(&mut self, value: T) {
+        self.gui.resources.insert(TypeId::of::<T>(), Box::new(value));
+    }
+
+    /// Get a reference to the value of type T that is owned by the Gui. If the value was not set
+    /// by Gui::set, this returns None.
+    pub fn get<T: Any + 'static>(&self) -> &T {
+        self.gui.get()
+    }
+
+    /// Get a mutable reference to the value of type T that is owned by the Gui. If the value was
+    /// not set by Gui::set, this returns None.
+    pub fn get_mut<T: Any + 'static>(&mut self) -> &mut T {
+        self.gui.get_mut()
     }
 
     pub fn create_control(&mut self) -> ControlBuilder {
@@ -125,6 +144,7 @@ impl<'a> Context<'a> {
         }
     }
 
+    // TODO: this should not return a reference?
     pub fn get_rect(&self, id: Id) -> &[f32; 4] {
         &self.gui.controls[id].rect.rect
     }

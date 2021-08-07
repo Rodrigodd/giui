@@ -106,7 +106,7 @@ impl<'a> ControlBuilder<'a> {
 
     pub fn child<F>(mut self, create_child: F) -> Self
     where
-        F: FnOnce(ControlBuilder) -> ControlBuilder,
+        F: for<'b> FnOnce(ControlBuilder<'b>) -> ControlBuilder<'b>,
     {
         let id = self.inner.controls().reserve();
         self.child_reserved(id, create_child)
@@ -114,7 +114,7 @@ impl<'a> ControlBuilder<'a> {
 
     pub fn child_reserved<F>(mut self, id: Id, create_child: F) -> Self
     where
-        F: FnOnce(ControlBuilder) -> ControlBuilder,
+        F: for<'b> FnOnce(ControlBuilder<'b>) -> ControlBuilder<'b>,
     {
         // let id = self.inner.controls().reserve();
         let parent = self.id;

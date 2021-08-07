@@ -8,8 +8,8 @@ use crate::{
 };
 use keyed_priority_queue::KeyedPriorityQueue;
 use std::{
-    any::Any,
-    collections::VecDeque,
+    any::{Any, TypeId},
+    collections::{HashMap, VecDeque},
     num::NonZeroU32,
     sync::atomic::AtomicU64,
     time::{Duration, Instant},
@@ -188,6 +188,7 @@ pub struct Gui {
     pub(crate) controls: Controls,
     pub(crate) fonts: Fonts,
     pub(crate) modifiers: ModifiersState,
+    pub(crate) resources: HashMap<TypeId, Box<dyn Any>>,
     redraw: bool,
     // controls that need to update the layout
     dirty_layouts: Vec<Id>,
@@ -219,6 +220,7 @@ impl Gui {
                 ..Default::default()
             }]
             .into(),
+            resources: HashMap::new(),
             redraw: true,
             scheduled_events: KeyedPriorityQueue::default(),
             dirty_layouts: Vec::new(),
@@ -231,6 +233,34 @@ impl Gui {
             over_is_locked: false,
             fonts,
         }
+    }
+
+    /// Set the value of the type T that is owned by the Gui. Any value set before will be dropped
+    /// and replaced.
+    pub fn set<T: Any + 'static>(&mut self, value: T) {
+        self.resources.insert(TypeId::of::<T>(), Box::new(value));
+    }
+
+    /// Get a reference to the value of type T that is owned by the Gui. If the value was not set
+    /// by Gui::set, this returns None.
+    /// # Panics
+    /// Panics if the value was not set before hand
+    pub fn get<T: Any + 'static>(&self) -> &T {
+        self.resources
+            .get(&TypeId::of::<T>())
+            .expect("The type need to be added with Gui::set before hand.")
+            .downcast_ref().expect("The type for get<T> must be T")
+    }
+
+    /// Get a mutable reference to the value of type T that is owned by the Gui. If the value was
+    /// not set by Gui::set, this returns None.
+    /// # Panics
+    /// Panics if the value was not set before hand
+    pub fn get_mut<T: Any + 'static>(&mut self) -> &mut T {
+        self.resources
+            .get_mut(&TypeId::of::<T>())
+            .expect("The type need to be added with Gui::set before hand.")
+            .downcast_mut().expect("The type for get<T> must be T")
     }
 
     fn get_parent(&self, id: Id) -> Option<Id> {
@@ -251,7 +281,7 @@ impl Gui {
     }
 
     /// Create a control with a predetermined id, id that can be obtained by the method reserve_id().
-    pub fn create_control_reserved(&mut self, reserved_id: Id) -> ControlBuilder {
+    pub fn create_control_reserved<'a>(&'a mut self, reserved_id: Id) -> ControlBuilder<'a> {
         struct Builder<'a>(&'a mut Gui);
         impl ControlBuilderInner for Builder<'_> {
             fn controls(&mut self) -> &mut Controls {
