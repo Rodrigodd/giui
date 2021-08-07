@@ -125,9 +125,12 @@ pub enum MouseEvent {
 pub struct MouseInfo {
     pub event: MouseEvent,
     // pub action: MouseAction,
+    /// The position of the mouse, in pixels, relative to the top-right corner of the window
     pub pos: [f32; 2],
+    /// The different beetween this mouse position, and the position in the last event. The last
+    /// position may be outside of this control.
     pub delta: Option<[f32; 2]>,
-    /// number of consecutives MouseDown's
+    /// Number of consecutives MouseDown's
     pub click_count: u8,
 }
 impl MouseInfo {
@@ -151,6 +154,7 @@ impl Default for MouseInfo {
 pub enum KeyboardEvent {
     Char(char),
     Pressed(VirtualKeyCode),
+    Release(VirtualKeyCode),
 }
 
 #[derive(Default)]
@@ -620,17 +624,24 @@ impl Gui {
             WindowEvent::KeyboardInput {
                 input:
                     KeyboardInput {
-                        state: ElementState::Pressed,
+                        state,
                         virtual_keycode: Some(keycode),
                         ..
                     },
                 ..
             } => {
                 if let Some(curr) = self.current_focus {
+                    let event = if *state == ElementState::Pressed {
+                        KeyboardEvent::Pressed(*keycode)
+                    } else {
+                        KeyboardEvent::Release(*keycode)
+                    };
                     let handled = self.call_event_chain(curr, |this, id, ctx| {
-                        this.on_keyboard_event(KeyboardEvent::Pressed(*keycode), id, ctx)
+                        this.on_keyboard_event(event, id, ctx)
                     });
-                    if !handled {
+                    // if the key press was not handled, use it for navigation. Tab go to next
+                    // control, Shift+Tab go to previous.
+                    if !handled && *state == ElementState::Pressed {
                         let shift = self.modifiers.shift();
                         let next = match *keycode {
                             VirtualKeyCode::Tab if !shift => {
