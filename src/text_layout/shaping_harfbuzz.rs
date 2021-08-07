@@ -1,11 +1,10 @@
 use super::TextLayoutStyle;
 use crate::{font::Fonts, text_layout::GlyphPosition};
 
-use ab_glyph::{point, Font, Glyph, GlyphId};
+use ab_glyph::{point, Glyph, GlyphId};
 use harfbuzz_rs::{shape as hb_shape, Face, Font as HbFont, UnicodeBuffer};
 
 pub fn shape(fonts: &Fonts, style: &TextLayoutStyle) -> Vec<GlyphPosition> {
-    let ppem = fonts.get(style.font_id).unwrap().units_per_em().unwrap();
     let bytes = &fonts.get(style.font_id).unwrap().data;
     let face = Face::from_bytes(bytes, 0);
     let font = HbFont::new(face);
@@ -15,7 +14,6 @@ pub fn shape(fonts: &Fonts, style: &TextLayoutStyle) -> Vec<GlyphPosition> {
         style.px / height as f32
     };
     // let scale = style.px / ppem;
-    println!("scale: {}, ppem: {}", scale, ppem);
     let buffer = UnicodeBuffer::new().add_str(style.text);
     let output = hb_shape(&font, buffer, &[]);
 
@@ -32,10 +30,6 @@ pub fn shape(fonts: &Fonts, style: &TextLayoutStyle) -> Vec<GlyphPosition> {
         let x_advance = position.x_advance as f32 * scale;
 
         // Here you would usually draw the glyphs.
-        println!(
-            "gid{:04x?}={:3?} {:?},{:?}+{:?}",
-            gid, cluster, x_advance, x_offset, y_offset
-        );
         if let Some(last) = glyphs.last_mut() {
             last.byte_range.end = cluster;
         }
