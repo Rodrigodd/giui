@@ -103,6 +103,18 @@ impl<'a> Context<'a> {
         self.send_event(cursor);
     }
 
+    /// If lock is true, locks the cursor over the current control that is receiving mouse events.
+    /// This means that even if the mouse position go out of the area of the control, the control
+    /// will continue receiving mouse events, and MouseExit will not be emitted. This is useful
+    /// for dragging behavior.
+    pub fn lock_cursor(&mut self, lock: bool) {
+        if lock {
+            self.send_event(event::LockOver);
+        } else {
+            self.send_event(event::UnlockOver);
+        }
+    }
+
     pub fn get_layouting(&mut self, id: Id) -> &mut Rect {
         &mut self.gui.controls[id].rect
     }
