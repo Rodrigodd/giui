@@ -67,6 +67,25 @@ impl<'de> Deserialize<'de> for Color {
     }
 }
 
+impl<'a, 'b: 'a> LoadStyle<'a, 'b> for Color {
+    type Loader = ColorLoader;
+    fn new_loader(_: &'a mut StyleLoader<'b>) -> Self::Loader {
+        ColorLoader
+    }
+}
+
+pub struct ColorLoader;
+impl<'de> DeserializeSeed<'de> for ColorLoader {
+    type Value = Color;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        <Color as Deserialize>::deserialize(deserializer)
+    }
+}
+
 impl<'a, 'b: 'a, T: 'a> LoadStyle<'a, 'b> for Rc<T>
 where
     T: LoadStyle<'a, 'b>,
