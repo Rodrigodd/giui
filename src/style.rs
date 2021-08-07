@@ -1,4 +1,5 @@
 use crate::graphics::{Graphic, TextStyle};
+use crate::style_loader::util::Color;
 
 #[derive(Clone, Debug, LoadStyle)]
 #[crui(crate = "crate")]
@@ -14,6 +15,14 @@ pub struct ButtonStyle {
     pub hover: Graphic,
     pub pressed: Graphic,
     pub focus: Graphic,
+}
+
+#[derive(LoadStyle)]
+#[crui(crate = "crate")]
+pub struct TextFieldStyle {
+    pub background: OnFocusStyle,
+    pub caret_color: Color,
+    pub selection_color: Color,
 }
 
 #[derive(Clone, Debug, LoadStyle)]

@@ -1,7 +1,7 @@
 use crate::{
     event::{self, SetValue},
     graphics::Graphic,
-    style::OnFocusStyle,
+    style::TextFieldStyle,
     text_layout::{LineMetrics, TextLayout},
     Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseButton, MouseEvent, MouseInfo,
 };
@@ -60,13 +60,13 @@ pub struct TextField<C: TextFieldCallback> {
     /// If it is non zero, the mouse is being dragged. 1 for single click, 2 for double click, etc...
     mouse_down: u8,
     drag_start: usize,
-    style: Rc<OnFocusStyle>,
+    style: Rc<TextFieldStyle>,
     blink: bool,
     /// event_id of the last scheduled BlinkCaret event
     blink_event: Option<u64>,
 }
 impl<C: TextFieldCallback> TextField<C> {
-    pub fn new(text: String, caret: Id, label: Id, style: Rc<OnFocusStyle>, callback: C) -> Self {
+    pub fn new(text: String, caret: Id, label: Id, style: Rc<TextFieldStyle>, callback: C) -> Self {
         Self {
             callback,
             caret,
@@ -222,7 +222,7 @@ impl<C: TextFieldCallback> TextField<C> {
 
         if let Some(selection_index) = self.selection_index {
             ctx.get_graphic_mut(self.caret)
-                .set_color([51, 153, 255, 255]);
+                .set_color(self.style.selection_color.0);
             let mut selection_pos = self.get_glyph_pos(selection_index);
             selection_pos[0] -= self.x_scroll;
             let mut margins = [
@@ -239,7 +239,8 @@ impl<C: TextFieldCallback> TextField<C> {
             }
             ctx.set_margins(self.caret, margins);
         } else {
-            ctx.get_graphic_mut(self.caret).set_color([0, 0, 0, 255]);
+            ctx.get_graphic_mut(self.caret)
+                .set_color(self.style.caret_color.0);
             if self.on_focus {
                 self.blink_event = Some(ctx.send_event_to_scheduled(
                     this,
@@ -413,7 +414,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         self.update_text(this, ctx);
         ctx.move_to_front(self.label);
-        ctx.set_graphic(this, self.style.normal.clone());
+        ctx.set_graphic(this, self.style.background.normal.clone());
     }
 
     fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
@@ -553,9 +554,9 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
         self.on_focus = focus;
         if focus {
-            ctx.set_graphic(this, self.style.focus.clone());
+            ctx.set_graphic(this, self.style.background.focus.clone());
         } else {
-            ctx.set_graphic(this, self.style.normal.clone());
+            ctx.set_graphic(this, self.style.background.normal.clone());
 
             let x = self.get_glyph_pos(self.caret_index)[0];
             if self.callback.on_unfocus(this, ctx, &mut self.text) {
@@ -702,6 +703,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 }
                 _ => {}
             },
+            KeyboardEvent::Release(_) => {}
         }
         true
     }
