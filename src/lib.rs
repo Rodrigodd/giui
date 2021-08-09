@@ -11,6 +11,7 @@ mod util;
 
 mod unicode;
 
+mod color;
 mod context;
 mod control;
 pub mod graphics;
@@ -23,6 +24,7 @@ pub mod widgets;
 
 pub mod style_loader;
 
+pub use color::Color;
 pub use context::*;
 pub use control::*;
 pub use gui::*;

@@ -99,7 +99,7 @@ impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for IconVisitor<'a, 'b> {
                     if Option::is_some(&color) {
                         return Err(de::Error::duplicate_field("color"));
                     }
-                    color = Some(map.next_value::<Color>()?.0);
+                    color = Some(map.next_value::<Color>()?);
                 }
             }
         }
@@ -113,7 +113,7 @@ impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for IconVisitor<'a, 'b> {
             uv_rect[3] as f32 / height as f32,
         ];
         let size = size.ok_or_else(|| de::Error::missing_field("size"))?;
-        let color = color.unwrap_or([255; 4]);
+        let color = color.unwrap_or([255; 4].into());
         Ok(Icon {
             texture,
             uv_rect,

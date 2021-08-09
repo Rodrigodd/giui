@@ -41,7 +41,7 @@ impl<F: Fn(Id, &mut Context, bool)> Behaviour for Toggle<F> {
         ctx.set_graphic(this, self.background_style.normal.clone());
         ctx.set_graphic(self.button, self.button_style.normal.clone());
         let graphic = ctx.get_graphic_mut(self.button);
-        graphic.set_color([200, 200, 200, 255]);
+        graphic.set_color([200, 200, 200, 255].into());
         if self.enable {
             ctx.get_graphic_mut(self.marker).set_alpha(255)
         } else {
@@ -78,21 +78,21 @@ impl<F: Fn(Id, &mut Context, bool)> Behaviour for Toggle<F> {
         match mouse.event {
             MouseEvent::Enter => {
                 let graphic = ctx.get_graphic_mut(self.button);
-                graphic.set_color([190, 190, 190, 255]);
+                graphic.set_color([190, 190, 190, 255].into());
             }
             MouseEvent::Exit => {
                 self.click = false;
                 let graphic = ctx.get_graphic_mut(self.button);
-                graphic.set_color([200, 200, 200, 255]);
+                graphic.set_color([200, 200, 200, 255].into());
             }
             MouseEvent::Down(Left) => {
                 self.click = true;
                 let graphic = ctx.get_graphic_mut(self.button);
-                graphic.set_color([170, 170, 170, 255]);
+                graphic.set_color([170, 170, 170, 255].into());
             }
             MouseEvent::Up(Left) => {
                 let graphic = ctx.get_graphic_mut(self.button);
-                graphic.set_color([190, 190, 190, 255]);
+                graphic.set_color([190, 190, 190, 255].into());
                 if self.click {
                     self.enable = !self.enable;
                     (self.on_change)(this, ctx, self.enable);

@@ -286,7 +286,7 @@ fn main() {
                                 scale: [width, height],
                                 angle: 0.0,
                                 uv_rect: x.uv_rect,
-                                color: x.color,
+                                color: x.color.to_array(),
                                 pos: [x.rect[0] + width / 2.0, x.rect[1] + height / 2.0],
                                 texture: x.texture,
                             }
@@ -370,7 +370,7 @@ fn create_gui(
                 "Open A Modal Window!".into(),
                 (0, 0),
                 crui::graphics::TextStyle {
-                    color: [0, 0, 0, 255],
+                    color: [0, 0, 0, 255].into(),
                     font_size: 16.0,
                     font_id,
                 },
@@ -427,7 +427,7 @@ fn create_gui(
                 "Open A Non-Modal Window!".into(),
                 (0, 0),
                 crui::graphics::TextStyle {
-                    color: [0, 0, 0, 255],
+                    color: [0, 0, 0, 255].into(),
                     font_size: 16.0,
                     font_id,
                 },

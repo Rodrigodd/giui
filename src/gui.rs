@@ -249,7 +249,8 @@ impl Gui {
         self.resources
             .get(&TypeId::of::<T>())
             .expect("The type need to be added with Gui::set before hand.")
-            .downcast_ref().expect("The type for get<T> must be T")
+            .downcast_ref()
+            .expect("The type for get<T> must be T")
     }
 
     /// Get a mutable reference to the value of type T that is owned by the Gui. If the value was
@@ -260,7 +261,8 @@ impl Gui {
         self.resources
             .get_mut(&TypeId::of::<T>())
             .expect("The type need to be added with Gui::set before hand.")
-            .downcast_mut().expect("The type for get<T> must be T")
+            .downcast_mut()
+            .expect("The type for get<T> must be T")
     }
 
     fn get_parent(&self, id: Id) -> Option<Id> {

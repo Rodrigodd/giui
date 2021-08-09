@@ -64,7 +64,7 @@ fn main() {
                 "Hello Word!!".to_string(),
                 (0, 0),
                 TextStyle {
-                    color: [0, 255, 0, 255],
+                    color: [0, 255, 0, 255].into(),
                     font_size: 70.0,
                     font_id: my_font,
                 },
@@ -165,7 +165,7 @@ fn main() {
                                 scale: [width, height],
                                 angle: 0.0,
                                 uv_rect: x.uv_rect,
-                                color: x.color,
+                                color: x.color.to_array(),
                                 pos: [x.rect[0] + width / 2.0, x.rect[1] + height / 2.0],
                                 texture: x.texture,
                             }

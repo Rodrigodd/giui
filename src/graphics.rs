@@ -2,13 +2,13 @@ use crate::{
     font::{FontId, Fonts},
     render::FontGlyph,
     text_layout::{TextLayout, TextLayoutStyle},
-    Rect, RenderDirtyFlags,
+    Color, Rect, RenderDirtyFlags,
 };
 
 #[derive(Clone)]
 pub struct Sprite {
     pub texture: u32,
-    pub color: [u8; 4],
+    pub color: Color,
     pub rect: [f32; 4],
     pub uv_rect: [f32; 4],
 }
@@ -54,12 +54,12 @@ impl From<Text> for Graphic {
     }
 }
 impl Graphic {
-    pub fn with_color(mut self, new_color: [u8; 4]) -> Self {
+    pub fn with_color(mut self, new_color: Color) -> Self {
         self.set_color(new_color);
         self
     }
 
-    pub fn get_color(&self) -> [u8; 4] {
+    pub fn get_color(&self) -> Color {
         match self {
             Graphic::Panel(Panel { color, .. })
             | Graphic::Texture(Texture { color, .. })
@@ -69,11 +69,11 @@ impl Graphic {
                 style: TextStyle { color, .. },
                 ..
             }) => *color,
-            Graphic::None => [255, 255, 255, 255],
+            Graphic::None => [255, 255, 255, 255].into(),
         }
     }
 
-    pub fn set_color(&mut self, new_color: [u8; 4]) {
+    pub fn set_color(&mut self, new_color: Color) {
         match self {
             Graphic::Panel(Panel {
                 color, color_dirty, ..
@@ -117,7 +117,7 @@ impl Graphic {
                 color_dirty,
                 ..
             }) => {
-                color[3] = new_alpha;
+                color.a = new_alpha;
                 *color_dirty = true;
             }
             Graphic::None => {}
@@ -184,7 +184,7 @@ pub struct Icon {
     pub texture: u32,
     pub uv_rect: [f32; 4],
     pub size: [f32; 2],
-    pub color: [u8; 4],
+    pub color: Color,
     pub color_dirty: bool,
 }
 impl Icon {
@@ -193,17 +193,17 @@ impl Icon {
             texture,
             uv_rect,
             size,
-            color: [255, 255, 255, 255],
+            color: [255, 255, 255, 255].into(),
             color_dirty: true,
         }
     }
 
-    pub fn with_color(mut self, color: [u8; 4]) -> Self {
+    pub fn with_color(mut self, color: Color) -> Self {
         self.set_color(color);
         self
     }
 
-    pub fn set_color(&mut self, color: [u8; 4]) {
+    pub fn set_color(&mut self, color: Color) {
         self.color = color;
         self.color_dirty = true;
     }
@@ -231,7 +231,7 @@ pub struct AnimatedIcon {
     pub curr_time: f32,
     pub frames: Vec<[f32; 4]>,
     pub size: [f32; 2],
-    pub color: [u8; 4],
+    pub color: Color,
     pub color_dirty: bool,
 }
 impl AnimatedIcon {
@@ -242,17 +242,17 @@ impl AnimatedIcon {
             fps: 60.0,
             curr_time: 0.0,
             size,
-            color: [255, 255, 255, 255],
+            color: [255, 255, 255, 255].into(),
             color_dirty: true,
         }
     }
 
-    pub fn with_color(mut self, color: [u8; 4]) -> Self {
+    pub fn with_color(mut self, color: Color) -> Self {
         self.set_color(color);
         self
     }
 
-    pub fn set_color(&mut self, color: [u8; 4]) {
+    pub fn set_color(&mut self, color: Color) {
         self.color = color;
         self.color_dirty = true;
     }
@@ -280,7 +280,7 @@ impl AnimatedIcon {
 pub struct Texture {
     pub texture: u32,
     pub uv_rect: [f32; 4],
-    pub color: [u8; 4],
+    pub color: Color,
     pub color_dirty: bool,
 }
 impl Clone for Texture {
@@ -293,7 +293,7 @@ impl Texture {
         Self {
             texture,
             uv_rect,
-            color: [255, 255, 255, 255],
+            color: [255, 255, 255, 255].into(),
             color_dirty: true,
         }
     }
@@ -307,12 +307,12 @@ impl Texture {
         }
     }
 
-    pub fn with_color(mut self, color: [u8; 4]) -> Self {
+    pub fn with_color(mut self, color: Color) -> Self {
         self.set_color(color);
         self
     }
 
-    pub fn set_color(&mut self, color: [u8; 4]) {
+    pub fn set_color(&mut self, color: Color) {
         self.color = color;
         self.color_dirty = true;
     }
@@ -323,7 +323,7 @@ pub struct Panel {
     pub texture: u32,
     pub uv_rects: [[f32; 4]; 9],
     pub border: [f32; 4],
-    pub color: [u8; 4],
+    pub color: Color,
     pub color_dirty: bool,
 }
 impl Panel {
@@ -347,7 +347,7 @@ impl Panel {
             texture,
             uv_rects,
             border,
-            color: [255, 255, 255, 255],
+            color: [255, 255, 255, 255].into(),
             color_dirty: true,
         }
     }
@@ -392,19 +392,10 @@ impl Panel {
 
 #[derive(Debug, Clone)]
 pub struct TextStyle {
-    pub color: [u8; 4],
+    pub color: Color,
     pub font_size: f32,
     pub font_id: FontId,
 }
-// impl Default for TextStyle {
-//     fn default() -> Self {
-//         Self {
-//             font_size: 16.0,
-//             font_id: 0,
-//             color: [0, 0, 0, 255],
-//         }
-//     }
-// }
 
 #[derive(Debug)]
 pub struct Text {
@@ -560,7 +551,7 @@ impl Text {
         self.min_size
     }
 
-    pub fn color(&self) -> [u8; 4] {
+    pub fn color(&self) -> Color {
         self.style.color
     }
 }

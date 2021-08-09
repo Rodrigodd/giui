@@ -6,13 +6,13 @@ use crui::{
     font::FontId,
     graphics::{Graphic, Icon, Panel, Text, TextStyle, Texture},
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
+    style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle, TextFieldStyle},
     widgets::{
         self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, DropMenu, Dropdown, Hoverable,
         Item, Menu, MenuBar, MenuItem, ScrollBar, ScrollView, Slider, TabButton, TextField, Toggle,
         ViewLayout,
     },
-    Context, ControlBuilder, Gui, Id, RectFill,
+    Color, Context, ControlBuilder, Gui, Id, RectFill,
 };
 use sprite_render::{GLSpriteRender, SpriteRender};
 use winit::{
@@ -79,10 +79,10 @@ impl common::CruiEventLoop<()> for Main {
             button: (*menu_button_style).clone(),
             arrow: Texture::new(icon_texture, [0.0, 0.0, 1.0, 1.0]).into(),
             separator: Texture::new(texture, [0.2, 0.2, 0.2, 0.2])
-                .with_color([180, 180, 180, 255])
+                .with_color([180, 180, 180, 255].into())
                 .into(),
             text: TextStyle {
-                color: [0, 0, 0, 255],
+                color: [0, 0, 0, 255].into(),
                 font_size: 16.0,
                 font_id: fonts.notosans,
             },
@@ -98,10 +98,10 @@ impl common::CruiEventLoop<()> for Main {
             focus: button_style.focus.clone(),
         });
         let close_button = Rc::new(ButtonStyle {
-            normal: painel.clone().with_color([255, 0, 0, 255]),
-            hover: painel.clone().with_color([240, 0, 0, 255]),
-            pressed: painel.clone().with_color([230, 0, 0, 255]),
-            focus: painel.clone().with_color([255, 0, 0, 255]),
+            normal: painel.clone().with_color([255, 0, 0, 255].into()),
+            hover: painel.clone().with_color([240, 0, 0, 255].into()),
+            pressed: painel.clone().with_color([230, 0, 0, 255].into()),
+            focus: painel.clone().with_color([255, 0, 0, 255].into()),
         });
 
         let style = Style {
@@ -148,7 +148,7 @@ struct Style {
 
 fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
     let (hover, hover_label) = {
-        let graphic = style.white.clone().with_color([50, 50, 50, 255]);
+        let graphic = style.white.clone().with_color([50, 50, 50, 255].into());
         let hover = gui
             .create_control()
             .anchors([0.0, 0.0, 0.0, 0.0])
@@ -160,7 +160,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             "This is a Hover".to_owned(),
             (-1, 0),
             TextStyle {
-                color: [255, 255, 255, 255],
+                color: [255, 255, 255, 255].into(),
                 font_size: 12.0,
                 font_id: style.fonts.notosans,
             },
@@ -330,7 +330,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .create_control()
                 .anchors([0.0, 0.0, 1.0, 0.5])
                 .margins([15.0, 15.0, -15.0, -7.5])
-                .graphic(style.painel.clone().with_color([200, 200, 200, 255]))
+                .graphic(style.painel.clone().with_color([200, 200, 200, 255].into()))
                 .parent(right_painel)
                 .build();
             let text = "This is a example text. Please, don't mind me. Continue doing what you need to do. If you cannot ignore this text, I don't mind.".to_owned();
@@ -338,7 +338,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 text,
                 (0, -1),
                 TextStyle {
-                    color: [0, 0, 0, 255],
+                    color: [0, 0, 0, 255].into(),
                     font_size: 20.0,
                     font_id: style.fonts.consolas,
                 },
@@ -355,7 +355,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .create_control()
                 .anchors([0.0, 0.5, 1.0, 1.0])
                 .margins([15.0, 7.5, -15.0, -15.0])
-                .graphic(style.painel.clone().with_color([200, 200, 200, 255]))
+                .graphic(style.painel.clone().with_color([200, 200, 200, 255].into()))
                 .parent(right_painel)
                 .build();
             let text = "This is another example text. Please, also don't mind me. Continue doing what you was doing. If you cannot ignore this text, I don't mind either.".to_owned();
@@ -363,7 +363,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 text,
                 (-1, 0),
                 TextStyle {
-                    color: [0, 0, 0, 255],
+                    color: [0, 0, 0, 255].into(),
                     font_size: 20.0,
                     font_id: style.fonts.notosans,
                 },
@@ -432,14 +432,14 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .create_control_reserved(slide_area)
                 .anchors([0.0, 0.5, 1.0, 0.5])
                 .margins([10.0, -3.0, -10.0, 3.0])
-                .graphic(style.painel.clone().with_color([170, 170, 170, 255]))
+                .graphic(style.painel.clone().with_color([170, 170, 170, 255].into()))
                 .parent(slider)
                 .build();
             let _handle = gui
                 .create_control_reserved(handle)
                 .anchors([0.5, 0.5, 0.5, 0.5])
                 .margins([-3.0, -14.0, 3.0, 14.0])
-                .graphic(style.painel.clone().with_color([200, 200, 200, 255]))
+                .graphic(style.painel.clone().with_color([200, 200, 200, 255].into()))
                 .parent(slider)
                 .build();
 
@@ -470,7 +470,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .build();
 
             let background = {
-                let graphic = style.white.clone().with_color([200, 200, 200, 255]);
+                let graphic = style.white.clone().with_color([200, 200, 200, 255].into());
                 gui.create_control_reserved(background)
                     .anchors([0.0, 0.5, 0.0, 0.5])
                     .margins([5.0, -10.0, 25.0, 10.0])
@@ -490,7 +490,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 "Bottom Text".to_owned(),
                 (-1, 0),
                 TextStyle {
-                    color: [40, 40, 100, 255],
+                    color: [40, 40, 100, 255].into(),
                     font_size: 16.0,
                     font_id: style.fonts.notosans,
                 },
@@ -538,7 +538,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                                         data.to_string(),
                                         (-1, 0),
                                         TextStyle {
-                                            color: [40, 40, 100, 255],
+                                            color: [40, 40, 100, 255].into(),
                                             font_size: 16.0,
                                             font_id: notosans,
                                         },
@@ -586,7 +586,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                         "Select one, please".to_owned(),
                         (-1, 0),
                         TextStyle {
-                            color: [40, 40, 100, 255],
+                            color: [40, 40, 100, 255].into(),
                             font_size: 16.0,
                             font_id: style.fonts.notosans,
                         },
@@ -613,7 +613,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .parent(page_2)
                 .expand_x(expand[0])
                 .expand_y(expand[1])
-                .graphic(style.painel.clone().with_color([100, 100, 100, 255]))
+                .graphic(style.painel.clone().with_color([100, 100, 100, 255].into()))
                 .layout(VBoxLayout::new(5.0, [0.0, 0.0, 0.0, 0.0], align))
                 .build()
         };
@@ -630,7 +630,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .fill_y(fill[1])
                 .expand_x(expand[0])
                 .expand_y(expand[1])
-                .graphic(style.painel.clone().with_color([200, 200, 200, 255]))
+                .graphic(style.painel.clone().with_color([200, 200, 200, 255].into()))
                 .behaviour(Hoverable::new(
                     hover,
                     hover_label,
@@ -653,7 +653,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 format!("{}x{}", min_size[0], min_size[1]),
                 (0, 0),
                 TextStyle {
-                    color: [40, 40, 100, 255],
+                    color: [40, 40, 100, 255].into(),
                     font_size: 12.0,
                     font_id: style.fonts.notosans,
                 },
@@ -832,7 +832,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                         "Add new: ".to_owned(),
                         (-1, 0),
                         TextStyle {
-                            color: [0, 0, 0, 255],
+                            color: [0, 0, 0, 255].into(),
                             font_size: 16.0,
                             font_id: style.fonts.notosans,
                         },
@@ -853,13 +853,17 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     "".into(),
                     caret,
                     input_text,
-                    OnFocusStyle {
-                        normal: style.painel.clone().with_color([200, 200, 200, 255]),
-                        focus: style
-                            .button_style
-                            .focus
-                            .clone()
-                            .with_color([200, 200, 200, 255]),
+                    TextFieldStyle {
+                        caret_color: Color::BLACK,
+                        selection_color: [170, 0, 255, 255].into(),
+                        background: OnFocusStyle {
+                            normal: style.painel.clone().with_color([200, 200, 200, 255].into()),
+                            focus: style
+                                .button_style
+                                .focus
+                                .clone()
+                                .with_color([200, 200, 200, 255].into()),
+                        },
                     }
                     .into(),
                     {
@@ -874,7 +878,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                                 painel.clone(),
                                 text.clone(),
                                 notosans,
-                                [130, 150, 255, 255],
+                                [130, 150, 255, 255].into(),
                                 button_style.clone(),
                             );
                             text.clear();
@@ -886,7 +890,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             let _caret = gui
                 .create_control_reserved(caret)
                 .anchors([0.0, 0.0, 0.0, 0.0])
-                .graphic(style.white.clone().with_color([0, 0, 0, 255]))
+                .graphic(style.white.clone().with_color([0, 0, 0, 255].into()))
                 .parent(input_box)
                 .build();
             let _input_text = gui
@@ -896,7 +900,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                         String::new(),
                         (-1, 0),
                         TextStyle {
-                            color: [0, 0, 0, 255],
+                            color: [0, 0, 0, 255].into(),
                             font_size: 16.0,
                             font_id: style.fonts.notosans,
                         },
@@ -918,7 +922,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
         let h_scroll_bar = gui
             .create_control()
             .min_size([20.0, 20.0])
-            .graphic(style.white.clone().with_color([150, 150, 150, 255]))
+            .graphic(style.white.clone().with_color([150, 150, 150, 255].into()))
             .behaviour(ScrollBar::new(
                 h_scroll_bar_handle,
                 scroll_view,
@@ -930,14 +934,14 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
         let h_scroll_bar_handle = gui
             .create_control_reserved(h_scroll_bar_handle)
             .min_size([20.0, 20.0])
-            .graphic(style.white.clone().with_color([220, 220, 220, 255]))
+            .graphic(style.white.clone().with_color([220, 220, 220, 255].into()))
             .parent(h_scroll_bar)
             .build();
         let v_scroll_bar_handle = gui.reserve_id();
         let v_scroll_bar = gui
             .create_control()
             .min_size([20.0, 20.0])
-            .graphic(style.white.clone().with_color([150, 150, 150, 255]))
+            .graphic(style.white.clone().with_color([150, 150, 150, 255].into()))
             .parent(scroll_view)
             .behaviour(ScrollBar::new(
                 v_scroll_bar_handle,
@@ -949,7 +953,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
         let v_scroll_bar_handle = gui
             .create_control_reserved(v_scroll_bar_handle)
             .min_size([20.0, 20.0])
-            .graphic(style.white.clone().with_color([220, 220, 220, 255]))
+            .graphic(style.white.clone().with_color([220, 220, 220, 255].into()))
             .parent(v_scroll_bar)
             .build();
         let list = gui
@@ -960,7 +964,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
 
         let _scroll_view = gui
             .create_control_reserved(scroll_view)
-            .graphic(style.white.clone().with_color([100, 100, 100, 255]))
+            .graphic(style.white.clone().with_color([100, 100, 100, 255].into()))
             .expand_y(true)
             .parent(page_3)
             .behaviour_and_layout(ScrollView::new(
@@ -978,7 +982,15 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
         seed = seed ^ (seed << 64);
         for i in 0..5 {
             let color = (seed.rotate_left(i * 3)) as u32 | 0xff;
-            create_item(&mut gui.get_context(), list, style.painel.clone(), format!("This is the item number {} with the color which hexadecimal representation is #{:0x}", i + 1, color), style.fonts.notosans, color.to_be_bytes(),style.button_style.clone());
+            create_item(
+                &mut gui.get_context(),
+                list,
+                style.painel.clone(),
+                format!("This is the item number {} with the color which hexadecimal representation is #{:0x}", i + 1, color), 
+                style.fonts.notosans,
+                Color::from_u32(color),
+                style.button_style.clone()
+            );
         }
         page_3
     };
@@ -1023,7 +1035,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
     };
     let page_na = {
         let page_na = gui.create_control().parent(page_area).build();
-        let graphic = Text::new("This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(), (0, -1), TextStyle { color: [255, 255, 255, 255], font_size: 20.0, font_id: style.fonts.notosans }).into();
+        let graphic = Text::new("This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(), (0, -1), TextStyle { color: [255, 255, 255, 255].into(), font_size: 20.0, font_id: style.fonts.notosans }).into();
         gui.create_control()
             .margins([15.0, 15.0, -15.0, -15.0])
             .graphic(graphic)
@@ -1052,7 +1064,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 label,
                 (0, 0),
                 TextStyle {
-                    color: [40, 40, 100, 255],
+                    color: [40, 40, 100, 255].into(),
                     font_size: 16.0,
                     font_id: style.fonts.notosans,
                 },
@@ -1082,7 +1094,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .build();
         let header = gui
             .create_control()
-            .graphic(style.painel.clone().with_color([0, 0, 255, 255]))
+            .graphic(style.painel.clone().with_color([0, 0, 255, 255].into()))
             .layout(HBoxLayout::new(2.0, [2.0, 2.0, 2.0, 2.0], -1))
             .fill_y(RectFill::ShrinkStart)
             .parent(window)
@@ -1093,7 +1105,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 "This is a Window".to_string(),
                 (-1, 0),
                 TextStyle {
-                    color: [255, 255, 255, 255],
+                    color: [255, 255, 255, 255].into(),
                     font_size: 20.0,
                     font_id: style.fonts.notosans,
                 },
@@ -1129,7 +1141,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 "This is the content of a window.\nPlease be aware of it.".to_string(),
                 (0, 0),
                 TextStyle {
-                    color: [0, 0, 0, 255],
+                    color: [0, 0, 0, 255].into(),
                     font_size: 20.0,
                     font_id: style.fonts.notosans,
                 },
@@ -1159,7 +1171,7 @@ fn create_item(
     painel: Graphic,
     text: String,
     font_id: FontId,
-    color: [u8; 4],
+    color: Color,
     button_style: Rc<ButtonStyle>,
 ) {
     let item = ctx
@@ -1177,7 +1189,7 @@ fn create_item(
                 text,
                 (-1, 0),
                 TextStyle {
-                    color: [0, 0, 0, 255],
+                    color: [0, 0, 0, 255].into(),
                     font_size: 16.0,
                     font_id,
                 },
@@ -1216,7 +1228,7 @@ fn create_button<F: Fn(Id, &mut Context) + 'static>(
                     text,
                     (0, 0),
                     TextStyle {
-                        color: [40, 40, 100, 255],
+                        color: [40, 40, 100, 255].into(),
                         font_size: 16.0,
                         font_id,
                     },

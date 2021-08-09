@@ -58,7 +58,9 @@ impl<'a> Context<'a> {
     /// Set the value of the type T that is owned by the Gui. Any value set before will be dropped
     /// and replaced.
     pub fn set<T: Any + 'static>(&mut self, value: T) {
-        self.gui.resources.insert(TypeId::of::<T>(), Box::new(value));
+        self.gui
+            .resources
+            .insert(TypeId::of::<T>(), Box::new(value));
     }
 
     /// Get a reference to the value of type T that is owned by the Gui. If the value was not set

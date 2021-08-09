@@ -222,7 +222,7 @@ impl<C: TextFieldCallback> TextField<C> {
 
         if let Some(selection_index) = self.selection_index {
             ctx.get_graphic_mut(self.caret)
-                .set_color(self.style.selection_color.0);
+                .set_color(self.style.selection_color);
             let mut selection_pos = self.get_glyph_pos(selection_index);
             selection_pos[0] -= self.x_scroll;
             let mut margins = [
@@ -240,7 +240,7 @@ impl<C: TextFieldCallback> TextField<C> {
             ctx.set_margins(self.caret, margins);
         } else {
             ctx.get_graphic_mut(self.caret)
-                .set_color(self.style.caret_color.0);
+                .set_color(self.style.caret_color);
             if self.on_focus {
                 self.blink_event = Some(ctx.send_event_to_scheduled(
                     this,

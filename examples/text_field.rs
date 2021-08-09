@@ -7,9 +7,9 @@ use crui::{
     font::FontId,
     graphics::{Panel, Text},
     layouts::MarginLayout,
-    style::OnFocusStyle,
+    style::{OnFocusStyle, TextFieldStyle},
     widgets::{TextField, TextFieldCallback},
-    ControlBuilder, Gui,
+    Color, ControlBuilder, Gui,
 };
 use sprite_render::{GLSpriteRender, SpriteRender};
 use winit::event_loop::EventLoop;
@@ -35,9 +35,13 @@ fn main() {
             text_field(
                 gui.create_control(),
                 "Hello Word!".to_string(),
-                OnFocusStyle {
-                    normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
-                    focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4]).into(),
+                TextFieldStyle {
+                    background: OnFocusStyle {
+                        normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
+                        focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4]).into(),
+                    },
+                    selection_color: [170, 0, 255, 255].into(),
+                    caret_color: Color::BLACK,
                 },
                 fonts.notosans,
                 (),
@@ -54,7 +58,7 @@ fn main() {
 fn text_field<'a, C: TextFieldCallback + 'static>(
     mut cb: ControlBuilder<'a>,
     initial_value: String,
-    style: OnFocusStyle,
+    style: TextFieldStyle,
     font_id: FontId,
     callback: C,
 ) -> ControlBuilder<'a> {
@@ -71,8 +75,13 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
     .min_size([0.0, 28.0])
     .expand_y(false)
     .child_reserved(caret, |cb| {
-        cb.anchors([0.0, 0.0, 0.0, 0.0])
-            .graphic(style.normal.clone().with_color([0, 0, 0, 255]))
+        cb.anchors([0.0, 0.0, 0.0, 0.0]).graphic(
+            style
+                .background
+                .normal
+                .clone()
+                .with_color([0, 0, 0, 255].into()),
+        )
     })
     .child_reserved(input_text, |cb| {
         cb.graphic(
@@ -80,7 +89,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
                 String::new(),
                 (-1, 0),
                 crui::graphics::TextStyle {
-                    color: [0, 0, 0, 255],
+                    color: [0, 0, 0, 255].into(),
                     font_size: 72.0,
                     font_id,
                 },

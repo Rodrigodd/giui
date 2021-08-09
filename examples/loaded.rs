@@ -49,13 +49,13 @@ use crui::{
     event::SetValue,
     graphics::{Graphic, Panel, Text, TextStyle, Texture},
     layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
-    style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle},
+    style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle, TextFieldStyle},
     widgets::{
         Blocker, Button, ButtonGroup, CloseMenu, DropMenu, Dropdown, Item, Menu, MenuBar, MenuItem,
         ScrollBar, ScrollView, Select, SetMaxValue, SetMinValue, SetSelected, Slider,
         SliderCallback, TabButton, TextField, TextFieldCallback, Toggle, ViewLayout,
     },
-    Context, ControlBuilder, Gui, Id, RectFill,
+    Color, Context, ControlBuilder, Gui, Id, RectFill,
 };
 use sprite_render::{GLSpriteRender, SpriteRender};
 use winit::{
@@ -148,7 +148,8 @@ struct StyleSheet {
     // fonts: MyFonts,
     text_style: TextStyle,
     menu: Rc<MenuStyle>,
-    text_field: Rc<OnFocusStyle>,
+    text_field: Rc<TextFieldStyle>,
+    on_focus: Rc<OnFocusStyle>,
     button: Rc<ButtonStyle>,
     tab_button: Rc<TabStyle>,
     page_background: Graphic,
@@ -165,7 +166,7 @@ impl StyleSheet {
         Self {
             // fonts: fonts.clone(),
             text_style: TextStyle {
-                color: [40, 40, 100, 255],
+                color: [40, 40, 100, 255].into(),
                 font_size: 16.0,
                 font_id: fonts.notosans,
             },
@@ -178,16 +179,25 @@ impl StyleSheet {
                 },
                 arrow: Texture::new(icon_texture, [0.0, 0.0, 1.0, 1.0]).into(),
                 separator: Texture::new(texture, [0.2, 0.2, 0.2, 0.2])
-                    .with_color([180, 180, 180, 255])
+                    .with_color([180, 180, 180, 255].into())
                     .into(),
                 text: TextStyle {
-                    color: [0, 0, 0, 255],
+                    color: [0, 0, 0, 255].into(),
                     font_size: 16.0,
                     font_id: fonts.notosans,
                 },
             }
             .into(),
-            text_field: OnFocusStyle {
+            text_field: TextFieldStyle {
+                background: OnFocusStyle {
+                    normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
+                    focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4]).into(),
+                },
+                caret_color: Color::BLACK,
+                selection_color: [170, 0, 255, 255].into(),
+            }
+            .into(),
+            on_focus: OnFocusStyle {
                 normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
                 focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4]).into(),
             }
@@ -204,16 +214,16 @@ impl StyleSheet {
                 unselected: Graphic::from(Panel::new(tab_texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4])),
                 selected: Graphic::from(Panel::new(tab_texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4])),
             }),
-            popup_background: white.clone().with_color([0, 0, 0, 160]).into(),
+            popup_background: white.clone().with_color([0, 0, 0, 160].into()).into(),
             popup_header: white.clone().into(),
-            popup_window: white.clone().with_color([200, 200, 200, 255]).into(),
+            popup_window: white.clone().with_color([200, 200, 200, 255].into()).into(),
             list_background: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
             page_background: white.clone().into(),
             scroll_background: Graphic::None,
             scroll_handle: Rc::new(ButtonStyle {
-                normal: white.clone().with_color([80, 80, 80, 255]).into(),
-                hover: white.clone().with_color([100, 100, 100, 255]).into(),
-                pressed: white.with_color([120, 120, 120, 255]).into(),
+                normal: white.clone().with_color([80, 80, 80, 255].into()).into(),
+                hover: white.clone().with_color([100, 100, 100, 255].into()).into(),
+                pressed: white.with_color([120, 120, 120, 255].into()).into(),
                 focus: Graphic::None,
             }),
         }
@@ -398,7 +408,7 @@ impl OptionsGui {
                         .button
                         .normal
                         .clone()
-                        .with_color([230, 230, 230, 255]),
+                        .with_color([230, 230, 230, 255].into()),
                 )
                 .layout(VBoxLayout::new(2.0, [5.0, 5.0, 5.0, 5.0], -1))
             },
@@ -417,7 +427,7 @@ impl OptionsGui {
                     .button
                     .normal
                     .clone()
-                    .with_color([230, 230, 230, 255]),
+                    .with_color([230, 230, 230, 255].into()),
             )
             .expand_y(true)
             .parent(surface)
@@ -779,7 +789,7 @@ impl OptionsGui {
                 .button
                 .normal
                 .clone()
-                .with_color([200, 200, 200, 255]);
+                .with_color([200, 200, 200, 255].into());
             gui.create_control()
                 .anchors([0.0, 0.5, 0.0, 0.5])
                 .margins([5.0, -10.0, 25.0, 10.0])
@@ -791,7 +801,14 @@ impl OptionsGui {
             .create_control()
             .anchors([0.5, 0.5, 0.5, 0.5])
             .margins([-6.0, -6.0, 6.0, 6.0])
-            .graphic(style.menu.button.normal.clone().with_color([0, 0, 0, 255]))
+            .graphic(
+                style
+                    .menu
+                    .button
+                    .normal
+                    .clone()
+                    .with_color([0, 0, 0, 255].into()),
+            )
             .parent(background)
             .build();
         gui.create_control_reserved(id)
@@ -800,7 +817,7 @@ impl OptionsGui {
                 marker,
                 initial_value,
                 style.button.clone(),
-                style.text_field.clone(),
+                style.on_focus.clone(),
                 on_change,
             ))
             .min_size([0.0, 30.0])
@@ -918,7 +935,13 @@ impl OptionsGui {
         let caret = gui
             .create_control()
             .anchors([0.0, 0.0, 0.0, 0.0])
-            .graphic(style.text_field.normal.clone().with_color([0, 0, 0, 255]))
+            .graphic(
+                style
+                    .on_focus
+                    .normal
+                    .clone()
+                    .with_color([0, 0, 0, 255].into()),
+            )
             .parent(input_box)
             .build();
         let input_text = gui
@@ -956,7 +979,7 @@ impl OptionsGui {
                     .button
                     .normal
                     .clone()
-                    .with_color([170, 170, 170, 255]),
+                    .with_color([170, 170, 170, 255].into()),
             )
             .parent(slider)
             .build();
@@ -970,7 +993,7 @@ impl OptionsGui {
                     .button
                     .normal
                     .clone()
-                    .with_color([200, 200, 200, 255]),
+                    .with_color([200, 200, 200, 255].into()),
             )
             .parent(slider)
             .build();
@@ -980,7 +1003,7 @@ impl OptionsGui {
             min,
             max,
             initial_value,
-            style.text_field.clone(),
+            style.on_focus.clone(),
             callback,
         ))
     }

@@ -23,12 +23,12 @@ mod text_style;
 mod texture;
 pub mod util;
 
+use crate::Color;
 use animated_icon::{AnimatedIconVisitor, FIELDS as ANIMATED_ICON_FIELDS};
 use icon::{IconVisitor, FIELDS as ICON_FIELDS};
 use panel::{PanelVisitor, FIELDS as PANEL_FIELDS};
 use text::{TextVisitor, FIELDS as TEXT_FIELDS};
 use texture::{TextureVisitor, FIELDS as TEXTURE_FIELDS};
-use util::Color;
 pub trait StyleLoaderCallback {
     /// Loads a texture and returns its (index, width, height).
     fn load_texture(&mut self, name: String) -> (u32, u32, u32);

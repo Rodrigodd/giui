@@ -2,7 +2,7 @@ use crate::{
     context::Context,
     font::FontId,
     graphics::{Graphic, Sprite},
-    Id, RenderDirtyFlags,
+    Color, Id, RenderDirtyFlags,
 };
 use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
 use std::{ops::Range, time::Instant};
@@ -331,7 +331,7 @@ pub fn to_sprite(
     tex_coords: ab_glyph::Rect,
     pixel_coords: ab_glyph::Rect,
     bounds: [f32; 4],
-    color: [u8; 4],
+    color: Color,
     font_texture: u32,
 ) -> Sprite {
     let mut sprite = Sprite {

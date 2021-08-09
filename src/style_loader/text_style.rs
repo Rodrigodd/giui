@@ -90,13 +90,13 @@ impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for TextStyleVisitor<'a, 'b> {
                     if Option::is_some(&color) {
                         return Err(de::Error::duplicate_field("color"));
                     }
-                    color = Some(map.next_value::<Color>()?.0);
+                    color = Some(map.next_value::<Color>()?);
                 }
             }
         }
         let font_id = font_id.ok_or_else(|| de::Error::missing_field("font_id"))?;
         let font_size = font_size.ok_or_else(|| de::Error::missing_field("font_size"))?;
-        let color = color.unwrap_or([255; 4]);
+        let color = color.unwrap_or(Color::WHITE);
         Ok(TextStyle {
             font_id,
             font_size,

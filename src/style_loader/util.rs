@@ -2,8 +2,6 @@ use std::rc::Rc;
 
 use super::*;
 
-pub struct Color(pub [u8; 4]);
-
 struct ColorVisitor;
 impl<'de> Visitor<'de> for ColorVisitor {
     type Value = Color;
@@ -21,11 +19,9 @@ impl<'de> Visitor<'de> for ColorVisitor {
                 de::Error::invalid_value(de::Unexpected::Str(v), &"hexadecimal color")
             })?;
             if v.len() == 6 {
-                let color = (num << 8 | 0xFF).to_be_bytes();
-                Ok(Color(color))
+                Ok(Color::from_u32(num << 8 | 0xFF))
             } else if v.len() == 8 {
-                let color = num.to_be_bytes();
-                Ok(Color(color))
+                Ok(Color::from_u32(num))
             } else {
                 Err(de::Error::invalid_value(
                     de::Unexpected::Str(v),
@@ -46,16 +42,20 @@ impl<'de> Visitor<'de> for ColorVisitor {
     {
         const EXPECT: &str = "[i32; 4], with 4 elements";
 
-        Ok(Color([
-            seq.next_element()?
+        Ok(Color {
+            r: seq
+                .next_element()?
                 .ok_or_else(|| de::Error::invalid_length(0, &EXPECT))?,
-            seq.next_element()?
+            b: seq
+                .next_element()?
                 .ok_or_else(|| de::Error::invalid_length(1, &EXPECT))?,
-            seq.next_element()?
+            g: seq
+                .next_element()?
                 .ok_or_else(|| de::Error::invalid_length(2, &EXPECT))?,
-            seq.next_element()?
+            a: seq
+                .next_element()?
                 .ok_or_else(|| de::Error::invalid_length(3, &EXPECT))?,
-        ]))
+        })
     }
 }
 impl<'de> Deserialize<'de> for Color {

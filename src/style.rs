@@ -1,5 +1,5 @@
 use crate::graphics::{Graphic, TextStyle};
-use crate::style_loader::util::Color;
+use crate::Color;
 
 #[derive(Clone, Debug, LoadStyle)]
 #[crui(crate = "crate")]
@@ -17,7 +17,7 @@ pub struct ButtonStyle {
     pub focus: Graphic,
 }
 
-#[derive(LoadStyle)]
+#[derive(Clone, Debug, LoadStyle)]
 #[crui(crate = "crate")]
 pub struct TextFieldStyle {
     pub background: OnFocusStyle,
