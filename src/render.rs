@@ -12,6 +12,7 @@ use std::{ops::Range, time::Instant};
 pub struct FontGlyph {
     pub glyph: ab_glyph::Glyph,
     pub font_id: FontId,
+    pub color: Color,
 }
 
 pub trait GuiRenderer {
@@ -266,7 +267,7 @@ impl GuiRender {
                                             tex_coords,
                                             pixel_coords,
                                             mask,
-                                            color,
+                                            glyph.color,
                                             self.font_texture,
                                         ));
                                     }

@@ -42,6 +42,7 @@ pub fn shape(fonts: &Fonts, style: &TextLayoutStyle) -> Vec<GlyphPosition> {
             font_id: style.font_id,
             byte_range: cluster..style.text.len(),
             width: x_advance,
+            color: style.color,
         })
     }
 

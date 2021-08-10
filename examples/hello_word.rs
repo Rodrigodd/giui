@@ -1,9 +1,4 @@
-use crui::{
-    font::{Font, Fonts},
-    graphics::{Text, TextStyle},
-    render::{GuiRender, GuiRenderer},
-    Gui,
-};
+use crui::{Gui, font::{Font, Fonts}, graphics::{Span, Text, TextStyle}, render::{GuiRender, GuiRenderer}};
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use winit::{
     dpi::PhysicalSize,
@@ -57,19 +52,25 @@ fn main() {
     let mut gui_render = GuiRender::new(font_texture, [128, 128]);
 
     // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
+    let mut text = Text::new(
+        "Hello Word!!".to_string(),
+        (0, 0),
+        TextStyle {
+            color: [0, 255, 0, 255].into(),
+            font_size: 70.0,
+            font_id: my_font,
+        },
+    );
+    text.add_span(Span {
+        range: 6..10,
+        color: Some([255, 0, 0, 255].into()),
+        ..Default::default()
+    });
+
     let _text = gui
         .create_control()
         .graphic(
-            Text::new(
-                "Hello Word!!".to_string(),
-                (0, 0),
-                TextStyle {
-                    color: [0, 255, 0, 255].into(),
-                    font_size: 70.0,
-                    font_id: my_font,
-                },
-            )
-            .into(),
+            text.into(),
         )
         .build();
 

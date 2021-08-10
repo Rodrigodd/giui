@@ -16,6 +16,7 @@
 use crate::{
     font::{FontId, Fonts},
     unicode::{linebreak_property, wrap_mask, LINEBREAK_HARD, LINEBREAK_NONE},
+    Color,
 };
 use std::ops::Range;
 
@@ -113,6 +114,8 @@ pub struct GlyphPosition {
     pub byte_range: Range<usize>,
     /// The width of the glyph. This does not take the kerning to next glyph into account.
     pub width: f32,
+    /// The color of this glyph
+    pub color: Color,
 }
 
 /// A style description for a segment of text.
@@ -123,11 +126,18 @@ pub struct TextLayoutStyle<'a> {
     pub px: f32,
     /// The font to layout the text in.
     pub font_id: FontId,
+    /// The color of the text
+    pub color: Color,
 }
 
 impl<'a> TextLayoutStyle<'a> {
-    pub fn new(text: &'a str, px: f32, font_id: FontId) -> TextLayoutStyle<'a> {
-        TextLayoutStyle { text, px, font_id }
+    pub fn new(text: &'a str, px: f32, font_id: FontId, color: Color) -> TextLayoutStyle<'a> {
+        TextLayoutStyle {
+            text,
+            px,
+            font_id,
+            color,
+        }
     }
 }
 

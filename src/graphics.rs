@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::{
     font::{FontId, Fonts},
     render::FontGlyph,
@@ -395,6 +397,16 @@ pub struct TextStyle {
     pub color: Color,
     pub font_size: f32,
     pub font_id: FontId,
+    
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Span {
+    pub range: Range<usize>,
+    pub color: Option<Color>,
+    pub font_size: Option<f32>,
+    pub font_id: Option<FontId>,
+    pub background: Option<Color>,
 }
 
 #[derive(Debug)]
@@ -408,22 +420,8 @@ pub struct Text {
     align: (i8, i8),
     color_dirty: bool,
     style: TextStyle,
+    span: Vec<Span>,
 }
-// impl Default for Text {
-//     fn default() -> Self {
-//         Self {
-//             color_dirty: true,
-//             text: Default::default(),
-//             text_dirty: true,
-//             align: Default::default(),
-//             glyphs: Default::default(),
-//             layout: None,
-//             last_pos: Default::default(),
-//             min_size: Default::default(),
-//             style: TextStyle::default(),
-//         }
-//     }
-// }
 impl Clone for Text {
     fn clone(&self) -> Self {
         Self::new(self.text.clone(), self.align, self.style.clone())
@@ -432,6 +430,13 @@ impl Clone for Text {
 impl Text {
     pub fn new(text: String, align: (i8, i8), style: TextStyle) -> Text {
         Self {
+            span: vec![Span {
+                range: 0..text.len(),
+                color: Some(style.color),
+                font_size: Some(style.font_size),
+                font_id: Some(style.font_id),
+                ..Default::default()
+            }],
             style,
             text,
             align,
@@ -442,6 +447,45 @@ impl Text {
             last_pos: Default::default(),
             min_size: Default::default(),
         }
+    }
+
+    pub fn add_span(&mut self, mut span: Span) {
+        span.color = span.color.or(Some(self.style.color));
+        span.font_id = span.font_id.or(Some(self.style.font_id));
+        span.font_size = span.font_size.or(Some(self.style.font_size));
+        let range = span.range.clone();
+        assert!(range.start <= self.text.len());
+        assert!(range.end <= self.text.len());
+
+        // remove, truncate or split any overlaping range
+
+        //   remove
+        self.span.retain(|span| {
+            let Range { start, end } = span.range.clone();
+            if start >= range.start && end <= range.end {
+                return false;
+            }
+            true
+        });
+
+        //   truncate or split
+        let mut append = vec![span];
+        for span in &mut self.span {
+            let Range { start, end } = span.range.clone();
+            if start < range.start && end > range.end {
+                // split
+                let mut split_span = span.clone();
+                span.range.end = range.start;
+                split_span.range.start = range.end;
+                dbg!(split_span.range.clone());
+                append.push(split_span);
+            } else if end > range.start && start < range.start {
+                span.range.end = range.start;
+            } else if start < range.end && end > range.end {
+                span.range.start = range.end;
+            }
+        }
+        self.span.append(&mut append);
     }
 
     pub fn dirty(&mut self) {
@@ -463,6 +507,14 @@ impl Text {
         self.text.clear();
         self.text += text;
         self.dirty();
+        self.span.clear();
+        self.span.push(Span {
+            range: 0..text.len(),
+            color: Some(self.style.color),
+            font_size: Some(self.style.font_size),
+            font_id: Some(self.style.font_id),
+            ..Default::default()
+        });
     }
 
     pub fn get_align_anchor(&self, rect: [f32; 4]) -> [f32; 2] {
@@ -492,10 +544,18 @@ impl Text {
             vertical_align: [Top, Middle, Bottom][(self.align.1 + 1) as usize],
             ..Default::default()
         });
-        layout.append(
-            fonts,
-            &TextLayoutStyle::new(&self.text, self.style.font_size, self.style.font_id),
-        );
+        self.span.sort_by_key(|x| x.range.start);
+        for span in &self.span {
+            layout.append(
+                fonts,
+                &TextLayoutStyle::new(
+                    &self.text[span.range.clone()],
+                    span.font_size.unwrap(),
+                    span.font_id.unwrap(),
+                    span.color.unwrap(),
+                ),
+            );
+        }
         self.glyphs = layout
             .glyphs()
             .iter()
@@ -506,6 +566,7 @@ impl Text {
                 FontGlyph {
                     glyph,
                     font_id: x.font_id,
+                    color: x.color,
                 }
             })
             .collect();
@@ -544,7 +605,12 @@ impl Text {
             let mut layout = TextLayout::new();
             layout.append(
                 fonts,
-                &TextLayoutStyle::new(&self.text, self.style.font_size, self.style.font_id),
+                &TextLayoutStyle::new(
+                    &self.text,
+                    self.style.font_size,
+                    self.style.font_id,
+                    self.style.color,
+                ),
             );
             self.min_size = Some(layout.min_size());
         }

@@ -48,6 +48,7 @@ pub fn shape(fonts: &Fonts, style: &TextLayoutStyle) -> Vec<GlyphPosition> {
             font_id: font.font.id(),
             byte_range: cur_character_offset..byte_offset,
             width: advance,
+            color: style.color,
         });
     }
     glyphs
