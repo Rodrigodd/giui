@@ -1,26 +1,24 @@
 use ab_glyph::{Font, ScaleFont};
+use crate::{TextStyle, font::Fonts, unicode::read_utf8};
+use super::GlyphPosition;
 
-use crate::{font::Fonts, unicode::read_utf8};
-
-use super::{GlyphPosition, TextLayoutStyle};
-
-pub fn shape(fonts: &Fonts, style: &TextLayoutStyle) -> Vec<GlyphPosition> {
+pub fn shape(fonts: &Fonts, text: &str, style: &TextStyle) -> Vec<GlyphPosition> {
     let font = fonts
         .get(style.font_id)
         .expect("FontId is out of bounds")
-        .as_scaled(style.px);
+        .as_scaled(style.font_size);
 
     let mut byte_offset = 0;
     let mut glyphs: Vec<GlyphPosition> = Vec::new();
-    while byte_offset < style.text.len() {
+    while byte_offset < text.len() {
         let cur_character_offset = byte_offset;
-        let c = unsafe { read_utf8(&style.text, &mut byte_offset) };
+        let c = unsafe { read_utf8(&text, &mut byte_offset) };
         println!("{:?}", c);
         let mut font = font;
         let mut glyph = font.scaled_glyph(c);
         if glyph.id.0 == 0 {
             while let Some(fallback) = font.font.fallback {
-                font = fonts.get(fallback).unwrap().as_scaled(style.px);
+                font = fonts.get(fallback).unwrap().as_scaled(style.font_size);
                 glyph = font.scaled_glyph(c);
                 if glyph.id.0 != 0 {
                     break;

@@ -7,6 +7,7 @@ pub use crui_derive::*;
 
 pub mod font;
 mod text_layout;
+mod text;
 mod util;
 
 mod unicode;
@@ -30,3 +31,4 @@ pub use control::*;
 pub use gui::*;
 pub use rect::*;
 pub use render::GuiRender;
+pub use text::*;

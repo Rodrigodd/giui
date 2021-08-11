@@ -373,6 +373,7 @@ fn create_gui(
                     color: [0, 0, 0, 255].into(),
                     font_size: 16.0,
                     font_id,
+                    ..Default::default()
                 },
             )
             .into(),
@@ -430,6 +431,7 @@ fn create_gui(
                     color: [0, 0, 0, 255].into(),
                     font_size: 16.0,
                     font_id,
+                    ..Default::default()
                 },
             )
             .into(),

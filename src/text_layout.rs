@@ -15,6 +15,7 @@
 
 use crate::{
     font::{FontId, Fonts},
+    text::{TextStyle, SpannedString},
     unicode::{linebreak_property, wrap_mask, LINEBREAK_HARD, LINEBREAK_NONE},
     Color,
 };
@@ -116,29 +117,6 @@ pub struct GlyphPosition {
     pub width: f32,
     /// The color of this glyph
     pub color: Color,
-}
-
-/// A style description for a segment of text.
-pub struct TextLayoutStyle<'a> {
-    /// The text to layout.
-    pub text: &'a str,
-    /// The scale of the text in pixel units.
-    pub px: f32,
-    /// The font to layout the text in.
-    pub font_id: FontId,
-    /// The color of the text
-    pub color: Color,
-}
-
-impl<'a> TextLayoutStyle<'a> {
-    pub fn new(text: &'a str, px: f32, font_id: FontId, color: Color) -> TextLayoutStyle<'a> {
-        TextLayoutStyle {
-            text,
-            px,
-            font_id,
-            color,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -328,12 +306,26 @@ impl TextLayout {
     /// Characters from the input string can only be omitted from the output, they are never
     /// reordered. The output buffer will always contain characters in the order they were defined
     /// in the styles.
-    pub fn append(&mut self, fonts: &Fonts, style: &TextLayoutStyle) {
-        self.text += style.text;
+    pub fn layout(&mut self, fonts: &Fonts, text: &SpannedString) {
+        self.text.clone_from(&text.string);
+        for i in 0..text.spans.len() {
+            let span = &text.spans[i];
+            let right = text
+                .spans
+                .get(i + 1)
+                .map(|x| x.0)
+                .unwrap_or(text.string.len());
+            let range = span.0..right;
+            self.append(fonts, range, &span.1);
+        }
+    }
+
+    fn append(&mut self, fonts: &Fonts, range: Range<usize>, style: &TextStyle) {
+        // let text = &self.text[range];
         let font = fonts
             .get(style.font_id)
             .expect("FontId is out of bounds")
-            .as_scaled(style.px);
+            .as_scaled(style.font_size);
 
         self.current_ascent = font.ascent().ceil();
         self.current_descent = font.descent().ceil();
@@ -350,9 +342,13 @@ impl TextLayout {
             }
         }
 
-        let glyphs = shaping::shape(fonts, style);
+        let glyphs = shaping::shape(fonts, &self.text[range.clone()], style);
         for mut glyph in glyphs {
-            let c = style.text[glyph.byte_range.start..].chars().next().unwrap();
+            // correct the byte_range of the glyph
+            glyph.byte_range.start += range.start;
+            glyph.byte_range.end += range.start;
+            
+            let c = self.text[glyph.byte_range.start..].chars().next().unwrap();
 
             let linebreak = linebreak_property(&mut self.linebreak_state, c) & self.wrap_mask;
             if linebreak >= self.linebreak_prev {

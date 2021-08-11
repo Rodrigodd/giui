@@ -263,6 +263,7 @@ fn deserialize_text() {
                     color: [255, 255, 255, 255].into(),
                     font_size: 16.0,
                     font_id: FontId::new(0),
+                    ..Default::default()
                 }
             ))
         )

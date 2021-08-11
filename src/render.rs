@@ -248,9 +248,7 @@ impl GuiRender {
                             }
                         }
                         Graphic::Text(ref mut text) => {
-                            let color = text.color();
                             let glyphs = text.get_glyphs(rect, fonts);
-
                             for glyph in glyphs {
                                 if let Some((tex_coords, pixel_coords)) = self
                                     .draw_cache

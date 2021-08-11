@@ -5,6 +5,11 @@ pub struct Color {
     pub b: u8,
     pub a: u8,
 }
+impl Default for Color {
+    fn default() -> Self {
+        Self::WHITE
+    }
+}
 impl Color {
     pub const WHITE: Color = Color::from_array([255; 4]);
     pub const BLACK: Color = Color::from_array([0, 0, 0, 255]);

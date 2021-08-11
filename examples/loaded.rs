@@ -169,6 +169,7 @@ impl StyleSheet {
                 color: [40, 40, 100, 255].into(),
                 font_size: 16.0,
                 font_id: fonts.notosans,
+                ..Default::default()
             },
             menu: MenuStyle {
                 button: ButtonStyle {
@@ -185,6 +186,7 @@ impl StyleSheet {
                     color: [0, 0, 0, 255].into(),
                     font_size: 16.0,
                     font_id: fonts.notosans,
+                    ..Default::default()
                 },
             }
             .into(),

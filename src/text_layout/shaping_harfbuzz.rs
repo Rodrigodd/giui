@@ -1,20 +1,19 @@
-use super::TextLayoutStyle;
-use crate::{font::Fonts, text_layout::GlyphPosition};
+use crate::{font::Fonts, text::TextStyle, text_layout::GlyphPosition};
 
 use ab_glyph::{point, Glyph, GlyphId};
 use harfbuzz_rs::{shape as hb_shape, Face, Font as HbFont, UnicodeBuffer};
 
-pub fn shape(fonts: &Fonts, style: &TextLayoutStyle) -> Vec<GlyphPosition> {
+pub fn shape(fonts: &Fonts, text: &str, style: &TextStyle) -> Vec<GlyphPosition> {
     let bytes = &fonts.get(style.font_id).unwrap().data;
     let face = Face::from_bytes(bytes, 0);
     let font = HbFont::new(face);
     let scale = {
         let extends = font.get_font_h_extents().unwrap();
         let height = extends.ascender - extends.descender;
-        style.px / height as f32
+        style.font_size / height as f32
     };
     // let scale = style.px / ppem;
-    let buffer = UnicodeBuffer::new().add_str(style.text);
+    let buffer = UnicodeBuffer::new().add_str(text);
     let output = hb_shape(&font, buffer, &[]);
 
     let positions = output.get_glyph_positions();
@@ -36,11 +35,11 @@ pub fn shape(fonts: &Fonts, style: &TextLayoutStyle) -> Vec<GlyphPosition> {
         glyphs.push(GlyphPosition {
             glyph: Glyph {
                 id: GlyphId(gid as u16),
-                scale: style.px.into(),
+                scale: style.font_size.into(),
                 position: point(x_offset, y_offset),
             },
             font_id: style.font_id,
-            byte_range: cluster..style.text.len(),
+            byte_range: cluster..text.len(),
             width: x_advance,
             color: style.color,
         })

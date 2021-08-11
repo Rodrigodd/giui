@@ -4,6 +4,11 @@ use ab_glyph::{Font as AbFont, FontVec};
 pub struct FontId {
     index: u32,
 }
+impl Default for FontId {
+    fn default() -> Self {
+        Self { index: 0 }
+    }
+}
 impl FontId {
     /// Create a new FontId from a index. This is discouraged, use the FontId
     /// return by [Fonts::add](crate::font::Fonts::add) instead.
@@ -107,13 +112,20 @@ impl AbFont for Font {
     }
 }
 
-#[derive(Default)]
 pub struct Fonts {
     fonts: Vec<Font>,
 }
+
+impl Default for Fonts {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl Fonts {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            fonts: Vec::new(),
+        }
     }
 
     pub fn add(&mut self, mut font: Font) -> FontId {

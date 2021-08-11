@@ -92,6 +92,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
                     color: [0, 0, 0, 255].into(),
                     font_size: 72.0,
                     font_id,
+                    ..Default::default()
                 },
             )
             .into(),

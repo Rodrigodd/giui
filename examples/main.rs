@@ -85,6 +85,7 @@ impl common::CruiEventLoop<()> for Main {
                 color: [0, 0, 0, 255].into(),
                 font_size: 16.0,
                 font_id: fonts.notosans,
+                ..Default::default()
             },
         });
         let tab_style = Rc::new(TabStyle {
@@ -163,6 +164,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 color: [255, 255, 255, 255].into(),
                 font_size: 12.0,
                 font_id: style.fonts.notosans,
+                ..Default::default()
             },
         )
         .into();
@@ -341,6 +343,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     color: [0, 0, 0, 255].into(),
                     font_size: 20.0,
                     font_id: style.fonts.consolas,
+                    ..Default::default()
                 },
             )
             .into();
@@ -366,6 +369,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     color: [0, 0, 0, 255].into(),
                     font_size: 20.0,
                     font_id: style.fonts.notosans,
+                    ..Default::default()
                 },
             )
             .into();
@@ -493,6 +497,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     color: [40, 40, 100, 255].into(),
                     font_size: 16.0,
                     font_id: style.fonts.notosans,
+                    ..Default::default()
                 },
             )
             .into();
@@ -541,6 +546,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                                             color: [40, 40, 100, 255].into(),
                                             font_size: 16.0,
                                             font_id: notosans,
+                                            ..Default::default()
                                         },
                                     )
                                     .into(),
@@ -589,6 +595,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                             color: [40, 40, 100, 255].into(),
                             font_size: 16.0,
                             font_id: style.fonts.notosans,
+                            ..Default::default()
                         },
                     )
                     .into(),
@@ -656,6 +663,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     color: [40, 40, 100, 255].into(),
                     font_size: 12.0,
                     font_id: style.fonts.notosans,
+                    ..Default::default()
                 },
             )
             .into();
@@ -835,6 +843,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                             color: [0, 0, 0, 255].into(),
                             font_size: 16.0,
                             font_id: style.fonts.notosans,
+                            ..Default::default()
                         },
                     )
                     .into(),
@@ -903,6 +912,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                             color: [0, 0, 0, 255].into(),
                             font_size: 16.0,
                             font_id: style.fonts.notosans,
+                            ..Default::default()
                         },
                     )
                     .into(),
@@ -1035,7 +1045,15 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
     };
     let page_na = {
         let page_na = gui.create_control().parent(page_area).build();
-        let graphic = Text::new("This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(), (0, -1), TextStyle { color: [255, 255, 255, 255].into(), font_size: 20.0, font_id: style.fonts.notosans }).into();
+        let graphic = Text::new(
+            "This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(),
+            (0, -1),
+            TextStyle {
+                color: [255, 255, 255, 255].into(),
+                font_size: 20.0,
+                font_id: style.fonts.notosans,
+                ..Default::default()
+        }).into();
         gui.create_control()
             .margins([15.0, 15.0, -15.0, -15.0])
             .graphic(graphic)
@@ -1067,6 +1085,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     color: [40, 40, 100, 255].into(),
                     font_size: 16.0,
                     font_id: style.fonts.notosans,
+                    ..Default::default()
                 },
             )
             .into();
@@ -1108,6 +1127,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     color: [255, 255, 255, 255].into(),
                     font_size: 20.0,
                     font_id: style.fonts.notosans,
+                    ..Default::default()
                 },
             )))
             .layout(FitText)
@@ -1144,6 +1164,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     color: [0, 0, 0, 255].into(),
                     font_size: 20.0,
                     font_id: style.fonts.notosans,
+                    ..Default::default()
                 },
             )))
             .layout(FitText)
@@ -1192,6 +1213,7 @@ fn create_item(
                     color: [0, 0, 0, 255].into(),
                     font_size: 16.0,
                     font_id,
+                    ..Default::default()
                 },
             )
             .into(),
@@ -1231,6 +1253,7 @@ fn create_button<F: Fn(Id, &mut Context) + 'static>(
                         color: [40, 40, 100, 255].into(),
                         font_size: 16.0,
                         font_id,
+                        ..Default::default()
                     },
                 )
                 .into(),

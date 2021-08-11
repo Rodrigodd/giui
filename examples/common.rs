@@ -32,6 +32,7 @@ fn main() {
                             color: [0, 255, 0, 255].into(),
                             font_size: 70.0,
                             font_id: fonts.notosans,
+                            ..Default::default()
                         },
                     )
                     .into(),

@@ -101,6 +101,7 @@ impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for TextStyleVisitor<'a, 'b> {
             font_id,
             font_size,
             color,
+            ..Default::default()
         })
     }
 }
