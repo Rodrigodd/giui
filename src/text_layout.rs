@@ -328,14 +328,8 @@ impl TextLayout {
     pub fn layout(&mut self, fonts: &Fonts, text: &SpannedString) {
         self.text.clone_from(&text.string);
         for i in 0..text.spans.len() {
-            let span = &text.spans[i];
-            let right = text
-                .spans
-                .get(i + 1)
-                .map(|x| x.0)
-                .unwrap_or(text.string.len());
-            let range = span.0..right;
-            self.append(fonts, range, &span.1);
+            let (range, span) = &text.spans[i];
+            self.append(fonts, range.clone(), span);
         }
     }
 
@@ -497,7 +491,6 @@ impl TextLayout {
         let mut y = self.y + ((self.max_height - self.height()) * self.vertical_align).floor();
         let mut idx = 0;
         let mut rect_idx = 0;
-        println!("num_rects: {}", self.rects.len());
         for line in &self.line_metrics {
             let padding = self.max_width - line.line_width;
             let x = self.x - line.x_start + padding * self.horizontal_align;

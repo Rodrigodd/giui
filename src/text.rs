@@ -1,7 +1,47 @@
+use std::ops::Range;
+
 use crate::font::{FontId, Fonts};
 use crate::render::FontGlyph;
 use crate::text_layout::{ColorRect, TextLayout};
 use crate::{Color, Rect, RenderDirtyFlags};
+
+#[cfg(test)]
+mod test {
+    use super::{Span, SpannedString, TextStyle};
+
+    #[rustfmt::skip]
+    #[test]
+    fn add_span() {
+        let mut spanned = SpannedString::from_string("012345678".into(), Default::default());
+        let red = [255, 0, 0, 255].into();
+        let gree = [0, 255, 0, 255].into();
+        let blue = [0, 0, 255, 255].into();
+        spanned.add_span( 3..6, Span { color: Some(red), ..Default::default() });
+        spanned.add_span( 1..4, Span { color: Some(gree), ..Default::default() });
+        spanned.add_span( 2..5, Span { color: Some(blue), ..Default::default() });
+        assert_eq!(
+            spanned.spans,
+            vec![
+                ( 0usize..1, TextStyle { ..Default::default() }),
+                ( 1..2, TextStyle { color: gree, ..Default::default() }),
+                ( 2..3, TextStyle { color: blue, ..Default::default() }),
+                ( 3..4, TextStyle { color: blue, ..Default::default() }),
+                ( 4..5, TextStyle { color: blue, ..Default::default() }),
+                ( 5..6, TextStyle { color: red, ..Default::default() }),
+                ( 6..9, TextStyle { ..Default::default() }),
+            ]
+        );
+    }
+}
+
+/// A partial description of the style of a section of text.
+#[derive(Debug, Clone, Default)]
+pub struct Span {
+    pub color: Option<Color>,
+    pub font_size: Option<f32>,
+    pub font_id: Option<FontId>,
+    pub background: Option<Color>,
+}
 
 /// A description of the style of a text.
 #[derive(Debug, Clone, Default)]
@@ -11,6 +51,17 @@ pub struct TextStyle {
     pub font_id: FontId,
     pub background: Option<Color>,
 }
+
+impl PartialEq for TextStyle {
+    fn eq(&self, other: &Self) -> bool {
+        self.color == other.color
+            && self.font_size == other.font_size
+            && self.font_id == other.font_id
+            && self.background == other.background
+    }
+}
+
+impl Eq for TextStyle {}
 impl TextStyle {
     pub fn with_color(self, color: Color) -> Self {
         Self { color, ..self }
@@ -21,7 +72,7 @@ impl TextStyle {
 #[derive(Default, Debug, Clone)]
 pub struct SpannedString {
     pub(crate) string: String,
-    pub(crate) spans: Vec<(usize, TextStyle)>,
+    pub(crate) spans: Vec<(Range<usize>, TextStyle)>,
 }
 impl SpannedString {
     pub fn new() -> Self {
@@ -35,9 +86,8 @@ impl SpannedString {
 
     pub fn from_string(string: String, style: TextStyle) -> Self {
         Self {
-            string,
             spans: vec![(
-                0,
+                0..string.len(),
                 TextStyle {
                     color: style.color,
                     font_size: style.font_size,
@@ -45,13 +95,68 @@ impl SpannedString {
                     background: None,
                 },
             )],
+            string,
         }
     }
 
     pub fn push_str(&mut self, string: &str, span: TextStyle) {
         let start = self.string.len();
         self.string.push_str(string);
-        self.spans.push((start, span));
+        self.spans.push((start..self.string.len(), span));
+    }
+
+    /// Clear all spans, and replace with only one, with the given style.
+    pub fn set_style(&mut self, style: TextStyle) {
+        self.spans.clear();
+        self.spans.push((
+            0..self.string.len(),
+            TextStyle {
+                color: style.color,
+                font_size: style.font_size,
+                font_id: style.font_id,
+                background: None,
+            },
+        ));
+    }
+
+    pub fn add_span(&mut self, range: Range<usize>, span: Span) {
+        let mut to_append = Vec::new();
+        for (rb, sp) in &mut self.spans {
+            if rb.start > range.start && rb.end < range.end {
+                // range overlap a range
+                merge_span(sp, &span);
+            } else if rb.start < range.start && rb.end > range.end {
+                // range cut a range in tree
+                let mut style = sp.clone();
+                merge_span(&mut style, &span);
+                to_append.push((range.start..range.end, style));
+                to_append.push((range.end..rb.end, sp.clone()));
+                rb.end = range.start;
+            } else if rb.start < range.start && rb.end > range.start {
+                // range.start cut a range in two
+                let mut style = sp.clone();
+                merge_span(&mut style, &span);
+                to_append.push((range.start..rb.end, style));
+                rb.end = range.start;
+            } else if rb.start < range.end && rb.end > range.end {
+                // range.end cut a range in two
+                let mut style = sp.clone();
+                merge_span(&mut style, &span);
+                to_append.push((rb.start..range.end, style));
+                rb.start = range.end;
+            }
+        }
+        self.spans.append(&mut to_append);
+        self.spans.sort_by_key(|x| x.0.start);
+    }
+}
+
+fn merge_span(style: &mut TextStyle, span: &Span) {
+    *style = TextStyle {
+        color: span.color.unwrap_or(style.color),
+        font_size: span.font_size.unwrap_or(style.font_size),
+        font_id: span.font_id.unwrap_or(style.font_id),
+        background: span.background.or(span.background),
     }
 }
 
@@ -133,17 +238,19 @@ impl Text {
         self.dirty();
     }
 
+    pub fn add_span(&mut self, range: Range<usize>, span: Span) {
+        self.text.add_span(range, span);
+        self.dirty();
+    }
+
+    pub fn clear_spans(&mut self) {
+        self.text.set_style(self.style.clone());
+        self.dirty();
+    }
+
     pub fn set_text(&mut self, text: &str) {
         self.text.clear();
-        self.text.push_str(
-            text,
-            TextStyle {
-                color: self.style.color,
-                font_size: self.style.font_size,
-                font_id: self.style.font_id,
-                background: None,
-            },
-        );
+        self.text.push_str(text, self.style.clone());
         self.dirty();
     }
 

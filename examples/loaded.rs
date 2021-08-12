@@ -49,7 +49,7 @@ use crui::{
     event::SetValue,
     graphics::{Graphic, Panel, Text, TextStyle, Texture},
     layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
-    style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle, TextFieldStyle},
+    style::{ButtonStyle, MenuStyle, OnFocusStyle, SelectionColor, TabStyle, TextFieldStyle},
     widgets::{
         Blocker, Button, ButtonGroup, CloseMenu, DropMenu, Dropdown, Item, Menu, MenuBar, MenuItem,
         ScrollBar, ScrollView, Select, SetMaxValue, SetMinValue, SetSelected, Slider,
@@ -196,7 +196,10 @@ impl StyleSheet {
                     focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4]).into(),
                 },
                 caret_color: Color::BLACK,
-                selection_color: [170, 0, 255, 255].into(),
+                selection_color: SelectionColor {
+                    bg: [170, 0, 255, 255].into(),
+                    fg: Some(Color::WHITE),
+                },
             }
             .into(),
             on_focus: OnFocusStyle {

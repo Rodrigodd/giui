@@ -1,6 +1,6 @@
 use ab_glyph::{Font as AbFont, FontVec};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FontId {
     index: u32,
 }

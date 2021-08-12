@@ -251,7 +251,6 @@ impl GuiRender {
                         }
                         Graphic::Text(ref mut text) => {
                             let (glyphs, rects) = text.get_glyphs_and_rects(rect, fonts);
-                            println!("Print rects:");
                             for rect in rects {
                                 let mut sprite = Sprite {
                                     texture: self.white_texture,
@@ -264,7 +263,6 @@ impl GuiRender {
                                     ],
                                     uv_rect: [0.0, 0.0, 1.0, 1.0],
                                 };
-                                println!("  {:?} => {:?}", rect.rect, sprite.rect);
                                 if cut_sprite(&mut sprite, &mask) {
                                     self.sprites.push(sprite);
                                 }

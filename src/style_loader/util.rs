@@ -118,63 +118,34 @@ where
     }
 }
 
-// impl<'de, 'a, C, T> DeserializeSeed<'de> for LoadStyle<'a, T, C>
-// where
-//     C: StyleLoaderCallback,
-//     T: for<'b> Deserialize<'b>,
-// {
-//     type Value = T;
-//     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-//     where
-//         D: Deserializer<'de>,
-//     {
-//         <T as Deserialize>::deserialize(deserializer)
-//     }
-// }
+impl<'a, 'b: 'a, T: 'a> LoadStyle<'a, 'b> for Option<T>
+where
+    T: LoadStyle<'a, 'b>,
+{
+    type Loader = OptionLoader<'a, 'b, T>;
+    fn new_loader(loader: &'a mut StyleLoader<'b>) -> Self::Loader {
+        OptionLoader {
+            loader,
+            _phantom: PhantomData::<fn() -> T>::default(),
+        }
+    }
+}
 
-// macro_rules! impl_load_style_rc {
-//     ($($x:ty),+) => {
-//         $(impl<'de, 'a, C> DeserializeSeed<'de> for LoadStyle<'a, Rc<$x>, C>
-//         where
-//             C: StyleLoaderCallback,
-//             for<'b, 'c> LoadStyle<'b, $x, C>: DeserializeSeed<'c, Value=$x>,
-//         {
-//             type Value = Rc<$x>;
-//             fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-//             where
-//                 D: Deserializer<'de>,
-//             {
-//                 <LoadStyle<'_, $x, C> as DeserializeSeed>::deserialize(
-//                     LoadStyle {
-//                         loader: self.loader,
-//                         _phantom: PhantomData::<fn() -> $x>::default(),
-//                     },
-//                     deserializer,
-//                 ).map(Rc::new)
-//             }
-//         })*
-//     }
-// }
+pub struct OptionLoader<'a, 'b, T> {
+    loader: &'a mut StyleLoader<'b>,
+    _phantom: PhantomData<fn() -> T>,
+}
+impl<'de, 'a, 'b, T> DeserializeSeed<'de> for OptionLoader<'a, 'b, T>
+where
+    T: LoadStyle<'a, 'b>,
+{
+    type Value = Option<T>;
 
-// use crate::style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle};
-// impl_load_style_rc! { ButtonStyle, MenuStyle, OnFocusStyle, TabStyle }
-
-// impl<'de, 'a, C> DeserializeSeed<'de> for LoadStyle<'a, Rc<ButtonStyle>, C>
-// where
-//     C: StyleLoaderCallback,
-//     for<'b, 'c> LoadStyle<'b, ButtonStyle, C>: DeserializeSeed<'c, Value=ButtonStyle>,
-// {
-//     type Value = Rc<ButtonStyle>;
-//     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-//     where
-//         D: Deserializer<'de>,
-//     {
-//         <LoadStyle<'_, ButtonStyle, C> as DeserializeSeed>::deserialize(
-//             LoadStyle {
-//                 loader: self.loader,
-//                 _phantom: PhantomData::<fn() -> ButtonStyle>::default(),
-//             },
-//             deserializer,
-//         ).map(Rc::new)
-//     }
-// }
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        DeserializeSeed::deserialize(<T as LoadStyle>::new_loader(self.loader), deserializer)
+            .map(Some)
+    }
+}

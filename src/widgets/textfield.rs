@@ -3,15 +3,15 @@ use crate::{
     graphics::Graphic,
     style::TextFieldStyle,
     text_layout::{LineMetrics, TextLayout},
-    Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseButton, MouseEvent, MouseInfo,
+    Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseButton, MouseEvent, MouseInfo, Span,
 };
 
 use copypasta::{ClipboardContext, ClipboardProvider};
-use std::rc::Rc;
 use std::{
     any::Any,
     time::{Duration, Instant},
 };
+use std::{ops::Range, rc::Rc};
 use winit::{event::VirtualKeyCode, window::CursorIcon};
 
 pub trait TextFieldCallback {
@@ -220,25 +220,24 @@ impl<C: TextFieldCallback> TextField<C> {
 
         caret_pos[0] -= self.x_scroll;
 
-        if let Some(selection_index) = self.selection_index {
-            ctx.get_graphic_mut(self.caret)
-                .set_color(self.style.selection_color);
-            let mut selection_pos = self.get_glyph_pos(selection_index);
-            selection_pos[0] -= self.x_scroll;
-            let mut margins = [
-                caret_pos[0],
-                caret_pos[1] - caret_pos[2],
-                selection_pos[0],
-                caret_pos[1],
-            ];
-            if margins[0] > margins[2] {
-                margins.swap(0, 2);
+        if let Some(_) = self.selection_index {
+            ctx.set_margins(self.caret, [0.0; 4]);
+            if let Graphic::Text(text) = ctx.get_graphic_mut(self.label) {
+                text.clear_spans();
+                let range = self.selection_range().unwrap();
+                text.add_span(
+                    range,
+                    Span {
+                        color: self.style.selection_color.fg,
+                        background: Some(self.style.selection_color.bg),
+                        ..Default::default()
+                    },
+                );
             }
-            if margins[1] > margins[3] {
-                margins.swap(1, 3);
-            }
-            ctx.set_margins(self.caret, margins);
         } else {
+            if let Graphic::Text(text) = ctx.get_graphic_mut(self.label) {
+                text.clear_spans();
+            }
             ctx.get_graphic_mut(self.caret)
                 .set_color(self.style.caret_color);
             if self.on_focus {
@@ -287,8 +286,9 @@ impl<C: TextFieldCallback> TextField<C> {
         self.caret_index = caret;
     }
 
-    fn delete_selection(&mut self, this: Id, ctx: &mut Context) {
-        let selection_index = self.selection_index.unwrap();
+    /// return the byte range of the selected text
+    fn selection_range(&mut self) -> Option<Range<usize>> {
+        let selection_index = self.selection_index?;
         let a = self.get_byte_range(self.caret_index);
         let b = self.get_byte_range(selection_index);
         let range = if a.start > b.start {
@@ -296,6 +296,12 @@ impl<C: TextFieldCallback> TextField<C> {
         } else {
             a.start..b.start
         };
+        Some(range)
+    }
+
+    fn delete_selection(&mut self, this: Id, ctx: &mut Context) {
+        let range = self.selection_range().unwrap();
+        let selection_index = self.selection_index.unwrap();
         if self.caret_index > selection_index {
             self.caret_index = selection_index;
         }

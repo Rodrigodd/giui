@@ -6,7 +6,7 @@ use crui::{
     font::FontId,
     graphics::{Graphic, Icon, Panel, Text, TextStyle, Texture},
     layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
-    style::{ButtonStyle, MenuStyle, OnFocusStyle, TabStyle, TextFieldStyle},
+    style::{ButtonStyle, MenuStyle, OnFocusStyle, SelectionColor, TabStyle, TextFieldStyle},
     widgets::{
         self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, DropMenu, Dropdown, Hoverable,
         Item, Menu, MenuBar, MenuItem, ScrollBar, ScrollView, Slider, TabButton, TextField, Toggle,
@@ -864,7 +864,10 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     input_text,
                     TextFieldStyle {
                         caret_color: Color::BLACK,
-                        selection_color: [170, 0, 255, 255].into(),
+                        selection_color: SelectionColor {
+                            bg: [170, 0, 255, 255].into(),
+                            fg: Some(Color::WHITE),
+                        },
                         background: OnFocusStyle {
                             normal: style.painel.clone().with_color([200, 200, 200, 255].into()),
                             focus: style

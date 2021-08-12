@@ -7,7 +7,7 @@ use crui::{
     font::FontId,
     graphics::{Panel, Text},
     layouts::MarginLayout,
-    style::{OnFocusStyle, TextFieldStyle},
+    style::{OnFocusStyle, SelectionColor, TextFieldStyle},
     widgets::{TextField, TextFieldCallback},
     Color, ControlBuilder, Gui,
 };
@@ -40,7 +40,10 @@ fn main() {
                         normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
                         focus: Panel::new(texture, [0.5, 0.5, 0.5, 0.5], [10.0; 4]).into(),
                     },
-                    selection_color: [170, 0, 255, 255].into(),
+                    selection_color: SelectionColor {
+                        bg: [170, 0, 255, 255].into(),
+                        fg: Some(Color::WHITE),
+                    },
                     caret_color: Color::BLACK,
                 },
                 fonts.notosans,

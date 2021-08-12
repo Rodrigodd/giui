@@ -19,10 +19,17 @@ pub struct ButtonStyle {
 
 #[derive(Clone, Debug, LoadStyle)]
 #[crui(crate = "crate")]
+pub struct SelectionColor {
+    pub fg: Option<Color>,
+    pub bg: Color,
+}
+
+#[derive(Clone, Debug, LoadStyle)]
+#[crui(crate = "crate")]
 pub struct TextFieldStyle {
     pub background: OnFocusStyle,
     pub caret_color: Color,
-    pub selection_color: Color,
+    pub selection_color: SelectionColor,
 }
 
 #[derive(Clone, Debug, LoadStyle)]
