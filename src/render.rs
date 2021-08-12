@@ -23,6 +23,7 @@ pub trait GuiRenderer {
 pub struct GuiRender {
     draw_cache: DrawCache,
     font_texture: u32,
+    white_texture: u32,
     last_sprites: Vec<Sprite>,
     last_sprites_map: Vec<(Id, Range<usize>)>,
     sprites: Vec<Sprite>,
@@ -30,7 +31,7 @@ pub struct GuiRender {
     last_anim_draw: Option<Instant>,
 }
 impl GuiRender {
-    pub fn new(font_texture: u32, font_texture_size: [u32; 2]) -> Self {
+    pub fn new(font_texture: u32, white_texture: u32, font_texture_size: [u32; 2]) -> Self {
         //TODO: change this to default dimensions, and allow resizing
         let draw_cache = DrawCacheBuilder::default()
             .dimensions(font_texture_size[0], font_texture_size[1])
@@ -38,6 +39,7 @@ impl GuiRender {
         Self {
             draw_cache,
             font_texture,
+            white_texture,
             last_sprites: Vec::new(),
             last_sprites_map: Vec::new(),
             sprites: Vec::new(),
@@ -106,7 +108,7 @@ impl GuiRender {
             while let Some(parent) = parents.pop() {
                 parents.extend(ctx.get_active_children(parent).iter());
                 if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(parent) {
-                    let glyphs = text.get_glyphs(rect, fonts);
+                    let (glyphs, _) = text.get_glyphs_and_rects(rect, fonts);
                     for glyph in glyphs {
                         self.draw_cache
                             .queue_glyph(glyph.font_id.index(), glyph.glyph.clone());
@@ -248,7 +250,25 @@ impl GuiRender {
                             }
                         }
                         Graphic::Text(ref mut text) => {
-                            let glyphs = text.get_glyphs(rect, fonts);
+                            let (glyphs, rects) = text.get_glyphs_and_rects(rect, fonts);
+                            println!("Print rects:");
+                            for rect in rects {
+                                let mut sprite = Sprite {
+                                    texture: self.white_texture,
+                                    color: rect.color,
+                                    rect: [
+                                        rect.rect[0],
+                                        rect.rect[1],
+                                        rect.rect[0] + rect.rect[2],
+                                        rect.rect[1] + rect.rect[3],
+                                    ],
+                                    uv_rect: [0.0, 0.0, 1.0, 1.0],
+                                };
+                                println!("  {:?} => {:?}", rect.rect, sprite.rect);
+                                if cut_sprite(&mut sprite, &mask) {
+                                    self.sprites.push(sprite);
+                                }
+                            }
                             for glyph in glyphs {
                                 if let Some((tex_coords, pixel_coords)) = self
                                     .draw_cache

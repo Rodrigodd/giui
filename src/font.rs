@@ -123,9 +123,7 @@ impl Default for Fonts {
 }
 impl Fonts {
     pub fn new() -> Self {
-        Self {
-            fonts: Vec::new(),
-        }
+        Self { fonts: Vec::new() }
     }
 
     pub fn add(&mut self, mut font: Font) -> FontId {

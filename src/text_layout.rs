@@ -15,7 +15,7 @@
 
 use crate::{
     font::{FontId, Fonts},
-    text::{TextStyle, SpannedString},
+    text::{SpannedString, TextStyle},
     unicode::{linebreak_property, wrap_mask, LINEBREAK_HARD, LINEBREAK_NONE},
     Color,
 };
@@ -135,6 +135,10 @@ pub struct LineMetrics {
     pub start_glyph: usize,
     /// The index of the last glyph in the line plus one.
     pub end_glyph: usize,
+    /// The index of the first rect in the line
+    pub start_rect: usize,
+    // The inde of the last rect in the line plus one.
+    pub end_rect: usize,
 }
 
 impl Default for LineMetrics {
@@ -147,8 +151,17 @@ impl Default for LineMetrics {
             new_line_size: 0.0,
             start_glyph: 0,
             end_glyph: 0,
+            start_rect: 0,
+            end_rect: 0,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct ColorRect {
+    pub color: Color,
+    // A rect, in [x, y, w, h] format.
+    pub rect: [f32; 4],
 }
 
 /// Text layout requires a small amount of heap usage which is contained in the Layout struct. This
@@ -166,7 +179,9 @@ pub struct TextLayout {
     horizontal_align: f32,
     // Single line state
     output: Vec<GlyphPosition>,
+    output_rects: Vec<ColorRect>,
     glyphs: Vec<GlyphPosition>,
+    rects: Vec<ColorRect>,
     line_metrics: Vec<LineMetrics>,
     text: String,
     linebreak_prev: u8,
@@ -178,6 +193,7 @@ pub struct TextLayout {
     current_descent: f32,
     current_new_line: f32,
     current_px: f32,
+    // start position of the current line
     start_pos: f32,
     height: f32,
     width: f32,
@@ -203,6 +219,9 @@ impl TextLayout {
             // Line state
             output: Vec::new(),
             glyphs: Vec::new(),
+            output_rects: Vec::new(),
+            /// Rects are what form backgrounds, underlines, etc...
+            rects: Vec::new(),
             line_metrics: Vec::new(),
             text: String::new(),
             linebreak_prev: 0,
@@ -343,11 +362,13 @@ impl TextLayout {
         }
 
         let glyphs = shaping::shape(fonts, &self.text[range.clone()], style);
+        // the position of the start of this section or line
+        let mut section_start = self.current_pos;
         for mut glyph in glyphs {
             // correct the byte_range of the glyph
             glyph.byte_range.start += range.start;
             glyph.byte_range.end += range.start;
-            
+
             let c = self.text[glyph.byte_range.start..].chars().next().unwrap();
 
             let linebreak = linebreak_property(&mut self.linebreak_state, c) & self.wrap_mask;
@@ -370,8 +391,29 @@ impl TextLayout {
             let line_width = self.current_pos + c_advance - self.start_pos;
             if linebreak == LINEBREAK_HARD || line_width > self.max_width {
                 self.linebreak_prev = LINEBREAK_NONE;
+
+                if let Some(background) = style.background {
+                    // TODO: if the breakline happens inside the previous style,
+                    // and the previous style has a background, the background
+                    // must also be breaked.
+                    let rect = [
+                        section_start,
+                        -self.current_ascent,
+                        self.linebreak_pos - section_start,
+                        self.current_ascent - self.current_descent,
+                    ];
+                    let rect = ColorRect {
+                        color: background,
+                        rect,
+                    };
+                    self.rects.push(rect);
+                }
+
+                // Close last line metric
+
                 if let Some(line) = self.line_metrics.last_mut() {
                     line.end_glyph = self.linebreak_idx;
+                    line.end_rect = self.rects.len();
                     line.line_width = self.linebreak_pos - self.start_pos;
                     if line.end_glyph > line.start_glyph {
                         let glyph = &self.glyphs[line.end_glyph - 1];
@@ -388,13 +430,11 @@ impl TextLayout {
                         self.width = line.line_width;
                     }
                 }
-                let start_index = self.glyphs().len();
-                // let break_glyph_id = if self.linebreak_idx < self.glyphs.len() {
-                //     self.glyphs[self.linebreak_idx].glyph.id
-                // } else {
-                //     glyph.id
-                // };
-                self.start_pos = self.linebreak_pos; // + font.h_side_bearing(break_glyph_id);
+
+                // Create a new line
+
+                let start_index = self.linebreak_idx;
+                self.start_pos = self.linebreak_pos;
                 self.line_metrics.push(LineMetrics {
                     line_width: 0.0,
                     ascent: self.current_ascent,
@@ -403,12 +443,28 @@ impl TextLayout {
                     new_line_size: self.current_new_line,
                     start_glyph: start_index,
                     end_glyph: 0,
+                    start_rect: self.rects.len(),
+                    end_rect: 0,
                 });
+
+                section_start = self.start_pos;
             }
             glyph.glyph.position.x += self.current_pos;
-            // glyph.glyph.position.y += 0.0;
             self.current_pos += glyph.width;
             self.glyphs.push(glyph);
+        }
+        if let Some(background) = style.background {
+            let rect = [
+                section_start,
+                -self.current_ascent,
+                self.current_pos - section_start,
+                self.current_ascent - self.current_descent,
+            ];
+            let rect = ColorRect {
+                color: background,
+                rect,
+            };
+            self.rects.push(rect);
         }
         if let Some(line) = self.line_metrics.last_mut() {
             line.line_width = self.current_pos - self.start_pos;
@@ -416,6 +472,7 @@ impl TextLayout {
                 self.width = line.line_width;
             }
             line.end_glyph = self.glyphs.len();
+            line.end_rect = self.rects.len();
         }
     }
 
@@ -425,8 +482,13 @@ impl TextLayout {
 
     /// Gets the current laid out glyphs. Additional layout may be performed lazily here.
     pub fn glyphs(&mut self) -> &Vec<GlyphPosition> {
+        self.glyphs_and_rects().0
+    }
+
+    /// Gets the current laid out glyphs and rects. Additional layout may be performed lazily here.
+    pub fn glyphs_and_rects(&mut self) -> (&Vec<GlyphPosition>, &Vec<ColorRect>) {
         if self.glyphs.len() == self.output.len() {
-            return &self.output;
+            return (&self.output, &self.output_rects);
         }
 
         unsafe { self.output.set_len(0) };
@@ -434,6 +496,8 @@ impl TextLayout {
 
         let mut y = self.y + ((self.max_height - self.height()) * self.vertical_align).floor();
         let mut idx = 0;
+        let mut rect_idx = 0;
+        println!("num_rects: {}", self.rects.len());
         for line in &self.line_metrics {
             let padding = self.max_width - line.line_width;
             let x = self.x - line.x_start + padding * self.horizontal_align;
@@ -445,9 +509,16 @@ impl TextLayout {
                 self.output.push(glyph);
                 idx += 1;
             }
+            while rect_idx < line.end_rect {
+                let mut rect = self.rects[rect_idx].clone();
+                rect.rect[0] += x;
+                rect.rect[1] += y;
+                self.output_rects.push(rect);
+                rect_idx += 1;
+            }
             y += line.new_line_size - line.ascent;
         }
 
-        &self.output
+        (&self.output, &self.output_rects)
     }
 }

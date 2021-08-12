@@ -1,6 +1,6 @@
 use crate::font::{FontId, Fonts};
 use crate::render::FontGlyph;
-use crate::text_layout::TextLayout;
+use crate::text_layout::{ColorRect, TextLayout};
 use crate::{Color, Rect, RenderDirtyFlags};
 
 /// A description of the style of a text.
@@ -60,6 +60,7 @@ pub struct Text {
     text: SpannedString,
     pub(crate) text_dirty: bool,
     glyphs: Vec<FontGlyph>,
+    rects: Vec<ColorRect>,
     layout: Option<TextLayout>,
     min_size: Option<[f32; 2]>,
     last_pos: [f32; 2],
@@ -76,6 +77,7 @@ impl Clone for Text {
             color_dirty: true,
             text_dirty: true,
             glyphs: Default::default(),
+            rects: Default::default(),
             layout: None,
             last_pos: Default::default(),
             min_size: Default::default(),
@@ -91,6 +93,7 @@ impl Text {
             color_dirty: true,
             text_dirty: true,
             glyphs: Default::default(),
+            rects: Default::default(),
             layout: None,
             last_pos: Default::default(),
             min_size: Default::default(),
@@ -105,6 +108,7 @@ impl Text {
             color_dirty: true,
             text_dirty: true,
             glyphs: Default::default(),
+            rects: Default::default(),
             layout: None,
             last_pos: Default::default(),
             min_size: Default::default(),
@@ -122,18 +126,24 @@ impl Text {
     }
 
     pub fn set_font_size(&mut self, font_size: f32) {
+        for (_, style) in &mut self.text.spans {
+            style.font_size = font_size;
+        }
         self.style.font_size = font_size;
         self.dirty();
     }
 
     pub fn set_text(&mut self, text: &str) {
         self.text.clear();
-        self.text.push_str(text, TextStyle {
-            color: self.style.color,
-            font_size: self.style.font_size,
-            font_id: self.style.font_id,
-            background: None,
-        });
+        self.text.push_str(
+            text,
+            TextStyle {
+                color: self.style.color,
+                font_size: self.style.font_size,
+                font_id: self.style.font_id,
+                background: None,
+            },
+        );
         self.dirty();
     }
 
@@ -165,8 +175,8 @@ impl Text {
             ..Default::default()
         });
         layout.layout(fonts, &self.text);
-        self.glyphs = layout
-            .glyphs()
+        let (glyphs, rects) = layout.glyphs_and_rects();
+        self.glyphs = glyphs
             .iter()
             .map(|x| {
                 let mut glyph = x.glyph.clone();
@@ -179,6 +189,15 @@ impl Text {
                 }
             })
             .collect();
+        self.rects = rects
+            .iter()
+            .cloned()
+            .map(|mut x| {
+                x.rect[0] += rect[0];
+                x.rect[1] += rect[1];
+                x
+            })
+            .collect();
         self.layout = Some(layout);
     }
 
@@ -189,7 +208,11 @@ impl Text {
         self.layout.as_ref().unwrap()
     }
 
-    pub fn get_glyphs(&mut self, rect: &mut Rect, fonts: &Fonts) -> &[FontGlyph] {
+    pub fn get_glyphs_and_rects(
+        &mut self,
+        rect: &mut Rect,
+        fonts: &Fonts,
+    ) -> (&[FontGlyph], &[ColorRect]) {
         let dirty_flags = rect.get_render_dirty_flags();
         let width_change = dirty_flags.contains(RenderDirtyFlags::WIDTH)
             && self.min_size.map_or(true, |x| rect.get_width() < x[0]);
@@ -206,7 +229,7 @@ impl Text {
                 glyph.glyph.position.y += delta[1];
             }
         }
-        &self.glyphs
+        (&self.glyphs, &self.rects)
     }
 
     pub fn compute_min_size(&mut self, fonts: &Fonts) -> Option<[f32; 2]> {

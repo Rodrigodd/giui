@@ -1,6 +1,6 @@
-use ab_glyph::{Font, ScaleFont};
-use crate::{TextStyle, font::Fonts, unicode::read_utf8};
 use super::GlyphPosition;
+use crate::{font::Fonts, unicode::read_utf8, TextStyle};
+use ab_glyph::{Font, ScaleFont};
 
 pub fn shape(fonts: &Fonts, text: &str, style: &TextStyle) -> Vec<GlyphPosition> {
     let font = fonts

@@ -78,6 +78,7 @@ fn main() {
         Camera::new(width, height, height as f32)
     };
     let font_texture = render.new_texture(128, 128, &[], false);
+    let white_texture = render.new_texture(1, 1, &[255, 255, 255, 255], false);
     let texture = {
         let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
         let data = data.to_rgba8();
@@ -88,7 +89,7 @@ fn main() {
     // TODO: I should not be cloning the fonts for each gui instance.
     let my_font = FontId::new(0); // this is not cool.
     let mut gui = Gui::new(0.0, 0.0, fonts());
-    let gui_render = GuiRender::new(font_texture, [128, 128]);
+    let gui_render = GuiRender::new(font_texture, white_texture, [128, 128]);
 
     // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
     let button_style = Rc::new(ButtonStyle {
@@ -158,12 +159,13 @@ fn main() {
                 }
 
                 let font_texture = render.new_texture(128, 128, &[], false);
+                let white_texture = render.new_texture(1, 1, &[255, 255, 255, 255], false);
                 let window = render.add_window(window_builder, event_loop);
                 let size = window.inner_size();
                 let width = size.width;
                 let height = size.height;
                 let mut gui = Gui::new(width as f32, height as f32, fonts());
-                let gui_render = GuiRender::new(font_texture, [128, 128]);
+                let gui_render = GuiRender::new(font_texture, white_texture, [128, 128]);
                 let mut camera = Camera::new(width, height, height as f32);
 
                 resize(

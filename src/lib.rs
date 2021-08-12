@@ -6,8 +6,8 @@ extern crate crui_derive;
 pub use crui_derive::*;
 
 pub mod font;
-mod text_layout;
 mod text;
+mod text_layout;
 mod util;
 
 mod unicode;

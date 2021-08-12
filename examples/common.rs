@@ -92,6 +92,7 @@ pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -
         Camera::new(width, height, height as f32)
     };
     let font_texture = render.new_texture(128, 128, &[], false);
+    let white_texture = render.new_texture(1, 1, &[255, 255, 255, 255], false);
 
     // load a font
     let mut fonts = Fonts::new();
@@ -104,7 +105,7 @@ pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -
 
     // create the gui, and the gui_render
     let mut gui = Gui::new(0.0, 0.0, fonts);
-    let mut gui_render = GuiRender::new(font_texture, [128, 128]);
+    let mut gui_render = GuiRender::new(font_texture, white_texture, [128, 128]);
 
     // populate the gui with controls.
     let mut app = T::init(&mut gui, &mut render, my_fonts, &event_loop);
