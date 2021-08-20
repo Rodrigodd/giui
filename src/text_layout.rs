@@ -140,6 +140,11 @@ pub struct LineMetrics {
     // The inde of the last rect in the line plus one.
     pub end_rect: usize,
 }
+impl LineMetrics {
+    pub fn height(&self) -> f32 {
+        self.ascent - self.descent
+    }
+}
 
 impl Default for LineMetrics {
     fn default() -> Self {
@@ -183,7 +188,7 @@ pub struct TextLayout {
     glyphs: Vec<GlyphPosition>,
     rects: Vec<ColorRect>,
     line_metrics: Vec<LineMetrics>,
-    text: String,
+    text: SpannedString,
     linebreak_prev: u8,
     linebreak_state: u8,
     linebreak_pos: f32,
@@ -200,13 +205,6 @@ pub struct TextLayout {
 }
 impl Default for TextLayout {
     fn default() -> Self {
-        Self::new()
-    }
-}
-impl TextLayout {
-    /// Creates a layout instance. This requires the direction that the Y coordinate increases in.
-    /// Layout needs to be aware of your coordinate system to place the glyphs correctly.
-    pub fn new() -> TextLayout {
         let mut layout = TextLayout {
             // Settings state
             x: 0.0,
@@ -223,7 +221,7 @@ impl TextLayout {
             /// Rects are what form backgrounds, underlines, etc...
             rects: Vec::new(),
             line_metrics: Vec::new(),
-            text: String::new(),
+            text: Default::default(),
             linebreak_prev: 0,
             linebreak_state: 0,
             linebreak_pos: 0.0,
@@ -237,8 +235,26 @@ impl TextLayout {
             height: 0.0,
             width: 0.0,
         };
-        layout.reset(&LayoutSettings::default());
+        layout.clear();
         layout
+    }
+}
+impl TextLayout {
+    /// Creates a layout instance. This requires the direction that the Y coordinate increases in.
+    /// Layout needs to be aware of your coordinate system to place the glyphs correctly.
+    pub fn new(text: SpannedString, settings: &LayoutSettings, fonts: &Fonts) -> TextLayout {
+        let mut layout = TextLayout {
+            text,
+            ..Default::default()
+        };
+        layout.reset(settings);
+        layout.layout(fonts);
+        layout
+    }
+
+    /// Desconstructs Self, and return the inner SpannedString
+    pub fn to_spanned(self) -> SpannedString {
+        self.text
     }
 
     /// Resets the current layout settings and clears all appended text.
@@ -279,7 +295,6 @@ impl TextLayout {
         self.output.clear();
         self.line_metrics.clear();
         self.line_metrics.push(LineMetrics::default());
-        self.text.clear();
 
         self.linebreak_prev = 0;
         self.linebreak_state = 0;
@@ -317,6 +332,18 @@ impl TextLayout {
         self.line_metrics.len()
     }
 
+    /// Replace a range of text, and recalculate the layout
+    pub fn replace_range(&mut self, range: Range<usize>, text: &str, fonts: &Fonts)  {
+        self.text.replace_range(range, text);
+        self.clear();
+        self.layout(fonts);
+    }
+
+    /// Returns a slice to the inner string.
+    pub fn text(&self) -> &str {
+        &self.text.string
+    }
+
     /// Performs layout for text horizontally, and wrapping vertically. This makes a best effort
     /// attempt at laying out the text defined in the given styles with the provided layout
     /// settings. Text may overflow out of the bounds defined in the layout settings and it's up
@@ -325,11 +352,16 @@ impl TextLayout {
     /// Characters from the input string can only be omitted from the output, they are never
     /// reordered. The output buffer will always contain characters in the order they were defined
     /// in the styles.
-    pub fn layout(&mut self, fonts: &Fonts, text: &SpannedString) {
-        self.text.clone_from(&text.string);
-        for i in 0..text.spans.len() {
-            let (range, span) = &text.spans[i];
-            self.append(fonts, range.clone(), span);
+    fn layout(&mut self, fonts: &Fonts) {
+        // A hack to make the text editor don't crash
+        if !self.text.string.ends_with(" ") {
+            let span = self.text.spans[0].1.clone();
+            self.text.push_str(" ", span);
+        }
+
+        for i in 0..self.text.spans.len() {
+            let (range, span) = self.text.spans[i].clone();
+            self.append(fonts, range, &span);
         }
     }
 
@@ -355,7 +387,7 @@ impl TextLayout {
             }
         }
 
-        let glyphs = shaping::shape(fonts, &self.text[range.clone()], style);
+        let glyphs = shaping::shape(fonts, &self.text.string[range.clone()], style);
         // the position of the start of this section or line
         let mut section_start = self.current_pos;
         for mut glyph in glyphs {
@@ -363,7 +395,7 @@ impl TextLayout {
             glyph.byte_range.start += range.start;
             glyph.byte_range.end += range.start;
 
-            let c = self.text[glyph.byte_range.start..].chars().next().unwrap();
+            let c = self.text.string[glyph.byte_range.start..].chars().next().unwrap();
 
             let linebreak = linebreak_property(&mut self.linebreak_state, c) & self.wrap_mask;
             if linebreak >= self.linebreak_prev {
@@ -413,7 +445,7 @@ impl TextLayout {
                         let glyph = &self.glyphs[line.end_glyph - 1];
                         let range = glyph.byte_range.clone();
                         // dont consider trailing whitespace char before a line break
-                        let c = self.text[range].chars().next().unwrap();
+                        let c = self.text.string[range].chars().next().unwrap();
                         if c.is_whitespace() && c != '\u{0004}' {
                             line.line_width -= glyph.width;
                         }

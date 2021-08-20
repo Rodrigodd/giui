@@ -859,7 +859,6 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .parent(hbox)
                 .expand_x(true)
                 .behaviour(TextField::new(
-                    "".into(),
                     caret,
                     input_text,
                     TextFieldStyle {

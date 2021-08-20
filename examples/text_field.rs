@@ -69,7 +69,6 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
     let input_text = cb.reserve();
 
     cb.behaviour(TextField::new(
-        initial_value,
         caret,
         input_text,
         Rc::new(style.clone()),
@@ -89,7 +88,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
     .child_reserved(input_text, |cb| {
         cb.graphic(
             Text::new(
-                String::new(),
+                initial_value,
                 (-1, 0),
                 crui::graphics::TextStyle {
                     color: [0, 0, 0, 255].into(),
