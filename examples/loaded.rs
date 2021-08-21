@@ -951,12 +951,11 @@ impl OptionsGui {
             .build();
         let input_text = gui
             .create_control()
-            .graphic(Text::new(String::new(), (-1, 0), style.text_style.clone()).into())
+            .graphic(Text::new(initial_value, (-1, 0), style.text_style.clone()).into())
             .parent(input_box)
             .build();
         gui.create_control_reserved(input_box)
             .behaviour(TextField::new(
-                initial_value,
                 caret,
                 input_text,
                 style.text_field.clone(),

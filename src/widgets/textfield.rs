@@ -5,11 +5,13 @@ use std::time::{Duration, Instant};
 use copypasta::{ClipboardContext, ClipboardProvider};
 use winit::event::VirtualKeyCode;
 
-use crate::graphics::Graphic;
-use crate::style::TextFieldStyle;
-use crate::text_editor::TextEditor;
-use crate::text_layout::TextLayout;
-use crate::{Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseInfo, Span};
+use crate::{
+    graphics::Graphic,
+    style::TextFieldStyle,
+    text::{editor::TextEditor, Span},
+    text_layout::TextLayout,
+    Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseInfo,
+};
 
 pub trait TextFieldCallback {
     fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool;
@@ -447,11 +449,13 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     self.update_carret(this, ctx, true);
                 }
                 VirtualKeyCode::Home => {
-                    self.editor.move_cursor_line_start(modifiers.shift(), text_layout);
+                    self.editor
+                        .move_cursor_line_start(modifiers.shift(), text_layout);
                     self.update_carret(this, ctx, true);
                 }
                 VirtualKeyCode::End => {
-                    self.editor.move_cursor_line_end(modifiers.shift(), text_layout);
+                    self.editor
+                        .move_cursor_line_end(modifiers.shift(), text_layout);
                     self.update_carret(this, ctx, true);
                 }
                 _ if !modifiers.is_empty() => {

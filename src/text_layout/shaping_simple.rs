@@ -1,5 +1,5 @@
 use super::GlyphPosition;
-use crate::{font::Fonts, unicode::read_utf8, TextStyle};
+use crate::{font::Fonts, text::TextStyle, unicode::read_utf8};
 use ab_glyph::{Font, ScaleFont};
 
 pub fn shape(fonts: &Fonts, text: &str, style: &TextStyle) -> Vec<GlyphPosition> {

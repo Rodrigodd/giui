@@ -6,7 +6,7 @@ extern crate crui_derive;
 pub use crui_derive::*;
 
 pub mod font;
-mod text;
+pub mod text;
 mod text_layout;
 mod util;
 
@@ -31,4 +31,3 @@ pub use control::*;
 pub use gui::*;
 pub use rect::*;
 pub use render::GuiRender;
-pub use text::*;

@@ -5,7 +5,7 @@ use crate::render::FontGlyph;
 use crate::text_layout::{ColorRect, LayoutSettings, TextLayout};
 use crate::{Color, Rect, RenderDirtyFlags};
 
-pub mod text_editor;
+pub mod editor;
 
 #[cfg(test)]
 mod test {

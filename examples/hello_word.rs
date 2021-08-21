@@ -2,7 +2,8 @@ use crui::{
     font::{Font, Fonts},
     graphics::{Text, TextStyle},
     render::{GuiRender, GuiRenderer},
-    Gui, SpannedString,
+    text::SpannedString,
+    Gui,
 };
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use winit::{
