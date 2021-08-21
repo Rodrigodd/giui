@@ -333,7 +333,7 @@ impl TextLayout {
     }
 
     /// Replace a range of text, and recalculate the layout
-    pub fn replace_range(&mut self, range: Range<usize>, text: &str, fonts: &Fonts)  {
+    pub fn replace_range(&mut self, range: Range<usize>, text: &str, fonts: &Fonts) {
         self.text.replace_range(range, text);
         self.clear();
         self.layout(fonts);
@@ -395,7 +395,10 @@ impl TextLayout {
             glyph.byte_range.start += range.start;
             glyph.byte_range.end += range.start;
 
-            let c = self.text.string[glyph.byte_range.start..].chars().next().unwrap();
+            let c = self.text.string[glyph.byte_range.start..]
+                .chars()
+                .next()
+                .unwrap();
 
             let linebreak = linebreak_property(&mut self.linebreak_state, c) & self.wrap_mask;
             if linebreak >= self.linebreak_prev {

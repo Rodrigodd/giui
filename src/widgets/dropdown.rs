@@ -3,8 +3,7 @@ use crate::{
     MouseInfo,
 };
 
-use std::any::Any;
-use std::rc::Rc;
+use std::{any::Any, rc::Rc};
 
 pub struct SetSelected(pub usize);
 struct SetIndex(usize);

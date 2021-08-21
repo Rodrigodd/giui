@@ -1,5 +1,7 @@
-use std::any::TypeId;
-use std::{any::Any, time::Instant};
+use std::{
+    any::{Any, TypeId},
+    time::Instant,
+};
 
 use winit::{event::ModifiersState, window::CursorIcon};
 

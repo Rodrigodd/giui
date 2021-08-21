@@ -1,5 +1,7 @@
-use crate::graphics::{Graphic, TextStyle};
-use crate::Color;
+use crate::{
+    graphics::{Graphic, TextStyle},
+    Color,
+};
 
 #[derive(Clone, Debug, LoadStyle)]
 #[crui(crate = "crate")]

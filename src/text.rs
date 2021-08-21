@@ -1,9 +1,11 @@
 use std::ops::Range;
 
-use crate::font::{FontId, Fonts};
-use crate::render::FontGlyph;
-use crate::text_layout::{ColorRect, LayoutSettings, TextLayout};
-use crate::{Color, Rect, RenderDirtyFlags};
+use crate::{
+    font::{FontId, Fonts},
+    render::FontGlyph,
+    text_layout::{ColorRect, LayoutSettings, TextLayout},
+    Color, Rect, RenderDirtyFlags,
+};
 
 pub mod editor;
 
@@ -65,13 +67,23 @@ mod test {
     #[test]
     fn replace_range2() {
         let mut spanned = SpannedString::from_string("01234567".into(), Default::default());
-        spanned.push_str("89a", TextStyle { font_size: 0.1, ..Default::default() });
-        spanned.push_str("b", TextStyle { ..Default::default() });
+        spanned.push_str(
+            "89a",
+            TextStyle {
+                font_size: 0.1,
+                ..Default::default()
+            },
+        );
+        spanned.push_str(
+            "b",
+            TextStyle {
+                ..Default::default()
+            },
+        );
 
         spanned.replace_range(8..11, "_");
         assert_eq!(spanned.spans, vec![(0..10, Default::default())]);
     }
-
 }
 
 /// A partial description of the style of a section of text.

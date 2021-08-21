@@ -1,6 +1,8 @@
-use std::any::Any;
-use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::{
+    any::Any,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 use copypasta::{ClipboardContext, ClipboardProvider};
 use winit::event::VirtualKeyCode;

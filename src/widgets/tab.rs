@@ -2,8 +2,7 @@ use crate::{
     style::TabStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
 };
 
-use std::rc::Rc;
-use std::{any::Any, cell::RefCell};
+use std::{any::Any, cell::RefCell, rc::Rc};
 
 struct Unselected;
 pub struct Select;

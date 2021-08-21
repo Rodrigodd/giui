@@ -1,7 +1,4 @@
-use crate::font::Fonts;
-use crate::text_layout::TextLayout;
-use crate::util::cmp_range;
-use crate::Context;
+use crate::{font::Fonts, text_layout::TextLayout, util::cmp_range, Context};
 use std::ops::Range;
 
 /// Represents a position in a text.
