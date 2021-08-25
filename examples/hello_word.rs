@@ -65,17 +65,7 @@ fn main() {
         font_id: my_font,
         ..Default::default()
     };
-    let mut text = SpannedString::new();
-    text.push_str("Hello\u{200B}", style.clone());
-    text.push_str(
-        "Word",
-        TextStyle {
-            background: Some([0, 255, 0, 255].into()),
-            color: [10, 10, 10, 255].into(),
-            ..style.clone()
-        },
-    );
-    text.push_str("!!", style);
+    let text = SpannedString::from_string("Hello Word!!".to_string(), style);
 
     let _text = gui
         .create_control()

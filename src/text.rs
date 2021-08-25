@@ -3,56 +3,61 @@ use std::ops::Range;
 use crate::{
     font::{FontId, Fonts},
     render::FontGlyph,
-    text_layout::{ColorRect, LayoutSettings, TextLayout},
+    text::layout::{LayoutSettings, TextLayout},
     Color, Rect, RenderDirtyFlags,
 };
 
 pub mod editor;
+pub mod layout;
+mod shaping;
 
 #[cfg(test)]
 mod test {
-    use super::{Span, SpannedString, TextStyle};
+    use crate::font::FontId;
+
+    use super::{ShapeSpan, Span, SpannedString};
 
     #[rustfmt::skip]
     #[test]
     fn add_span() {
         let mut spanned = SpannedString::from_string("012345678".into(), Default::default());
-        let red = [255, 0, 0, 255].into();
-        let gree = [0, 255, 0, 255].into();
-        let blue = [0, 0, 255, 255].into();
-        spanned.add_span( 3..6, Span { color: Some(red), ..Default::default() });
-        spanned.add_span( 1..4, Span { color: Some(gree), ..Default::default() });
-        spanned.add_span( 2..5, Span { color: Some(blue), ..Default::default() });
+        let a = FontId::new(1);
+        let b = FontId::new(2);
+        let c = FontId::new(3);
+        spanned.add_span( 3..6, Span::FontId(a), );
+        spanned.add_span( 1..4, Span::FontId(b),);
+        spanned.add_span( 2..5, Span::FontId(c),);
+        let default = ShapeSpan { byte_range: 0..0, font_size: 16.0, font_id: FontId::new(0) };
         assert_eq!(
-            spanned.spans,
+            spanned.shape_spans,
             vec![
-                ( 0usize..1, TextStyle { ..Default::default() }),
-                ( 1..2, TextStyle { color: gree, ..Default::default() }),
-                ( 2..5, TextStyle { color: blue, ..Default::default() }),
-                ( 5..6, TextStyle { color: red, ..Default::default() }),
-                ( 6..9, TextStyle { ..Default::default() }),
+                ShapeSpan { byte_range: 0..1, ..default.clone() },
+                ShapeSpan { byte_range: 1..2, font_id: b, ..default.clone() },
+                ShapeSpan { byte_range: 2..5, font_id: c, ..default.clone() },
+                ShapeSpan { byte_range: 5..6, font_id: a, ..default.clone() },
+                ShapeSpan { byte_range: 6..9, ..default.clone() },
             ]
         );
         spanned.replace_range(3..7, "");
         assert_eq!(
-            spanned.spans,
+            spanned.shape_spans,
             vec![
-                ( 0usize..1, TextStyle { ..Default::default() }),
-                ( 1..2, TextStyle { color: gree, ..Default::default() }),
-                ( 2..3, TextStyle { color: blue, ..Default::default() }),
-                ( 3..5, TextStyle { ..Default::default() }),
+                ShapeSpan { byte_range: 0..1, ..default.clone() },
+                ShapeSpan { byte_range: 1..2, font_id: b, ..default.clone() },
+                ShapeSpan { byte_range: 2..3, font_id: c, ..default.clone() },
+                ShapeSpan { byte_range: 3..5, ..default.clone() },
             ]
         );
         assert_eq!(spanned.string, "01278");
         spanned.replace_range(3..3, "aaa");
         assert_eq!(spanned.string, "012aaa78");
         assert_eq!(
-            spanned.spans,
+            spanned.shape_spans,
             vec![
-                ( 0..1, TextStyle { ..Default::default() }),
-                ( 1..2, TextStyle { color: gree, ..Default::default() }),
-                ( 2..3, TextStyle { color: blue, ..Default::default() }),
-                ( 3..8, TextStyle { ..Default::default() }),
+                ShapeSpan { byte_range: 0..1, ..default.clone() },
+                ShapeSpan { byte_range: 1..2, font_id: b, ..default.clone() },
+                ShapeSpan { byte_range: 2..3, font_id: c, ..default.clone() },
+                ShapeSpan { byte_range: 3..8, ..default.clone() },
             ]
         );
     }
@@ -61,38 +66,116 @@ mod test {
     fn replace_range() {
         let mut spanned = SpannedString::from_string("Hel".into(), Default::default());
         spanned.replace_range(1..2, "");
-        assert_eq!(spanned.spans, vec![(0..2, Default::default())]);
+        assert_eq!(
+            spanned.shape_spans,
+            vec![ShapeSpan {
+                byte_range: 0..2,
+                font_size: 16.0,
+                font_id: FontId::new(0),
+            }]
+        );
     }
 
     #[test]
     fn replace_range2() {
-        let mut spanned = SpannedString::from_string("01234567".into(), Default::default());
-        spanned.push_str(
-            "89a",
-            TextStyle {
-                font_size: 0.1,
-                ..Default::default()
-            },
-        );
-        spanned.push_str(
-            "b",
-            TextStyle {
-                ..Default::default()
-            },
-        );
-
+        let mut spanned = SpannedString::from_string("0123456789ab".into(), Default::default());
+        spanned.add_span(8..11, Span::FontSize(0.1));
         spanned.replace_range(8..11, "_");
-        assert_eq!(spanned.spans, vec![(0..10, Default::default())]);
+        assert_eq!(
+            spanned.shape_spans,
+            vec![ShapeSpan {
+                byte_range: 0..10,
+                font_size: 16.0,
+                font_id: FontId::new(0),
+            }]
+        );
+    }
+
+    #[test]
+    fn split_shape() {
+        let mut spanned = SpannedString::from_string("0123456789ab".into(), Default::default());
+        spanned.split_shape_span(4);
+        spanned.split_shape_span(7);
+        spanned.split_shape_span(1);
+        spanned.split_shape_span(4);
+        spanned.split_shape_span(40);
+        spanned.split_shape_span(0);
+        let default = ShapeSpan {
+            byte_range: 0..10,
+            font_size: 16.0,
+            font_id: FontId::new(0),
+        };
+        assert_eq!(
+            spanned.shape_spans,
+            vec![
+                ShapeSpan {
+                    byte_range: 0..1,
+                    ..default.clone()
+                },
+                ShapeSpan {
+                    byte_range: 1..4,
+                    ..default.clone()
+                },
+                ShapeSpan {
+                    byte_range: 4..7,
+                    ..default.clone()
+                },
+                ShapeSpan {
+                    byte_range: 7..12,
+                    ..default.clone()
+                },
+            ]
+        );
     }
 }
 
-/// A partial description of the style of a section of text.
-#[derive(Debug, Clone, Default)]
-pub struct Span {
-    pub color: Option<Color>,
-    pub font_size: Option<f32>,
-    pub font_id: Option<FontId>,
-    pub background: Option<Color>,
+/// A span of text of certain shape. This contains all information necessary for text shaping.
+#[derive(Debug, Clone)]
+pub(crate) struct ShapeSpan {
+    pub byte_range: Range<usize>,
+    pub font_size: f32,
+    pub font_id: FontId,
+    // diretion
+    // language
+    // script
+}
+impl PartialEq for ShapeSpan {
+    fn eq(&self, other: &Self) -> bool {
+        self.byte_range == other.byte_range
+            && self.font_size == other.font_size
+            && self.font_id == other.font_id
+    }
+}
+impl Eq for ShapeSpan {}
+impl ShapeSpan {
+    /// Check if the two ShapeSpan are equal, disregarding the range.
+    fn cmp_shape(&self, other: &Self) -> bool {
+        self.font_size == other.font_size && self.font_id == other.font_id
+    }
+}
+
+/// A span of text with certain style. This contains information for text effects.
+#[derive(Debug, Clone)]
+struct StyleSpan {
+    range: Range<usize>,
+    kind: StyleKind,
+}
+
+#[derive(Debug, Clone)]
+enum StyleKind {
+    Color(Color),
+    Selection(Color),
+    // Shadow { color: Color, dir: [f32; 2] }
+    // Mark { color: Color, round?: bool }
+    // Anim?
+    //
+}
+
+pub enum Span {
+    FontSize(f32),
+    FontId(FontId),
+    Color(Color),
+    Selection(Color),
 }
 
 /// A description of the style of a text.
@@ -101,7 +184,6 @@ pub struct TextStyle {
     pub color: Color,
     pub font_size: f32,
     pub font_id: FontId,
-    pub background: Option<Color>,
 }
 
 impl Default for TextStyle {
@@ -110,7 +192,6 @@ impl Default for TextStyle {
             color: Color::BLACK,
             font_size: 16.0,
             font_id: Default::default(),
-            background: None,
         }
     }
 }
@@ -120,7 +201,6 @@ impl PartialEq for TextStyle {
         self.color == other.color
             && self.font_size == other.font_size
             && self.font_id == other.font_id
-            && self.background == other.background
     }
 }
 impl Eq for TextStyle {}
@@ -135,50 +215,58 @@ impl TextStyle {
 #[derive(Default, Debug, Clone)]
 pub struct SpannedString {
     pub(crate) string: String,
-    pub(crate) spans: Vec<(Range<usize>, TextStyle)>,
+    shape_spans: Vec<ShapeSpan>,
+    style_spans: Vec<StyleSpan>,
+    default: TextStyle,
 }
 impl SpannedString {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(default_style: TextStyle) -> Self {
+        Self {
+            default: default_style,
+            ..Default::default()
+        }
     }
 
     pub fn clear(&mut self) {
         self.string.clear();
-        self.spans.clear();
+        self.shape_spans.clear();
+        self.style_spans.clear();
     }
 
     pub fn from_string(string: String, style: TextStyle) -> Self {
         Self {
-            spans: vec![(
-                0..string.len(),
-                TextStyle {
-                    color: style.color,
-                    font_size: style.font_size,
-                    font_id: style.font_id,
-                    background: None,
-                },
-            )],
+            shape_spans: vec![ShapeSpan {
+                byte_range: 0..string.len(),
+                font_size: style.font_size,
+                font_id: style.font_id,
+            }],
+            style_spans: Vec::new(),
+            default: style,
             string,
         }
     }
 
-    pub fn push_str(&mut self, string: &str, span: TextStyle) {
-        let start = self.string.len();
-        self.string.push_str(string);
-        self.spans.push((start..self.string.len(), span));
-    }
+    // pub fn push_str(&mut self, string: &str, span: TextStyle) {
+    //     let start = self.string.len();
+    //     self.string.push_str(string);
+    //     self.spans.push((start..self.string.len(), span));
+    // }
 
     pub fn replace_range(&mut self, range: Range<usize>, string: &str) {
         let offset = string.len() as isize - range.len() as isize;
-        // remove spans
-        self.spans.retain(|(rb, sp)| {
+        let overlap = |this_range: Range<usize>| {
             // range overlap a range
-            if rb.start >= range.start && rb.end <= range.end {
+            if this_range.start >= range.start && this_range.end <= range.end {
                 false
             } else {
                 true
             }
-        });
+        };
+
+        // remove spans
+        self.shape_spans.retain(|x| overlap(x.byte_range.clone()));
+        self.style_spans.retain(|x| overlap(x.range.clone()));
+
         let shift_range = |range: &mut Range<usize>| {
             if offset < 0 {
                 range.start -= (-offset) as usize;
@@ -190,17 +278,14 @@ impl SpannedString {
         };
 
         let mut insert_index = 0;
-        let mut to_append = Vec::new();
         // cut and shift spans
-        for (i, (rb, sp)) in self.spans.iter_mut().enumerate() {
-            if rb.start > range.start && rb.end < range.end {
+        for (i, x) in self.shape_spans.iter_mut().enumerate() {
+            let rb = &mut x.byte_range;
+            if rb.start >= range.start && rb.end <= range.end {
                 unreachable!()
             } else if rb.start < range.start && rb.end > range.end {
                 // range cut a range in three
-                let mut r = range.end..rb.end;
-                shift_range(&mut r);
-                to_append.push((r, sp.clone()));
-                rb.end = range.start;
+                rb.end -= range.len();
             } else if rb.start < range.start && rb.end > range.start {
                 // range.start cut a range
                 rb.end = range.start;
@@ -220,18 +305,17 @@ impl SpannedString {
 
         self.string.replace_range(range.clone(), string);
         if string.len() > 0 {
-            let style = self.spans.get(0).map(|x| x.1.clone()).unwrap_or_default();
-            // self.spans
-            //     .insert(insert_index, (range.start..range.start + string.len(), style))
-            self.spans
-                .push((range.start..range.start + string.len(), style))
+            let shape = ShapeSpan {
+                byte_range: range,
+                font_size: self.default.font_size,
+                font_id: self.default.font_id,
+            };
+            self.shape_spans.insert(insert_index, shape);
         }
 
-        self.spans.append(&mut to_append);
-        self.spans.sort_by_key(|x| x.0.start);
-        self.spans.dedup_by(|a, b| {
-            if a.1 == b.1 {
-                b.0.end = a.0.end;
+        self.shape_spans.dedup_by(|a, b| {
+            if a.cmp_shape(b) {
+                b.byte_range.end = a.byte_range.end;
                 true
             } else {
                 false
@@ -241,64 +325,99 @@ impl SpannedString {
 
     /// Clear all spans, and replace with only one, with the given style.
     pub fn set_style(&mut self, style: TextStyle) {
-        self.spans.clear();
-        self.spans.push((
-            0..self.string.len(),
-            TextStyle {
-                color: style.color,
-                font_size: style.font_size,
-                font_id: style.font_id,
-                background: None,
-            },
-        ));
+        self.shape_spans.clear();
+        self.style_spans.clear();
+        self.shape_spans.push(ShapeSpan {
+            byte_range: 0..self.string.len(),
+            font_size: style.font_size,
+            font_id: style.font_id,
+        });
+        self.default = style;
     }
 
     pub fn add_span(&mut self, range: Range<usize>, span: Span) {
         let mut to_append = Vec::new();
-        for (rb, sp) in &mut self.spans {
+        for shape in &mut self.shape_spans {
+            let rb = shape.byte_range.clone();
             if rb.start >= range.start && rb.end <= range.end {
                 // range overlap a range
-                merge_span(sp, &span);
+                merge_shape_span(shape, &span);
             } else if rb.start < range.start && rb.end > range.end {
                 // range cut a range in three
-                let mut style = sp.clone();
-                merge_span(&mut style, &span);
-                to_append.push((range.start..range.end, style));
-                to_append.push((range.end..rb.end, sp.clone()));
-                rb.end = range.start;
+                {
+                    let mut middle = shape.clone();
+                    merge_shape_span(&mut middle, &span);
+                    middle.byte_range = range.clone();
+                    to_append.push(middle);
+                }
+                {
+                    let mut end = shape.clone();
+                    end.byte_range = range.end..rb.end;
+                    to_append.push(end);
+                }
+                shape.byte_range.end = range.start;
             } else if rb.start < range.start && rb.end > range.start {
                 // range.start cut a range in two
-                let mut style = sp.clone();
-                merge_span(&mut style, &span);
-                to_append.push((range.start..rb.end, style));
-                rb.end = range.start;
+                {
+                    let mut end = shape.clone();
+                    merge_shape_span(&mut end, &span);
+                    end.byte_range = range.start..rb.end;
+                    to_append.push(end);
+                }
+                shape.byte_range.end = range.start;
             } else if rb.start < range.end && rb.end > range.end {
                 // range.end cut a range in two
-                let mut style = sp.clone();
-                merge_span(&mut style, &span);
-                to_append.push((rb.start..range.end, style));
-                rb.start = range.end;
+                {
+                    let mut beggin = shape.clone();
+                    merge_shape_span(&mut beggin, &span);
+                    beggin.byte_range = rb.start..range.end;
+                    to_append.push(beggin);
+                }
+                shape.byte_range.start = range.end;
             }
         }
-        self.spans.append(&mut to_append);
-        self.spans.sort_by_key(|x| x.0.start);
-        self.spans.dedup_by(|a, b| {
-            if a.1 == b.1 {
-                b.0.end = a.0.end;
+        self.shape_spans.append(&mut to_append);
+        self.shape_spans.sort_by_key(|x| x.byte_range.start);
+        self.shape_spans.dedup_by(|a, b| {
+            if a.cmp_shape(b) {
+                b.byte_range.end = a.byte_range.end;
                 true
             } else {
                 false
             }
         });
     }
+
+    /// Find the shape span that contains the index, and split it in two. This is used for text
+    /// shaping.
+    pub fn split_shape_span(&mut self, index: usize) {
+        let i = match self
+            .shape_spans
+            .binary_search_by(|x| crate::util::cmp_range(index, x.byte_range.clone()))
+        {
+            Ok(x) => x,
+            // out of bounds, ignore
+            Err(_) => return,
+        };
+
+        let span = &mut self.shape_spans[i];
+        if span.byte_range.start == index {
+            // there is already a split there
+            return;
+        }
+
+        let mut clone = span.clone();
+        span.byte_range.end = index;
+        clone.byte_range.start = index;
+        self.shape_spans.insert(i + 1, clone);
+    }
 }
 
-fn merge_span(style: &mut TextStyle, span: &Span) {
-    *style = TextStyle {
-        color: span.color.unwrap_or(style.color),
-        font_size: span.font_size.unwrap_or(style.font_size),
-        font_id: span.font_id.unwrap_or(style.font_id),
-        background: span.background.or(span.background),
+fn merge_shape_span(a: &mut ShapeSpan, b: &Span) {
+    match b {
+        Span::FontSize(x) => a.font_size = *x,
+        Span::FontId(x) => a.font_id = *x,
+        _ => unreachable!("the span b is not type shape"),
     }
 }
 
@@ -314,10 +433,17 @@ impl Default for InnerText {
     }
 }
 impl InnerText {
+    fn as_spanned(&self) -> &SpannedString {
+        match self {
+            InnerText::SpannedString(x) => x,
+            InnerText::TextLayout(x) => x.spanned(),
+            InnerText::None => unreachable!(),
+        }
+    }
     fn to_spanned(&mut self) -> &mut SpannedString {
         match self {
             InnerText::SpannedString(x) => x,
-            InnerText::TextLayout(x) => {
+            InnerText::TextLayout(_) => {
                 if let InnerText::TextLayout(x) = std::mem::take(self) {
                     *self = Self::SpannedString(x.to_spanned());
                     self.to_spanned()
@@ -350,7 +476,7 @@ impl InnerText {
             InnerText::TextLayout(x) => x.to_spanned(),
             _ => unreachable!(),
         };
-        *self = Self::TextLayout(TextLayout::new(x, settings, fonts));
+        *self = Self::TextLayout(TextLayout::new(x, settings.clone(), fonts));
         if let Self::TextLayout(x) = self {
             x
         } else {
@@ -363,25 +489,21 @@ impl InnerText {
 pub struct Text {
     text: InnerText,
     pub(crate) text_dirty: bool,
-    glyphs: Vec<FontGlyph>,
-    rects: Vec<ColorRect>,
     min_size: Option<[f32; 2]>,
     last_pos: [f32; 2],
     align: (i8, i8),
+    glyphs: Vec<FontGlyph>,
     pub(crate) color_dirty: bool,
-    pub(crate) style: TextStyle,
 }
 impl Clone for Text {
     fn clone(&self) -> Self {
         Self {
             text: self.text.clone(),
-            style: self.style.clone(),
             align: self.align,
             color_dirty: true,
             text_dirty: true,
-            glyphs: Default::default(),
-            rects: Default::default(),
             last_pos: Default::default(),
+            glyphs: Vec::new(),
             min_size: Default::default(),
         }
     }
@@ -390,28 +512,24 @@ impl Text {
     pub fn new(text: String, align: (i8, i8), style: TextStyle) -> Self {
         Self {
             text: InnerText::SpannedString(SpannedString::from_string(text, style.clone())),
-            style,
             align,
             color_dirty: true,
             text_dirty: true,
-            glyphs: Default::default(),
-            rects: Default::default(),
             last_pos: Default::default(),
             min_size: Default::default(),
+            glyphs: Vec::new(),
         }
     }
 
     pub fn from_spanned_string(text: SpannedString, align: (i8, i8)) -> Self {
         Self {
-            style: text.spans[0].1.clone(),
             text: InnerText::SpannedString(text),
             align,
             color_dirty: true,
             text_dirty: true,
-            glyphs: Default::default(),
-            rects: Default::default(),
             last_pos: Default::default(),
             min_size: Default::default(),
+            glyphs: Vec::new(),
         }
     }
 
@@ -421,14 +539,15 @@ impl Text {
     }
 
     pub fn get_font_size(&mut self) -> f32 {
-        self.style.font_size
+        self.text.as_spanned().default.font_size
     }
 
     pub fn set_font_size(&mut self, font_size: f32) {
-        for (_, style) in &mut self.text.to_spanned().spans {
-            style.font_size = font_size;
+        let spanned = self.text.to_spanned();
+        spanned.default.font_size = font_size;
+        for span in &mut spanned.shape_spans {
+            span.font_size = font_size;
         }
-        self.style.font_size = font_size;
         self.dirty();
     }
 
@@ -438,13 +557,16 @@ impl Text {
     }
 
     pub fn clear_spans(&mut self) {
-        self.text.to_spanned().set_style(self.style.clone());
+        let spanned = self.text.to_spanned();
+        let style = spanned.default.clone();
+        spanned.set_style(style);
         self.dirty();
     }
 
     pub fn set_text(&mut self, text: &str) {
-        self.text.to_spanned().clear();
-        self.text.to_spanned().push_str(text, self.style.clone());
+        let spanned = self.text.to_spanned();
+        let style = spanned.default.clone();
+        *spanned = SpannedString::from_string(text.into(), style);
         self.dirty();
     }
 
@@ -469,42 +591,33 @@ impl Text {
     }
 
     fn update_glyphs(&mut self, rect: &mut Rect, fonts: &Fonts) {
-        use crate::text_layout::{HorizontalAlign::*, VerticalAlign::*};
-        self.last_pos = self.get_align_anchor(*rect.get_rect());
+        use crate::text::layout::Alignment::*;
+        let anchor_pos = self.get_align_anchor(*rect.get_rect());
+        self.last_pos = anchor_pos;
         let rect = rect.get_rect();
-        let (glyphs, rects) = self
+        // let (glyphs, rects) = self
+        let glyphs = self
             .text
             .to_layout(
                 &LayoutSettings {
                     max_width: Some(rect[2] - rect[0]),
-                    max_height: Some(rect[3] - rect[1]),
-                    horizontal_align: [Left, Center, Right][(self.align.0 + 1) as usize],
-                    vertical_align: [Top, Middle, Bottom][(self.align.1 + 1) as usize],
-                    ..Default::default()
+                    horizontal_align: [Start, Center, End][(self.align.0 + 1) as usize],
+                    vertical_align: [Start, Center, End][(self.align.1 + 1) as usize],
                 },
                 fonts,
             )
-            .glyphs_and_rects();
+            .glyphs();
         self.glyphs = glyphs
             .iter()
             .map(|x| {
                 let mut glyph = x.glyph.clone();
-                glyph.position.x += rect[0];
-                glyph.position.y += rect[1];
+                glyph.position.x += anchor_pos[0];
+                glyph.position.y += anchor_pos[1];
                 FontGlyph {
                     glyph,
                     font_id: x.font_id,
                     color: x.color,
                 }
-            })
-            .collect();
-        self.rects = rects
-            .iter()
-            .cloned()
-            .map(|mut x| {
-                x.rect[0] += rect[0];
-                x.rect[1] += rect[1];
-                x
             })
             .collect();
     }
@@ -520,7 +633,7 @@ impl Text {
         &mut self,
         rect: &mut Rect,
         fonts: &Fonts,
-    ) -> (&[FontGlyph], &[ColorRect]) {
+    ) -> (&[FontGlyph], &[()]) {
         let dirty_flags = rect.get_render_dirty_flags();
         let width_change = dirty_flags.contains(RenderDirtyFlags::WIDTH)
             && self.min_size.map_or(true, |x| rect.get_width() < x[0]);
@@ -537,7 +650,7 @@ impl Text {
                 glyph.glyph.position.y += delta[1];
             }
         }
-        (&self.glyphs, &self.rects)
+        (&self.glyphs, &[])
     }
 
     pub fn compute_min_size(&mut self, fonts: &Fonts) -> Option<[f32; 2]> {
@@ -549,6 +662,14 @@ impl Text {
     }
 
     pub fn color(&self) -> Color {
-        self.style.color
+        self.text.as_spanned().default.color
+    }
+
+    pub fn color_mut(&mut self) -> &mut Color {
+        &mut self.text.to_spanned().default.color
+    }
+
+    pub fn set_color(&mut self, color: Color) {
+        self.text.to_spanned().default.color = color;
     }
 }

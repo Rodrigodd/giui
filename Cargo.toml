@@ -17,8 +17,8 @@ members = ["./crui-derive"]
 
 glyph_brush_draw_cache = "0.1"
 ab_glyph = "0.2"
-harfbuzz_rs = "1"
-xi-unicode = "0.3"
+harfbuzz_rs = "2"
+unicode-linebreak = "0.1"
 winit = "0.24"
 bitflags = "1"
 copypasta = "0.7"

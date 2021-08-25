@@ -858,45 +858,45 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .min_size([0.0, 24.0])
                 .parent(hbox)
                 .expand_x(true)
-                .behaviour(TextField::new(
-                    caret,
-                    input_text,
-                    TextFieldStyle {
-                        caret_color: Color::BLACK,
-                        selection_color: SelectionColor {
-                            bg: [170, 0, 255, 255].into(),
-                            fg: Some(Color::WHITE),
-                        },
-                        background: OnFocusStyle {
-                            normal: style.painel.clone().with_color([200, 200, 200, 255].into()),
-                            focus: style
-                                .button_style
-                                .focus
-                                .clone()
-                                .with_color([200, 200, 200, 255].into()),
-                        },
-                    }
-                    .into(),
-                    {
-                        let button_style = style.button_style.clone();
-                        let painel = style.white.clone();
-                        let notosans = style.fonts.notosans;
-                        move |_this: Id, ctx: &mut Context, text: &mut String| {
-                            println!("Submited {}!", text);
-                            create_item(
-                                ctx,
-                                list,
-                                painel.clone(),
-                                text.clone(),
-                                notosans,
-                                [130, 150, 255, 255].into(),
-                                button_style.clone(),
-                            );
-                            text.clear();
-                            true
-                        }
-                    },
-                ))
+                // .behaviour(TextField::new(
+                //     caret,
+                //     input_text,
+                //     TextFieldStyle {
+                //         caret_color: Color::BLACK,
+                //         selection_color: SelectionColor {
+                //             bg: [170, 0, 255, 255].into(),
+                //             fg: Some(Color::WHITE),
+                //         },
+                //         background: OnFocusStyle {
+                //             normal: style.painel.clone().with_color([200, 200, 200, 255].into()),
+                //             focus: style
+                //                 .button_style
+                //                 .focus
+                //                 .clone()
+                //                 .with_color([200, 200, 200, 255].into()),
+                //         },
+                //     }
+                //     .into(),
+                //     {
+                //         let button_style = style.button_style.clone();
+                //         let painel = style.white.clone();
+                //         let notosans = style.fonts.notosans;
+                //         move |_this: Id, ctx: &mut Context, text: &mut String| {
+                //             println!("Submited {}!", text);
+                //             create_item(
+                //                 ctx,
+                //                 list,
+                //                 painel.clone(),
+                //                 text.clone(),
+                //                 notosans,
+                //                 [130, 150, 255, 255].into(),
+                //                 button_style.clone(),
+                //             );
+                //             text.clear();
+                //             true
+                //         }
+                //     },
+                // ))
                 .build();
             let _caret = gui
                 .create_control_reserved(caret)

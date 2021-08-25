@@ -62,11 +62,8 @@ impl Graphic {
             Graphic::Panel(Panel { color, .. })
             | Graphic::Texture(Texture { color, .. })
             | Graphic::Icon(Icon { color, .. })
-            | Graphic::AnimatedIcon(AnimatedIcon { color, .. })
-            | Graphic::Text(Text {
-                style: TextStyle { color, .. },
-                ..
-            }) => *color,
+            | Graphic::AnimatedIcon(AnimatedIcon { color, .. }) => *color,
+            Graphic::Text(x) => x.color(),
             Graphic::None => [255, 255, 255, 255].into(),
         }
     }
@@ -84,15 +81,11 @@ impl Graphic {
             })
             | Graphic::AnimatedIcon(AnimatedIcon {
                 color, color_dirty, ..
-            })
-            | Graphic::Text(Text {
-                style: TextStyle { color, .. },
-                color_dirty,
-                ..
             }) => {
                 *color = new_color;
                 *color_dirty = true;
             }
+            Graphic::Text(x) => x.set_color(new_color),
             Graphic::None => {}
         }
     }
@@ -109,15 +102,11 @@ impl Graphic {
             })
             | Graphic::AnimatedIcon(AnimatedIcon {
                 color, color_dirty, ..
-            })
-            | Graphic::Text(Text {
-                style: TextStyle { color, .. },
-                color_dirty,
-                ..
             }) => {
                 color.a = new_alpha;
                 *color_dirty = true;
             }
+            Graphic::Text(x) => x.color_mut().a = new_alpha,
             Graphic::None => {}
         }
     }

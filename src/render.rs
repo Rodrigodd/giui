@@ -251,22 +251,22 @@ impl GuiRender {
                         }
                         Graphic::Text(ref mut text) => {
                             let (glyphs, rects) = text.get_glyphs_and_rects(rect, fonts);
-                            for rect in rects {
-                                let mut sprite = Sprite {
-                                    texture: self.white_texture,
-                                    color: rect.color,
-                                    rect: [
-                                        rect.rect[0],
-                                        rect.rect[1],
-                                        rect.rect[0] + rect.rect[2],
-                                        rect.rect[1] + rect.rect[3],
-                                    ],
-                                    uv_rect: [0.0, 0.0, 1.0, 1.0],
-                                };
-                                if cut_sprite(&mut sprite, &mask) {
-                                    self.sprites.push(sprite);
-                                }
-                            }
+                            // for rect in rects {
+                            //     let mut sprite = Sprite {
+                            //         texture: self.white_texture,
+                            //         color: rect.color,
+                            //         rect: [
+                            //             rect.rect[0],
+                            //             rect.rect[1],
+                            //             rect.rect[0] + rect.rect[2],
+                            //             rect.rect[1] + rect.rect[3],
+                            //         ],
+                            //         uv_rect: [0.0, 0.0, 1.0, 1.0],
+                            //     };
+                            //     if cut_sprite(&mut sprite, &mask) {
+                            //         self.sprites.push(sprite);
+                            //     }
+                            // }
                             for glyph in glyphs {
                                 if let Some((tex_coords, pixel_coords)) = self
                                     .draw_cache

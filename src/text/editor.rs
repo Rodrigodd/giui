@@ -1,4 +1,4 @@
-use crate::{font::Fonts, text_layout::TextLayout, util::cmp_range, Context};
+use crate::{font::Fonts, text::layout::TextLayout, util::cmp_range};
 use std::ops::Range;
 
 /// Represents a position in a text.
@@ -102,9 +102,9 @@ impl TextEditor {
         let glyph = self
             .get_glyph_from_byte_index(index, text_layout)
             .unwrap_or(0);
-        let line_metrics = text_layout.line_metrics();
-        let line = line_metrics
-            .binary_search_by(|x| cmp_range(glyph, x.start_glyph..x.end_glyph))
+        let lines = text_layout.lines();
+        let line = lines
+            .binary_search_by(|x| cmp_range(glyph, x.glyph_range.clone()))
             .unwrap_or_else(|x| x);
         let byte_range = self.get_line_byte_range(line, text_layout);
         let offset = index - byte_range.clone().start;
@@ -159,13 +159,13 @@ impl TextEditor {
 
     /// Get the glyph range of the given line.
     fn get_line_glyph_range(&mut self, line: usize, text_layout: &mut TextLayout) -> Range<usize> {
-        let line_metrics = text_layout.line_metrics();
-        let l = if line < line_metrics.len() {
-            &line_metrics[line]
+        let lines = text_layout.lines();
+        let l = if line < lines.len() {
+            &lines[line]
         } else {
-            line_metrics.last().unwrap()
+            lines.last().unwrap()
         };
-        l.start_glyph..l.end_glyph
+        l.glyph_range.clone()
     }
 
     /// Get the byte range of the given line.
@@ -227,7 +227,7 @@ impl TextEditor {
     /// Return the x y position of the top of the caret, and its height.
     pub fn get_cursor_position_and_height(&mut self, text_layout: &mut TextLayout) -> [f32; 3] {
         let (descent, height) = text_layout
-            .line_metrics()
+            .lines()
             .get(self.selection.cursor.line)
             .map_or((0.0, 0.0), |x| (x.descent, x.height()));
         let [x, y] = self.get_pixel_position(self.selection.cursor, text_layout);
@@ -306,7 +306,7 @@ impl TextEditor {
 
         let mut line = self.selection.cursor.line;
         line = add(line, lines);
-        let num_lines = text_layout.line_metrics().len();
+        let num_lines = text_layout.lines().len();
         if line >= num_lines {
             line = num_lines - 1;
         }

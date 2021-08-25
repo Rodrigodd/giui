@@ -7,10 +7,7 @@ pub use crui_derive::*;
 
 pub mod font;
 pub mod text;
-mod text_layout;
 mod util;
-
-mod unicode;
 
 mod color;
 mod context;

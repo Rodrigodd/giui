@@ -11,7 +11,7 @@ use crate::{
     graphics::Graphic,
     style::TextFieldStyle,
     text::{editor::TextEditor, Span},
-    text_layout::TextLayout,
+    text::layout::TextLayout,
     Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseInfo,
 };
 
@@ -170,11 +170,12 @@ impl<C: TextFieldCallback> TextField<C> {
                 text.clear_spans();
                 text.add_span(
                     selection_range,
-                    Span {
-                        color: self.style.selection_color.fg,
-                        background: Some(self.style.selection_color.bg),
-                        ..Default::default()
-                    },
+                    // Span {
+                    //     color: self.style.selection_color.fg,
+                    //     background: Some(self.style.selection_color.bg),
+                    //     ..Default::default()
+                    // },
+                    Span::Selection(self.style.selection_color.bg)
                 );
             }
         } else {
