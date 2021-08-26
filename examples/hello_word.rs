@@ -2,7 +2,7 @@ use crui::{
     font::{Font, Fonts},
     graphics::{Text, TextStyle},
     render::{GuiRender, GuiRenderer},
-    text::SpannedString,
+    text::{Span, SpannedString},
     Gui,
 };
 use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
@@ -65,7 +65,9 @@ fn main() {
         font_id: my_font,
         ..Default::default()
     };
-    let text = SpannedString::from_string("Hello Word!!".to_string(), style);
+    let mut text = SpannedString::from_string("Hello Word!!".to_string(), style);
+    text.add_span(6..10, Span::Color([0, 0, 0, 255].into()));
+    text.add_span(6..10, Span::Selection([255, 0, 0, 255].into()));
 
     let _text = gui
         .create_control()

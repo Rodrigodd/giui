@@ -10,8 +10,8 @@ use winit::event::VirtualKeyCode;
 use crate::{
     graphics::Graphic,
     style::TextFieldStyle,
-    text::{editor::TextEditor, Span},
     text::layout::TextLayout,
+    text::{editor::TextEditor, Span},
     Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseInfo,
 };
 
@@ -175,7 +175,7 @@ impl<C: TextFieldCallback> TextField<C> {
                     //     background: Some(self.style.selection_color.bg),
                     //     ..Default::default()
                     // },
-                    Span::Selection(self.style.selection_color.bg)
+                    Span::Selection(self.style.selection_color.bg),
                 );
             }
         } else {

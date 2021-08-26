@@ -7,7 +7,7 @@ use crate::font::{FontId, Fonts};
 use crate::text::SpannedString;
 use crate::Color;
 
-use super::ShapeSpan;
+use super::{ShapeSpan, StyleKind, StyleSpan};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Alignment {
@@ -104,6 +104,15 @@ impl GlyphPosition {
     }
 }
 
+/// A rect associated with a color.
+#[derive(Clone, Debug)]
+pub struct ColorRect {
+    /// The [x1, y1, x2, y2] rect.
+    pub rect: [f32; 4],
+    /// The color of the rect.
+    pub color: Color,
+}
+
 /// Performs the shaping and layout of a SpannedString, producing glyphs for rendering. The
 /// layouted glyphs are positioned relative to the alignment anchor, and must be translated to the
 /// desired location to be rendered.
@@ -117,6 +126,8 @@ pub struct TextLayout {
     lines: Vec<Line>,
     /// The glyphs of the layout.
     glyphs: Vec<GlyphPosition>,
+    /// Rects that add others drawings such as underlines, and selections.
+    rects: Vec<ColorRect>,
     /// The minimum width and height required so that there is no line wrap or overflow
     min_size: [f32; 2],
 }
@@ -128,6 +139,7 @@ impl TextLayout {
             settings,
             lines: Vec::new(),
             glyphs: Vec::new(),
+            rects: Vec::new(),
             min_size: [0.0, 0.0],
         };
         this.layout(fonts);
@@ -156,6 +168,12 @@ impl TextLayout {
     /// alignment anchor, and must be translated to the desired location to be rendered.
     pub fn glyphs(&self) -> &[GlyphPosition] {
         &self.glyphs
+    }
+
+    /// Return a slice of the rects in this layout. All rects are positioned relative to the
+    /// alignment anchor, and must be translated to the desired location to be rendered.
+    pub fn rects(&self) -> &[ColorRect] {
+        &self.rects
     }
 
     /// Return a slice of the glyphs in this layout. All glyphs are positioned relative to the
@@ -198,6 +216,7 @@ impl TextLayout {
         self.compute_min_size(&lines);
         self.break_lines(lines, allowed_breaks);
         self.position_lines();
+        self.apply_styles();
     }
 
     /// Layout it paragraph in a LineLayout. Each paragraph is section of the text, separated by
@@ -294,6 +313,98 @@ impl TextLayout {
             y += -line.descent + line.line_gap;
         }
     }
+
+    /// Apply the styles describe in SpannedString.style_spans for each respective range of text.
+    /// This change glyph color and add selections for example.
+    fn apply_styles(&mut self) {
+        for style in &self.text.style_spans {
+            let StyleSpan {
+                byte_range: range,
+                kind,
+            } = style;
+            let glyph_range = {
+                let start_glyph = self
+                    .glyphs
+                    .binary_search_by(|x| crate::util::cmp_range(range.start, x.byte_range.clone()))
+                    .unwrap();
+                let end_glyph = self
+                    .glyphs
+                    .binary_search_by(|x| crate::util::cmp_range(range.end, x.byte_range.clone()))
+                    .unwrap();
+                start_glyph..end_glyph
+            };
+            if glyph_range.is_empty() {
+                continue;
+            }
+            match kind {
+                &StyleKind::Color(color) => self.glyphs[glyph_range]
+                    .iter_mut()
+                    .for_each(move |x| x.color = color),
+                &StyleKind::Selection(color) => {
+                    let first_line = self
+                        .lines
+                        .binary_search_by(|x| {
+                            crate::util::cmp_range(range.start, x.byte_range.clone())
+                        })
+                        .unwrap();
+                    let glyphs = &self.glyphs;
+                    let glyph_pos = |glyph_index: usize| {
+                        let glyph = &glyphs[glyph_index];
+                        [glyph.glyph.position.x, glyph.glyph.position.y]
+                    };
+                    let glyph_pos_end = |glyph_index: usize| {
+                        let glyph = &glyphs[glyph_index];
+                        [glyph.right(), glyph.glyph.position.y]
+                    };
+                    let start_pos = glyph_pos(glyph_range.start);
+                    let end_pos = glyph_pos_end(glyph_range.end - 1);
+                    let line = &self.lines[first_line];
+                    if line.glyph_range.end > glyph_range.end {
+                        let rect = [
+                            start_pos[0],
+                            start_pos[1] - line.ascent,
+                            end_pos[0],
+                            end_pos[1] - line.descent,
+                        ];
+                        self.rects.push(ColorRect { rect, color });
+                    } else {
+                        {
+                            let end_pos = glyph_pos_end(line.glyph_range.end - 1);
+                            let rect = [
+                                start_pos[0],
+                                start_pos[1] - line.ascent,
+                                end_pos[0],
+                                end_pos[1] - line.descent,
+                            ];
+                            self.rects.push(ColorRect { rect, color });
+                        }
+                        for line in self.lines[first_line..].iter().skip(1) {
+                            let start_pos = glyph_pos(line.glyph_range.start);
+                            if line.glyph_range.end > glyph_range.end {
+                                let rect = [
+                                    start_pos[0],
+                                    start_pos[1] - line.ascent,
+                                    end_pos[0],
+                                    end_pos[1] - line.descent,
+                                ];
+                                self.rects.push(ColorRect { rect, color });
+                                break;
+                            } else {
+                                let end_pos = glyph_pos_end(line.glyph_range.end - 1);
+                                let rect = [
+                                    start_pos[0],
+                                    start_pos[1] - line.ascent,
+                                    end_pos[0],
+                                    end_pos[1] - line.descent,
+                                ];
+                                self.rects.push(ColorRect { rect, color });
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// The layout of a single line of text. This can be break in multiple line later.
@@ -341,7 +452,13 @@ impl LineLayout {
         this
     }
 
-    fn append_run(&mut self, fonts: &Fonts, shape: &ShapeSpan, text: &str, byte_range: Range<usize>) {
+    fn append_run(
+        &mut self,
+        fonts: &Fonts,
+        shape: &ShapeSpan,
+        text: &str,
+        byte_range: Range<usize>,
+    ) {
         if shape.byte_range.is_empty() {
             return;
         }

@@ -7,6 +7,8 @@ use crate::{
     Color, Rect, RenderDirtyFlags,
 };
 
+use self::layout::ColorRect;
+
 pub mod editor;
 pub mod layout;
 mod shaping;
@@ -157,8 +159,8 @@ impl ShapeSpan {
 /// A span of text with certain style. This contains information for text effects.
 #[derive(Debug, Clone)]
 struct StyleSpan {
-    range: Range<usize>,
-    kind: StyleKind,
+    pub byte_range: Range<usize>,
+    pub kind: StyleKind,
 }
 
 #[derive(Debug, Clone)]
@@ -169,6 +171,15 @@ enum StyleKind {
     // Mark { color: Color, round?: bool }
     // Anim?
     //
+}
+impl StyleKind {
+    fn from_span(span: Span) -> Result<Self, Span> {
+        Ok(match span {
+            Span::FontSize(_) | Span::FontId(_) => return Err(span),
+            Span::Color(x) => Self::Color(x),
+            Span::Selection(x) => Self::Selection(x),
+        })
+    }
 }
 
 pub enum Span {
@@ -227,6 +238,11 @@ impl SpannedString {
         }
     }
 
+    /// Returns a reference to the underline string.
+    pub fn string(&self) -> &str {
+        &self.string
+    }
+
     pub fn clear(&mut self) {
         self.string.clear();
         self.shape_spans.clear();
@@ -265,7 +281,7 @@ impl SpannedString {
 
         // remove spans
         self.shape_spans.retain(|x| overlap(x.byte_range.clone()));
-        self.style_spans.retain(|x| overlap(x.range.clone()));
+        self.style_spans.retain(|x| overlap(x.byte_range.clone()));
 
         let shift_range = |range: &mut Range<usize>| {
             if offset < 0 {
@@ -336,6 +352,18 @@ impl SpannedString {
     }
 
     pub fn add_span(&mut self, range: Range<usize>, span: Span) {
+        match StyleKind::from_span(span) {
+            Ok(kind) => self.style_spans.push(StyleSpan {
+                byte_range: range,
+                kind,
+            }),
+            Err(span) => {
+                self.add_shape_span(range, span);
+            }
+        }
+    }
+
+    pub fn add_shape_span(&mut self, range: Range<usize>, span: Span) {
         let mut to_append = Vec::new();
         for shape in &mut self.shape_spans {
             let rb = shape.byte_range.clone();
@@ -493,6 +521,7 @@ pub struct Text {
     last_pos: [f32; 2],
     align: (i8, i8),
     glyphs: Vec<FontGlyph>,
+    rects: Vec<ColorRect>,
     pub(crate) color_dirty: bool,
 }
 impl Clone for Text {
@@ -504,6 +533,7 @@ impl Clone for Text {
             text_dirty: true,
             last_pos: Default::default(),
             glyphs: Vec::new(),
+            rects: Vec::new(),
             min_size: Default::default(),
         }
     }
@@ -518,6 +548,7 @@ impl Text {
             last_pos: Default::default(),
             min_size: Default::default(),
             glyphs: Vec::new(),
+            rects: Vec::new(),
         }
     }
 
@@ -530,6 +561,7 @@ impl Text {
             last_pos: Default::default(),
             min_size: Default::default(),
             glyphs: Vec::new(),
+            rects: Vec::new(),
         }
     }
 
@@ -595,19 +627,16 @@ impl Text {
         let anchor_pos = self.get_align_anchor(*rect.get_rect());
         self.last_pos = anchor_pos;
         let rect = rect.get_rect();
-        // let (glyphs, rects) = self
-        let glyphs = self
-            .text
-            .to_layout(
-                &LayoutSettings {
-                    max_width: Some(rect[2] - rect[0]),
-                    horizontal_align: [Start, Center, End][(self.align.0 + 1) as usize],
-                    vertical_align: [Start, Center, End][(self.align.1 + 1) as usize],
-                },
-                fonts,
-            )
-            .glyphs();
-        self.glyphs = glyphs
+        let layout = self.text.to_layout(
+            &LayoutSettings {
+                max_width: Some(rect[2] - rect[0]),
+                horizontal_align: [Start, Center, End][(self.align.0 + 1) as usize],
+                vertical_align: [Start, Center, End][(self.align.1 + 1) as usize],
+            },
+            fonts,
+        );
+        self.glyphs = layout
+            .glyphs()
             .iter()
             .map(|x| {
                 let mut glyph = x.glyph.clone();
@@ -618,6 +647,18 @@ impl Text {
                     font_id: x.font_id,
                     color: x.color,
                 }
+            })
+            .collect();
+        self.rects = layout
+            .rects()
+            .iter()
+            .cloned()
+            .map(|mut x| {
+                x.rect[0] += anchor_pos[0];
+                x.rect[1] += anchor_pos[1];
+                x.rect[2] += anchor_pos[0];
+                x.rect[3] += anchor_pos[1];
+                x
             })
             .collect();
     }
@@ -633,7 +674,7 @@ impl Text {
         &mut self,
         rect: &mut Rect,
         fonts: &Fonts,
-    ) -> (&[FontGlyph], &[()]) {
+    ) -> (&[FontGlyph], &[ColorRect]) {
         let dirty_flags = rect.get_render_dirty_flags();
         let width_change = dirty_flags.contains(RenderDirtyFlags::WIDTH)
             && self.min_size.map_or(true, |x| rect.get_width() < x[0]);
@@ -649,8 +690,14 @@ impl Text {
                 glyph.glyph.position.x += delta[0];
                 glyph.glyph.position.y += delta[1];
             }
+            for rect in &mut self.rects {
+                rect.rect[0] += delta[0];
+                rect.rect[1] += delta[1];
+                rect.rect[2] += delta[0];
+                rect.rect[3] += delta[1];
+            }
         }
-        (&self.glyphs, &[])
+        (&self.glyphs, &self.rects)
     }
 
     pub fn compute_min_size(&mut self, fonts: &Fonts) -> Option<[f32; 2]> {

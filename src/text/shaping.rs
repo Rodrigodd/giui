@@ -1,5 +1,5 @@
 use crate::Color;
-use crate::{font::Fonts, text::ShapeSpan, text::layout::GlyphPosition};
+use crate::{font::Fonts, text::layout::GlyphPosition, text::ShapeSpan};
 
 use ab_glyph::{point, Glyph, GlyphId};
 use harfbuzz_rs::{shape as hb_shape, Face, Font as HbFont, UnicodeBuffer};
@@ -33,7 +33,10 @@ pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPo
         if let Some(last) = glyphs.last_mut() {
             last.byte_range.end = cluster;
         }
-        let is_whitespace = text[cluster..].chars().next().map_or(false, |x| x.is_whitespace());
+        let is_whitespace = text[cluster..]
+            .chars()
+            .next()
+            .map_or(false, |x| x.is_whitespace());
         glyphs.push(GlyphPosition {
             glyph: Glyph {
                 id: GlyphId(gid as u16),
