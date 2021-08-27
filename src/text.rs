@@ -189,7 +189,7 @@ struct StyleSpan {
 #[derive(Debug, Clone)]
 enum StyleKind {
     Color(Color),
-    Selection(Color),
+    Selection { bg: Color, fg: Option<Color> },
     // Shadow { color: Color, dir: [f32; 2] }
     // Mark { color: Color, round?: bool }
     // Anim?
@@ -200,7 +200,7 @@ impl StyleKind {
         Ok(match span {
             Span::FontSize(_) | Span::FontId(_) => return Err(span),
             Span::Color(x) => Self::Color(x),
-            Span::Selection(x) => Self::Selection(x),
+            Span::Selection { bg, fg } => Self::Selection { bg, fg },
         })
     }
 }
@@ -209,7 +209,7 @@ pub enum Span {
     FontSize(f32),
     FontId(FontId),
     Color(Color),
-    Selection(Color),
+    Selection { bg: Color, fg: Option<Color> },
 }
 
 /// A description of the style of a text.
@@ -643,6 +643,12 @@ impl Text {
         let spanned = self.text.to_spanned();
         let style = spanned.default.clone();
         spanned.set_style(style);
+        self.dirty();
+    }
+
+    pub fn clear_selections(&mut self) {
+        let spanned = self.text.to_spanned();
+        spanned.style_spans.retain(|x| !matches!(x.kind, StyleKind::Selection { .. }));
         self.dirty();
     }
 

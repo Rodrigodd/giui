@@ -174,15 +174,13 @@ impl<C: TextFieldCallback> TextField<C> {
         if selection_range.len() > 0 {
             ctx.set_margins(self.caret, [0.0; 4]);
             if let Graphic::Text(text) = ctx.get_graphic_mut(self.label) {
-                text.clear_spans();
+                text.clear_selections();
                 text.add_span(
                     selection_range,
-                    // Span {
-                    //     color: self.style.selection_color.fg,
-                    //     background: Some(self.style.selection_color.bg),
-                    //     ..Default::default()
-                    // },
-                    Span::Selection(self.style.selection_color.bg),
+                    Span::Selection {
+                        bg: self.style.selection_color.bg,
+                        fg: self.style.selection_color.fg,
+                    },
                 );
             }
         } else {
@@ -204,7 +202,7 @@ impl<C: TextFieldCallback> TextField<C> {
                     [
                         caret_pos[0],
                         caret_pos[1] - caret_pos[2],
-                        caret_pos[0] + 3.0,
+                        caret_pos[0] + 1.0,
                         caret_pos[1],
                     ],
                 );

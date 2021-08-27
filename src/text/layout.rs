@@ -493,10 +493,16 @@ impl TextLayout {
                 continue;
             }
             match kind {
-                &StyleKind::Color(color) => self.glyphs[glyph_range]
+                &StyleKind::Color(color)
+                | &StyleKind::Selection {
+                    fg: Some(color), ..
+                } => self.glyphs[glyph_range.clone()]
                     .iter_mut()
                     .for_each(move |x| x.color = color),
-                &StyleKind::Selection(color) => {
+                _ => {}
+            }
+            match kind {
+                &StyleKind::Selection { bg: color, .. } => {
                     let first_line = self
                         .lines
                         .binary_search_by(|x| {
@@ -558,6 +564,7 @@ impl TextLayout {
                         }
                     }
                 }
+                _ => {}
             }
         }
     }
