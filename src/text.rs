@@ -648,7 +648,9 @@ impl Text {
 
     pub fn clear_selections(&mut self) {
         let spanned = self.text.to_spanned();
-        spanned.style_spans.retain(|x| !matches!(x.kind, StyleKind::Selection { .. }));
+        spanned
+            .style_spans
+            .retain(|x| !matches!(x.kind, StyleKind::Selection { .. }));
         self.dirty();
     }
 

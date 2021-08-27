@@ -15,20 +15,24 @@ impl std::fmt::Debug for Position {
     }
 }
 
+#[repr(transparent)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug, Default)]
+pub struct ByteIndex(usize);
+
 /// A selection of text. This can also represent a cursor.
 pub struct Selection {
     /// The position of the cursor. Can also be the selection ends. Can be before or after the
     /// anchor.
-    cursor: Position,
+    cursor: ByteIndex,
+    /// The position where the selection starts. Can be before or after the cursor.
+    anchor: ByteIndex,
     /// The x position of the cursor. This only updated in horizontal motion. This is use to keep
     /// the cursor motion align when moving vertically multiple lines.
     cursor_x: f32,
-    /// The position where the selection starts. Can be before or after the cursor.
-    anchor: Position,
 }
 impl Selection {
     /// Set cursor and anchor to the same value.
-    pub fn set_pos(&mut self, pos: Position) {
+    pub fn set_pos(&mut self, pos: ByteIndex) {
         self.cursor = pos;
         self.anchor = pos;
     }
@@ -39,7 +43,7 @@ impl Selection {
     }
 
     /// Return the position of the start of the selection. This is the min(cursor, anchor).
-    pub fn start(&self) -> Position {
+    pub fn start(&self) -> ByteIndex {
         if self.cursor < self.anchor {
             self.cursor
         } else {
@@ -48,7 +52,7 @@ impl Selection {
     }
 
     /// Return the position of the end of the selection. This is the max(cursor, anchor).
-    pub fn end(&self) -> Position {
+    pub fn end(&self) -> ByteIndex {
         if self.cursor > self.anchor {
             self.cursor
         } else {
@@ -67,45 +71,29 @@ impl TextEditor {
     pub fn new() -> Self {
         Self {
             selection: Selection {
-                cursor: Position {
-                    line: 0,
-                    collumn: 0,
-                },
+                cursor: ByteIndex(0),
                 cursor_x: 0.0,
-                anchor: Position {
-                    line: 0,
-                    collumn: 0,
-                },
+                anchor: ByteIndex(0),
             },
         }
     }
 
-    /// Get the index of the glyph that contains the given byte index in its range.
-    fn get_glyph_from_byte_index(
-        &mut self,
-        byte_index: usize,
-        text_layout: &mut TextLayout,
-    ) -> Option<usize> {
-        let glyph = text_layout
-            .glyphs()
+    fn get_line_from_byte_index(&mut self, byte_index: usize, text_layout: &TextLayout) -> usize {
+        let lines = text_layout.lines();
+        lines
             .binary_search_by(|x| cmp_range(byte_index, x.byte_range.clone()))
-            .ok()?;
-        Some(glyph)
+            .unwrap_or(lines.len())
     }
 
     /// Get the position, given the byte index in the text string.
-    fn get_position_from_byte_index(
+    pub fn get_position_from_byte_index(
         &mut self,
-        index: usize,
-        text_layout: &mut TextLayout,
+        byte_index: usize,
+        text_layout: &TextLayout,
     ) -> Position {
-        let glyph = self.get_glyph_from_byte_index(index, text_layout).unwrap();
-        let lines = text_layout.lines();
-        let line = lines
-            .binary_search_by(|x| cmp_range(glyph, x.glyph_range.clone()))
-            .unwrap_or_else(|x| x);
-        let byte_range = self.get_line_byte_range(line, text_layout);
-        let offset = index - byte_range.clone().start;
+        let line = self.get_line_from_byte_index(byte_index, text_layout);
+        let byte_range = text_layout.lines()[line].byte_range.clone();
+        let offset = byte_index - byte_range.clone().start;
         let collumn = text_layout.text()[byte_range]
             .char_indices()
             .map(|(i, _)| i)
@@ -116,9 +104,9 @@ impl TextEditor {
     }
 
     /// Get the byte index in the text string, given a Position.
-    fn get_byte_index(&mut self, position: Position, text_layout: &mut TextLayout) -> usize {
+    pub fn get_byte_index(&mut self, position: Position, text_layout: &TextLayout) -> usize {
         let Position { line, collumn } = position;
-        let byte_range = self.get_line_byte_range(line, text_layout);
+        let byte_range = text_layout.lines()[line].byte_range.clone();
         let (offset, _) = text_layout.text()[byte_range.clone()]
             .char_indices()
             .nth(collumn)
@@ -126,22 +114,15 @@ impl TextEditor {
         byte_range.start + offset
     }
 
-    /// Get the x and y position of the caret, in pixels, for the given position.
-    fn get_pixel_position(&mut self, position: Position, text_layout: &mut TextLayout) -> [f32; 2] {
-        let byte_index = self.get_byte_index(position, text_layout);
-        let pos = text_layout.pixel_position_from_byte_index(byte_index);
-        pos.unwrap_or([0.0, 0.0])
-    }
-
     /// Get the byte range of the currently selected text. This range can be used to slice the
     /// text string
-    pub fn selection_range(&mut self, text_layout: &mut TextLayout) -> Range<usize> {
+    pub fn selection_range(&mut self) -> Range<usize> {
         if self.selection.is_empty() {
-            let byte = self.get_byte_index(self.selection.cursor, text_layout);
+            let byte = self.selection.cursor.0;
             byte..byte
         } else {
-            let mut start = self.get_byte_index(self.selection.cursor, text_layout);
-            let mut end = self.get_byte_index(self.selection.anchor, text_layout);
+            let mut start = self.selection.cursor.0;
+            let mut end = self.selection.anchor.0;
             if start > end {
                 std::mem::swap(&mut start, &mut end);
             }
@@ -149,48 +130,18 @@ impl TextEditor {
         }
     }
 
-    /// Get the glyph range of the given line.
-    fn get_line_glyph_range(&mut self, line: usize, text_layout: &mut TextLayout) -> Range<usize> {
-        let lines = text_layout.lines();
-        let l = if line < lines.len() {
-            &lines[line]
-        } else {
-            lines.last().unwrap()
-        };
-        l.glyph_range.clone()
-    }
-
-    /// Get the byte range of the given line.
-    fn get_line_byte_range(&mut self, line: usize, text_layout: &mut TextLayout) -> Range<usize> {
-        let glyph_range = self.get_line_glyph_range(line, text_layout);
-        let byte_range = {
-            let glyphs = text_layout.glyphs();
-            if glyphs.is_empty() {
-                return 0..0;
-            }
-            if glyph_range.len() > 0 {
-                glyphs[glyph_range.start].byte_range.start
-                    ..glyphs[glyph_range.end - 1].byte_range.end
-            } else {
-                let r = glyphs[glyph_range.start].byte_range.start;
-                r..r
-            }
-        };
-        byte_range
-    }
-
     /// Offset a position by a give amount of graphene clusters. Offset to the right if
     /// delta_x is positive, and left if it is negative.
-    fn offset_position(
+    fn offset_byte_index(
         &mut self,
-        position: Position,
+        position: ByteIndex,
         delta_x: i32,
-        text_layout: &mut TextLayout,
-    ) -> Position {
+        text_layout: &TextLayout,
+    ) -> ByteIndex {
         if delta_x == 0 {
             return position;
         }
-        let byte_index = self.get_byte_index(position, text_layout);
+        let byte_index = position.0;
         if delta_x > 0 {
             let n = delta_x as usize;
             let (offset, _) = text_layout.text()[byte_index..]
@@ -199,7 +150,7 @@ impl TextEditor {
                 .last()
                 .unwrap();
             let target = byte_index + offset;
-            self.get_position_from_byte_index(target, text_layout)
+            ByteIndex(target)
         } else {
             let n = (-delta_x) as usize;
             let offset = text_layout.text()[..byte_index]
@@ -209,7 +160,7 @@ impl TextEditor {
                 .map(|x| x.0)
                 .last();
             if let Some(offset) = offset {
-                self.get_position_from_byte_index(offset, text_layout)
+                ByteIndex(offset)
             } else {
                 position
             }
@@ -218,12 +169,16 @@ impl TextEditor {
 
     /// Return the x y position of the top of the caret, and its height, in pixels. The position is
     /// relative to the algnment anchor of the text.
-    pub fn get_caret_position_and_height(&mut self, text_layout: &mut TextLayout) -> [f32; 3] {
-        let (descent, height) = text_layout
-            .lines()
-            .get(self.selection.cursor.line)
-            .map_or((0.0, 0.0), |x| (x.descent, x.height()));
-        let [x, y] = self.get_pixel_position(self.selection.cursor, text_layout);
+    pub fn get_caret_position_and_height(&mut self, text_layout: &TextLayout) -> [f32; 3] {
+        let byte_index = self.selection.cursor.0;
+        let (height, descent) = {
+            let line = self.get_line_from_byte_index(byte_index, text_layout);
+            let line = &text_layout.lines()[line];
+            (line.height(), line.descent)
+        };
+        let [x, y] = text_layout
+            .pixel_position_from_byte_index(byte_index)
+            .unwrap_or([0.0, 0.0]);
         [x, y - descent, height]
     }
 
@@ -234,11 +189,13 @@ impl TextEditor {
         &mut self,
         delta_x: i32,
         expand_selection: bool,
-        text_layout: &mut TextLayout,
+        text_layout: &TextLayout,
     ) {
         let cursor = self.selection.cursor;
-        let cursor = self.offset_position(cursor, delta_x, text_layout);
-        self.selection.cursor_x = self.get_pixel_position(cursor, text_layout)[0];
+        let cursor = self.offset_byte_index(cursor, delta_x, text_layout);
+        self.selection.cursor_x = text_layout
+            .pixel_position_from_byte_index(cursor.0)
+            .unwrap_or([0.0, 0.0])[0];
         if expand_selection {
             self.selection.cursor = cursor;
         } else {
@@ -257,9 +214,9 @@ impl TextEditor {
 
     /// Move the cursor to the start of the currently line. If expand_selection is true, the anchor
     /// of the selection will be preserved. Otherwise, the selection is clear.
-    pub fn move_cursor_line_start(&mut self, expand_selection: bool, text_layout: &mut TextLayout) {
-        let line_range = self.get_line_byte_range(self.selection.cursor.line, text_layout);
-        let cursor = self.get_position_from_byte_index(line_range.start, text_layout);
+    pub fn move_cursor_line_start(&mut self, expand_selection: bool, text_layout: &TextLayout) {
+        let line = self.get_line_from_byte_index(self.selection.cursor.0, text_layout);
+        let cursor = ByteIndex(text_layout.lines()[line].byte_range.start);
         if expand_selection {
             self.selection.cursor = cursor;
         } else {
@@ -269,10 +226,9 @@ impl TextEditor {
 
     /// Move the cursor to the end of the currently line. If expand_selection is true, the anchor
     /// of the selection will be preserved. Otherwise, the selection is clear.
-    pub fn move_cursor_line_end(&mut self, expand_selection: bool, text_layout: &mut TextLayout) {
-        let line_range = self.get_line_byte_range(self.selection.cursor.line, text_layout);
-        let cursor = self.get_position_from_byte_index(line_range.end - 1, text_layout);
-        // let cursor = self.offset_position(cursor, -1, text_layout);
+    pub fn move_cursor_line_end(&mut self, expand_selection: bool, text_layout: &TextLayout) {
+        let line = self.get_line_from_byte_index(self.selection.cursor.0, text_layout);
+        let cursor = ByteIndex(text_layout.lines()[line].byte_range.end - 1);
         if expand_selection {
             self.selection.cursor = cursor;
         } else {
@@ -287,39 +243,23 @@ impl TextEditor {
         &mut self,
         lines: i32,
         expand_selection: bool,
-        text_layout: &mut TextLayout,
+        text_layout: &TextLayout,
     ) {
-        fn add(a: usize, b: i32) -> usize {
-            if b >= 0 {
-                a.saturating_add(b as usize)
-            } else {
-                a.saturating_sub((-b) as usize)
-            }
-        }
-
-        let mut line = self.selection.cursor.line;
-        line = add(line, lines);
-        let num_lines = text_layout.lines().len();
-        if line >= num_lines {
-            line = num_lines - 1;
-        }
-
-        let line_range = self.get_line_glyph_range(line, text_layout);
-        let cursor_x = self.selection.cursor_x;
-        let glyph = text_layout.glyphs()[line_range]
-            .iter()
-            .take_while(|x| x.glyph.position.x < cursor_x)
-            .last()
-            .unwrap();
-
-        // check if it more to the left or to the right of the glyph
-        let s = (self.selection.cursor_x - glyph.glyph.position.x) / glyph.width;
-        let byte = if s < 0.5 {
-            glyph.byte_range.start
+        let curr_line = self.get_line_from_byte_index(self.selection.cursor.0, text_layout);
+        let target = curr_line as isize + lines as isize;
+        let lines = text_layout.lines();
+        let cursor = if target < 0 {
+            // if move to a negative line, go to the start of the text.
+            ByteIndex(0)
+        } else if target >= lines.len() as isize {
+            // if move to a out of bounds line, go to the end of the text.
+            ByteIndex(lines.last().unwrap().byte_range.end - 1)
         } else {
-            glyph.byte_range.end
+            let index = text_layout
+                .byte_index_from_x_position(target as usize, self.selection.cursor_x)
+                .unwrap();
+            ByteIndex(index)
         };
-        let cursor = self.get_position_from_byte_index(byte, text_layout);
 
         if expand_selection {
             self.selection.cursor = cursor;
@@ -334,13 +274,13 @@ impl TextEditor {
     ///
     /// If the given text is empty, this acts as a selection deletion.
     pub fn insert_text(&mut self, text: &str, fonts: &Fonts, text_layout: &mut TextLayout) {
-        let range = self.selection_range(text_layout);
+        let range = self.selection_range();
         text_layout.replace_range(range.clone(), text, fonts);
-        let target = range.start + text.len();
-        let pos = self.get_position_from_byte_index(target, text_layout);
-        assert_eq!(self.get_byte_index(pos, text_layout), target);
-        self.selection.set_pos(pos);
-        self.selection.cursor_x = self.get_pixel_position(pos, text_layout)[0];
+        let byte_index = range.start + text.len();
+        self.selection.set_pos(ByteIndex(byte_index));
+        self.selection.cursor_x = text_layout
+            .pixel_position_from_byte_index(byte_index)
+            .unwrap_or([0.0, 0.0])[0];
     }
 
     /// If the selection is empty, delete horizontaly, by the given amount of graphene clusters.
@@ -349,7 +289,7 @@ impl TextEditor {
     pub fn delete_hor(&mut self, delta_x: i32, fonts: &Fonts, text_layout: &mut TextLayout) {
         if self.selection.is_empty() {
             let anchor = self.selection.anchor;
-            let anchor = self.offset_position(anchor, delta_x, text_layout);
+            let anchor = self.offset_byte_index(anchor, delta_x, text_layout);
 
             self.selection.anchor = anchor;
         }

@@ -169,8 +169,7 @@ impl<C: TextFieldCallback> TextField<C> {
 
         caret_pos[0] -= self.x_scroll;
 
-        let text_layout = self.get_layout(ctx);
-        let selection_range = self.editor.selection_range(text_layout);
+        let selection_range = self.editor.selection_range();
         if selection_range.len() > 0 {
             ctx.set_margins(self.caret, [0.0; 4]);
             if let Graphic::Text(text) = ctx.get_graphic_mut(self.label) {

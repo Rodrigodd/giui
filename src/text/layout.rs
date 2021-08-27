@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::ops::Range;
 
@@ -5,6 +6,7 @@ use ab_glyph::{Font, Glyph, ScaleFont};
 
 use crate::font::{FontId, Fonts};
 use crate::text::SpannedString;
+use crate::util::cmp_range;
 use crate::Color;
 
 use super::{ShapeSpan, StyleKind, StyleSpan};
@@ -298,11 +300,49 @@ impl TextLayout {
         }
         let x = self
             .glyphs
-            .binary_search_by(|x| crate::util::cmp_range(byte_index, x.byte_range.clone()))
+            .binary_search_by(|x| cmp_range(byte_index, x.byte_range.clone()))
             .ok()?;
         let glyph = &self.glyphs[x];
         let pos = [glyph.glyph.position.x, glyph.glyph.position.y];
         Some(pos)
+    }
+
+    /// Return the byte index for the caret located at the given line and horizontal position in
+    /// pixels. This is rounded to the closest possible caret position.
+    pub fn byte_index_from_x_position(&self, line: usize, x_position: f32) -> Option<usize> {
+        if self.glyphs.is_empty() {
+            return None;
+        }
+        let line = self.lines.get(line)?;
+        let glyphs = &self.glyphs[line.glyph_range.clone()];
+        let g = glyphs.binary_search_by(|g| {
+            if x_position < g.glyph.position.x {
+                Ordering::Greater
+            } else if x_position > g.right() {
+                Ordering::Less
+            } else {
+                Ordering::Equal
+            }
+        });
+        let byte_index = match g {
+            Ok(i) => {
+                // round to nearest
+                let middle = {
+                    let glyph = &glyphs[i];
+                    glyph.glyph.position.x + glyph.width / 2.0
+                };
+                let i = if i < glyphs.len() - 1 && x_position > middle {
+                    i + 1
+                } else {
+                    i
+                };
+                glyphs[i].byte_range.start
+            }
+            Err(0) => line.byte_range.start,
+            Err(i) if i == glyphs.len() => glyphs.last().unwrap().byte_range.start,
+            _ => unreachable!(),
+        };
+        Some(byte_index)
     }
 
     /// Removes the specified range in the string, and replaces it with the given string. This
@@ -481,11 +521,11 @@ impl TextLayout {
             let glyph_range = {
                 let start_glyph = self
                     .glyphs
-                    .binary_search_by(|x| crate::util::cmp_range(range.start, x.byte_range.clone()))
+                    .binary_search_by(|x| cmp_range(range.start, x.byte_range.clone()))
                     .unwrap();
                 let end_glyph = self
                     .glyphs
-                    .binary_search_by(|x| crate::util::cmp_range(range.end, x.byte_range.clone()))
+                    .binary_search_by(|x| cmp_range(range.end, x.byte_range.clone()))
                     .unwrap();
                 start_glyph..end_glyph
             };
@@ -505,9 +545,7 @@ impl TextLayout {
                 &StyleKind::Selection { bg: color, .. } => {
                     let first_line = self
                         .lines
-                        .binary_search_by(|x| {
-                            crate::util::cmp_range(range.start, x.byte_range.clone())
-                        })
+                        .binary_search_by(|x| cmp_range(range.start, x.byte_range.clone()))
                         .unwrap();
                     let glyphs = &self.glyphs;
                     let glyph_pos = |glyph_index: usize| {
