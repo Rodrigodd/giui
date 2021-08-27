@@ -94,6 +94,29 @@ mod test {
     }
 
     #[test]
+    fn replace_range3() {
+        let mut spanned = SpannedString::from_string("012".into(), Default::default());
+        spanned.replace_range(1..1, "_");
+        assert_eq!(
+            spanned.shape_spans,
+            vec![ShapeSpan {
+                byte_range: 0..4,
+                font_size: 16.0,
+                font_id: FontId::new(0),
+            }]
+        );
+        spanned.replace_range(1..2, "_");
+        assert_eq!(
+            spanned.shape_spans,
+            vec![ShapeSpan {
+                byte_range: 0..4,
+                font_size: 16.0,
+                font_id: FontId::new(0),
+            }]
+        );
+    }
+
+    #[test]
     fn split_shape() {
         let mut spanned = SpannedString::from_string("0123456789ab".into(), Default::default());
         spanned.split_shape_span(4);
@@ -268,7 +291,14 @@ impl SpannedString {
     //     self.spans.push((start..self.string.len(), span));
     // }
 
-    pub fn replace_range(&mut self, range: Range<usize>, string: &str) {
+    pub fn replace_range(&mut self, mut range: Range<usize>, string: &str) {
+        if !range.is_empty() {
+            assert!(range.end <= self.string.len());
+        } else {
+            range.end = range.start;
+        }
+        assert!(range.start <= self.string.len());
+
         let offset = string.len() as isize - range.len() as isize;
         let overlap = |this_range: Range<usize>| {
             // range overlap a range
@@ -284,6 +314,10 @@ impl SpannedString {
         self.style_spans.retain(|x| overlap(x.byte_range.clone()));
 
         let shift_range = |range: &mut Range<usize>| {
+            // range.start -= range.len();
+            // range.start += string.len();
+            // range.end -= range.len();
+            // range.end += string.len();
             if offset < 0 {
                 range.start -= (-offset) as usize;
                 range.end -= (-offset) as usize;
@@ -294,27 +328,33 @@ impl SpannedString {
         };
 
         let mut insert_index = 0;
+        let mut split = None;
         // cut and shift spans
         for (i, x) in self.shape_spans.iter_mut().enumerate() {
-            let rb = &mut x.byte_range;
-            if rb.start >= range.start && rb.end <= range.end {
-                unreachable!()
-            } else if rb.start < range.start && rb.end > range.end {
-                // range cut a range in three
-                rb.end -= range.len();
-            } else if rb.start < range.start && rb.end > range.start {
+            if x.byte_range.start < range.start && x.byte_range.end > range.end {
+                // range cut a range in three, if there is a string to insert
+                if string.is_empty() {
+                    x.byte_range.end -= range.len();
+                } else {
+                    let mut s = x.clone();
+                    s.byte_range.start = range.end;
+                    shift_range(&mut s.byte_range);
+                    split = Some(s);
+                    x.byte_range.end = range.start;
+                }
+            } else if x.byte_range.start < range.start && x.byte_range.end > range.start {
                 // range.start cut a range
-                rb.end = range.start;
-            } else if rb.start < range.end && rb.end > range.end {
+                x.byte_range.end = range.start;
+            } else if x.byte_range.start < range.end && x.byte_range.end > range.end {
                 // range.end cut a range
-                rb.start = range.end;
-                shift_range(rb);
-            } else if rb.start >= range.end {
+                x.byte_range.start = range.end;
+                shift_range(&mut x.byte_range);
+            } else if x.byte_range.start >= range.end {
                 // range is to the right, and must be shifted
-                shift_range(rb);
+                shift_range(&mut x.byte_range);
             }
 
-            if rb.end <= range.start {
+            if x.byte_range.end <= range.start {
                 insert_index = i + 1;
             }
         }
@@ -326,7 +366,14 @@ impl SpannedString {
                 font_size: self.default.font_size,
                 font_id: self.default.font_id,
             };
-            self.shape_spans.insert(insert_index, shape);
+            if let Some(split) = split {
+                self.shape_spans
+                    .splice(insert_index..insert_index, [shape, split]);
+            } else {
+                self.shape_spans.insert(insert_index, shape);
+            }
+        } else {
+            assert!(split.is_none());
         }
 
         self.shape_spans.dedup_by(|a, b| {
@@ -520,6 +567,7 @@ pub struct Text {
     min_size: Option<[f32; 2]>,
     last_pos: [f32; 2],
     align: (i8, i8),
+    wrap_line: bool,
     glyphs: Vec<FontGlyph>,
     rects: Vec<ColorRect>,
     pub(crate) color_dirty: bool,
@@ -529,6 +577,7 @@ impl Clone for Text {
         Self {
             text: self.text.clone(),
             align: self.align,
+            wrap_line: true,
             color_dirty: true,
             text_dirty: true,
             last_pos: Default::default(),
@@ -543,6 +592,7 @@ impl Text {
         Self {
             text: InnerText::SpannedString(SpannedString::from_string(text, style.clone())),
             align,
+            wrap_line: true,
             color_dirty: true,
             text_dirty: true,
             last_pos: Default::default(),
@@ -556,6 +606,7 @@ impl Text {
         Self {
             text: InnerText::SpannedString(text),
             align,
+            wrap_line: true,
             color_dirty: true,
             text_dirty: true,
             last_pos: Default::default(),
@@ -602,6 +653,11 @@ impl Text {
         self.dirty();
     }
 
+    pub fn set_wrap(&mut self, wrap: bool) {
+        self.wrap_line = wrap;
+        self.dirty();
+    }
+
     pub fn set_text_layout(&mut self, text: TextLayout) {
         self.text.set_layout(text);
         self.dirty();
@@ -629,7 +685,7 @@ impl Text {
         let rect = rect.get_rect();
         let layout = self.text.to_layout(
             &LayoutSettings {
-                max_width: Some(rect[2] - rect[0]),
+                max_width: self.wrap_line.then(|| rect[2] - rect[0]),
                 horizontal_align: [Start, Center, End][(self.align.0 + 1) as usize],
                 vertical_align: [Start, Center, End][(self.align.1 + 1) as usize],
             },

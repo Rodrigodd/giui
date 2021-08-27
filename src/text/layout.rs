@@ -9,6 +9,85 @@ use crate::Color;
 
 use super::{ShapeSpan, StyleKind, StyleSpan};
 
+#[cfg(test)]
+mod test {
+    use crate::font::{Font, FontId, Fonts};
+    use crate::text::layout::{LayoutSettings, TextLayout};
+    use crate::text::{SpannedString, TextStyle};
+    use crate::Color;
+
+    fn fonts() -> (Fonts, FontId) {
+        let mut fonts = Fonts::new();
+        let font_id = fonts.add(Font::new(include_bytes!(
+            "..\\..\\examples\\CascadiaCode.ttf"
+        )));
+        (fonts, font_id)
+    }
+
+    #[test]
+    fn layout_empty() {
+        let (fonts, font_id) = fonts();
+        let text = SpannedString::from_string(
+            "".to_string(),
+            TextStyle {
+                color: Color::WHITE,
+                font_size: 16.0,
+                font_id,
+            },
+        );
+        let settings = LayoutSettings {
+            max_width: None,
+            horizontal_align: Default::default(),
+            vertical_align: Default::default(),
+        };
+        let _text_layout = TextLayout::new(text, settings, &fonts);
+    }
+
+    #[test]
+    fn replace_nothing() {
+        let (fonts, font_id) = fonts();
+        let text = SpannedString::from_string(
+            "H ".to_string(),
+            TextStyle {
+                color: Color::WHITE,
+                font_size: 16.0,
+                font_id,
+            },
+        );
+        let settings = LayoutSettings {
+            max_width: None,
+            horizontal_align: Default::default(),
+            vertical_align: Default::default(),
+        };
+        let mut text_layout = TextLayout::new(text, settings, &fonts);
+
+        let lines = text_layout.lines.clone();
+        let glyphs = text_layout.glyphs.clone();
+        let rects = text_layout.rects.clone();
+        let min_size = text_layout.min_size;
+
+        text_layout.replace_range(0..0, "", &fonts);
+
+        assert_eq!(
+            glyphs,
+            text_layout.glyphs,
+            "byte_ranges:\n{:?}\n{:?}\n",
+            glyphs
+                .iter()
+                .map(|x| x.glyph.position.clone())
+                .collect::<Vec<_>>(),
+            text_layout
+                .glyphs
+                .iter()
+                .map(|x| x.glyph.position.clone())
+                .collect::<Vec<_>>(),
+        );
+        assert_eq!(lines, text_layout.lines);
+        assert_eq!(rects, text_layout.rects);
+        assert_eq!(min_size, text_layout.min_size);
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Alignment {
     /// If the alignment is horizontal, align to the left. If is vertical, to the top.
@@ -40,7 +119,7 @@ pub struct LayoutSettings {
     pub vertical_align: Alignment,
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub struct Line {
     /// The position of the top of the line, in pixels, relative to the line origin. It grows up.
     pub ascent: f32,
@@ -66,6 +145,20 @@ impl Line {
         self.ascent - self.descent
     }
 
+    /// The width of this line, ignoring the last glyph is it is a whitespace.
+    pub fn visible_width(&self, glyphs: &[GlyphPosition]) -> f32 {
+        if self.glyph_range.is_empty() {
+            return self.width;
+        }
+        let last_glyph = &glyphs[self.glyph_range.end - 1];
+        let ignore = if last_glyph.is_whitespace {
+            last_glyph.width
+        } else {
+            0.0
+        };
+        self.width - ignore
+    }
+
     /// Move this line and all it's glyphs to the given position.
     pub fn move_to(&mut self, x: f32, y: f32, glyphs: &mut [GlyphPosition]) {
         let x_off = x - self.x;
@@ -81,7 +174,7 @@ impl Line {
 }
 
 /// A positioned scaled glyph.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GlyphPosition {
     /// The glyph itself, with position and scale
     pub glyph: Glyph,
@@ -97,15 +190,14 @@ pub struct GlyphPosition {
     pub is_whitespace: bool,
 }
 impl GlyphPosition {
-    /// The position of the right edge of this glyph. Equal to position.x + width. If the glyph is
-    /// a whitespace, the width will be interpreted as zero.
+    /// The position of the right edge of this glyph. Equal to position.x + width.
     pub fn right(&self) -> f32 {
-        self.glyph.position.x + if self.is_whitespace { 0.0 } else { self.width }
+        self.glyph.position.x + self.width
     }
 }
 
 /// A rect associated with a color.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ColorRect {
     /// The [x1, y1, x2, y2] rect.
     pub rect: [f32; 4],
@@ -133,7 +225,21 @@ pub struct TextLayout {
 }
 impl TextLayout {
     /// Create a new TextLayout from the given SpannedString.
-    pub fn new(text: SpannedString, settings: LayoutSettings, fonts: &Fonts) -> Self {
+    pub fn new(mut text: SpannedString, settings: LayoutSettings, fonts: &Fonts) -> Self {
+        // Add a extra glyph to the text, to be used as the final empty line (if the text has a
+        // trailing "\n") and for the position of the last caret.
+        let len = text.string.len();
+        let last_font_size = text
+            .shape_spans
+            .last()
+            .map_or(text.default.font_size, |x| x.font_size);
+        text.string.push_str(" ");
+        text.shape_spans.push(ShapeSpan {
+            byte_range: len..len + 1,
+            font_size: last_font_size,
+            font_id: Default::default(),
+        });
+
         let mut this = Self {
             text,
             settings,
@@ -147,7 +253,8 @@ impl TextLayout {
         this
     }
 
-    /// Return a string slice to the text that this TextLayout represents.
+    /// Return a string slice to the text that this TextLayout represents. This contais a extra
+    /// char at the end.
     pub fn text(&self) -> &str {
         &self.text.string
     }
@@ -182,11 +289,50 @@ impl TextLayout {
         &self.lines
     }
 
-    pub fn replace_range(&mut self, range: Range<usize>, text: &str, fonts: &Fonts) {
-        todo!()
+    /// Return the x y position, in pixels, of the caret when positioned at the given byte index.
+    /// Returns None if it is out of bounds. Notice that a extra glyph is add at the end of the
+    /// represented text, which represents the position of caret for byte_index == text.len().
+    pub fn pixel_position_from_byte_index(&self, byte_index: usize) -> Option<[f32; 2]> {
+        if self.glyphs.is_empty() {
+            return None;
+        }
+        let x = self
+            .glyphs
+            .binary_search_by(|x| crate::util::cmp_range(byte_index, x.byte_range.clone()))
+            .ok()?;
+        let glyph = &self.glyphs[x];
+        let pos = [glyph.glyph.position.x, glyph.glyph.position.y];
+        Some(pos)
     }
 
-    pub fn to_spanned(self) -> SpannedString {
+    /// Removes the specified range in the string, and replaces it with the given string. This
+    /// recompute the layout. The given string doesn’t need to be the same length as the range.
+    pub fn replace_range(&mut self, range: Range<usize>, text: &str, fonts: &Fonts) {
+        // the string has a extra char, so check for out of bounds for len() - 1.
+        assert!(
+            range.end <= self.text.string.len() - 1,
+            "range.end is {}, but string.len() is {}",
+            range.end,
+            self.text.string.len() - 1
+        );
+        self.text.replace_range(range, text);
+
+        // clear everthing
+        self.glyphs.clear();
+        self.rects.clear();
+        self.lines.clear();
+        self.min_size = [0.0, 0.0];
+
+        // recompute everthing
+        self.layout(fonts);
+    }
+
+    /// Destroys self, returning the inner SpannedString.
+    pub fn to_spanned(mut self) -> SpannedString {
+        // remove the extra char at the end, before returning it.
+        let len = self.text.string.len();
+        self.text.replace_range(len - 1..len, "");
+
         self.text
     }
 
@@ -215,6 +361,16 @@ impl TextLayout {
 
         self.compute_min_size(&lines);
         self.break_lines(lines, allowed_breaks);
+        assert_eq!(self.lines[0].glyph_range.start, 0);
+        assert_eq!(
+            self.lines.last().unwrap().glyph_range.end,
+            self.glyphs.len()
+        );
+        assert_eq!(self.lines[0].byte_range.start, 0);
+        assert_eq!(
+            self.lines.last().unwrap().byte_range.end,
+            self.text.string.len()
+        );
         self.position_lines();
         self.apply_styles();
     }
@@ -306,8 +462,8 @@ impl TextLayout {
             y += line.ascent;
             let x = match self.settings.horizontal_align {
                 Alignment::Start => 0.0,
-                Alignment::Center => -line.width / 2.0,
-                Alignment::End => -line.width,
+                Alignment::Center => -line.visible_width(&self.glyphs) / 2.0,
+                Alignment::End => -line.visible_width(&self.glyphs),
             };
             line.move_to(x, y, &mut self.glyphs);
             y += -line.descent + line.line_gap;
@@ -447,7 +603,7 @@ impl LineLayout {
         }
 
         let last_glyph = this.glyphs.last().unwrap();
-        this.width = last_glyph.glyph.position.x + last_glyph.width;
+        this.width = last_glyph.right();
 
         this
     }
@@ -544,6 +700,7 @@ impl LineLayout {
         let mut curr_line = self.lines[0].clone();
         curr_line.byte_range.end = byte_index;
         curr_line.width = right_pos - curr_line.x;
+        curr_line.glyph_range.end = self.glyphs.len();
 
         for line in self.lines[1..].iter_mut() {
             curr_line.ascent = curr_line.ascent.max(line.ascent);
@@ -624,10 +781,21 @@ impl LineLayout {
     /// Greedily break the line in smaller ones, in a way that each line has width smaller than the
     /// given max_width.
     fn break_lines(&mut self, max_width: f32, linebreaks: &mut VecDeque<usize>) {
+        if self.width < max_width {
+            let value = self.form_line();
+            self.lines.push(value);
+            return;
+        }
         let mut lines = Vec::new();
         // skip the first glyph, because there is no way to do a break line there.
         for (g, glyph) in self.glyphs.iter().enumerate().skip(1) {
-            let right_pos = glyph.right() - self.lines[0].x;
+            // a partial overflow of a whitespace glyph is ignored.
+            let right = if glyph.is_whitespace {
+                glyph.glyph.position.x
+            } else {
+                glyph.right()
+            };
+            let right_pos = right - self.lines[0].x;
             if right_pos > max_width {
                 let mut prev_break = None;
                 let byte_index = glyph.byte_range.start;

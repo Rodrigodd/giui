@@ -83,12 +83,12 @@ impl TextEditor {
     /// Get the index of the glyph that contains the given byte index in its range.
     fn get_glyph_from_byte_index(
         &mut self,
-        index: usize,
+        byte_index: usize,
         text_layout: &mut TextLayout,
     ) -> Option<usize> {
         let glyph = text_layout
             .glyphs()
-            .binary_search_by(|x| cmp_range(index, x.byte_range.clone()))
+            .binary_search_by(|x| cmp_range(byte_index, x.byte_range.clone()))
             .ok()?;
         Some(glyph)
     }
@@ -99,9 +99,7 @@ impl TextEditor {
         index: usize,
         text_layout: &mut TextLayout,
     ) -> Position {
-        let glyph = self
-            .get_glyph_from_byte_index(index, text_layout)
-            .unwrap_or(0);
+        let glyph = self.get_glyph_from_byte_index(index, text_layout).unwrap();
         let lines = text_layout.lines();
         let line = lines
             .binary_search_by(|x| cmp_range(glyph, x.glyph_range.clone()))
@@ -130,15 +128,9 @@ impl TextEditor {
 
     /// Get the x and y position of the caret, in pixels, for the given position.
     fn get_pixel_position(&mut self, position: Position, text_layout: &mut TextLayout) -> [f32; 2] {
-        let byte = self.get_byte_index(position, text_layout);
-        let glyph = self.get_glyph_from_byte_index(byte, text_layout);
-        let glyph = if let Some(x) = glyph {
-            x
-        } else {
-            return [0.0, 0.0];
-        };
-        let pos = text_layout.glyphs()[glyph].glyph.position;
-        [pos.x, pos.y]
+        let byte_index = self.get_byte_index(position, text_layout);
+        let pos = text_layout.pixel_position_from_byte_index(byte_index);
+        pos.unwrap_or([0.0, 0.0])
     }
 
     /// Get the byte range of the currently selected text. This range can be used to slice the
@@ -224,8 +216,9 @@ impl TextEditor {
         }
     }
 
-    /// Return the x y position of the top of the caret, and its height.
-    pub fn get_cursor_position_and_height(&mut self, text_layout: &mut TextLayout) -> [f32; 3] {
+    /// Return the x y position of the top of the caret, and its height, in pixels. The position is
+    /// relative to the algnment anchor of the text.
+    pub fn get_caret_position_and_height(&mut self, text_layout: &mut TextLayout) -> [f32; 3] {
         let (descent, height) = text_layout
             .lines()
             .get(self.selection.cursor.line)
@@ -278,7 +271,7 @@ impl TextEditor {
     /// of the selection will be preserved. Otherwise, the selection is clear.
     pub fn move_cursor_line_end(&mut self, expand_selection: bool, text_layout: &mut TextLayout) {
         let line_range = self.get_line_byte_range(self.selection.cursor.line, text_layout);
-        let cursor = self.get_position_from_byte_index(line_range.end, text_layout);
+        let cursor = self.get_position_from_byte_index(line_range.end - 1, text_layout);
         // let cursor = self.offset_position(cursor, -1, text_layout);
         if expand_selection {
             self.selection.cursor = cursor;

@@ -125,12 +125,19 @@ impl<C: TextFieldCallback> TextField<C> {
         }
 
         let text_layout = self.get_layout(ctx);
-        let mut caret_pos = self.editor.get_cursor_position_and_height(text_layout);
+        let mut caret_pos = self.editor.get_caret_position_and_height(text_layout);
 
         const MARGIN: f32 = 5.0;
 
         let this_rect = *ctx.get_rect(this);
         self.this_width = this_rect[2] - this_rect[0];
+        let label_rect = *ctx.get_rect(self.label);
+        if let Graphic::Text(x) = ctx.get_graphic_mut(self.label) {
+            let anchor = x.get_align_anchor(label_rect);
+            caret_pos[0] += anchor[0] - label_rect[0];
+            caret_pos[1] += anchor[1] - label_rect[1];
+        } else {
+        }
 
         // caret_pos[0] += label_rect[0];
         // caret_pos[1] += label_rect[1] - this_rect[1];
@@ -211,6 +218,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         let fonts = ctx.get_fonts();
         if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {
+            text.set_wrap(false);
             let min_size = text.compute_min_size(fonts).unwrap_or([0.0, 0.0]);
             self.text_width = min_size[0];
             rect.set_min_size(min_size);
