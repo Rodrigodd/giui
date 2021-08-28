@@ -66,8 +66,13 @@ fn main() {
         ..Default::default()
     };
     let mut text = SpannedString::from_string("Hello Word!!".to_string(), style);
-    text.add_span(6..10, Span::Color([0, 0, 0, 255].into()));
-    text.add_span(6..10, Span::Selection([255, 0, 0, 255].into()));
+    text.add_span(
+        6..10,
+        Span::Selection {
+            bg: [255, 0, 0, 255].into(),
+            fg: Some([0, 0, 0, 255].into()),
+        },
+    );
 
     let _text = gui
         .create_control()
