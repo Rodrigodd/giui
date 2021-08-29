@@ -30,8 +30,20 @@ pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPo
         let y_offset = position.y_offset as f32 * scale;
         let x_advance = position.x_advance as f32 * scale;
 
-        if let Some(last) = glyphs.last_mut() {
-            last.byte_range.end = cluster;
+        if let Some((mut last, split)) = glyphs.split_last_mut() {
+            if last.byte_range.start != cluster {
+                last.byte_range.end = cluster;
+                // if multiple glyphs are from the same cluster, the first one will map to the
+                // entire byte range of cluster, and the others will have a empty byte_range
+                for prev in split.iter_mut().rev() {
+                    if !prev.byte_range.is_empty() && prev.byte_range.start == last.byte_range.start
+                    {
+                        last.byte_range.start = cluster;
+                        prev.byte_range.end = cluster;
+                        last = prev;
+                    }
+                }
+            }
         }
         let is_whitespace = text[cluster..]
             .chars()
@@ -50,6 +62,20 @@ pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPo
             is_whitespace,
         });
         x += x_advance;
+    }
+
+    if let Some((mut last, split)) = glyphs.split_last_mut() {
+        let cluster = text.len();
+        last.byte_range.end = cluster;
+        // if multiple glyphs are from the same cluster, the first one will map to the
+        // entire byte range of cluster, and the others will have a empty byte_range
+        for prev in split.iter_mut().rev() {
+            if !prev.byte_range.is_empty() && prev.byte_range.start == last.byte_range.start {
+                last.byte_range.start = cluster;
+                prev.byte_range.end = cluster;
+                last = prev;
+            }
+        }
     }
 
     glyphs

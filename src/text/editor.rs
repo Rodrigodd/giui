@@ -1,5 +1,6 @@
 use crate::{font::Fonts, text::layout::TextLayout, util::cmp_range};
 use std::ops::Range;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Represents a position in a text.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -93,9 +94,12 @@ impl TextEditor {
     ) -> Position {
         let line = self.get_line_from_byte_index(byte_index, text_layout);
         let byte_range = text_layout.lines()[line].byte_range.clone();
+        if byte_range.is_empty() {
+            return Position { line, collumn: 0 };
+        }
         let offset = byte_index - byte_range.clone().start;
         let collumn = text_layout.text()[byte_range]
-            .char_indices()
+            .grapheme_indices(true)
             .map(|(i, _)| i)
             .take_while(|x| *x <= offset)
             .count()
@@ -108,9 +112,9 @@ impl TextEditor {
         let Position { line, collumn } = position;
         let byte_range = text_layout.lines()[line].byte_range.clone();
         let (offset, _) = text_layout.text()[byte_range.clone()]
-            .char_indices()
+            .grapheme_indices(true)
             .nth(collumn)
-            .unwrap_or((0, ' '));
+            .unwrap_or((0, ""));
         byte_range.start + offset
     }
 
@@ -145,7 +149,7 @@ impl TextEditor {
         if delta_x > 0 {
             let n = delta_x as usize;
             let (offset, _) = text_layout.text()[byte_index..]
-                .char_indices()
+                .grapheme_indices(true)
                 .take(n + 1)
                 .last()
                 .unwrap();
@@ -154,7 +158,7 @@ impl TextEditor {
         } else {
             let n = (-delta_x) as usize;
             let offset = text_layout.text()[..byte_index]
-                .char_indices()
+                .grapheme_indices(true)
                 .rev()
                 .take(n)
                 .map(|x| x.0)
