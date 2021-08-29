@@ -307,13 +307,31 @@ impl TextLayout {
         Some(pos)
     }
 
+    /// Return the index of the line that contains the given y_position, in pixels, or the closest
+    /// one. If y is above the first line, return 0. If y is below the last line, return the last
+    /// line index.
+    pub fn line_from_y_position(&self, y_position: f32) -> usize {
+        let l = self.lines.binary_search_by(|l| {
+            if l.y - l.ascent > y_position {
+                Ordering::Greater
+            } else if l.y - l.descent < y_position {
+                Ordering::Less
+            } else {
+                Ordering::Equal
+            }
+        });
+        match l {
+            Ok(i) => i,
+            Err(0) => 0,
+            Err(x) if x == self.lines.len() => self.lines.len() - 1,
+            _ => unreachable!(),
+        }
+    }
+
     /// Return the byte index for the caret located at the given line and horizontal position in
     /// pixels. This is rounded to the closest possible caret position.
-    pub fn byte_index_from_x_position(&self, line: usize, x_position: f32) -> Option<usize> {
-        if self.glyphs.is_empty() {
-            return None;
-        }
-        let line = self.lines.get(line)?;
+    pub fn byte_index_from_x_position(&self, line: usize, x_position: f32) -> usize {
+        let line = self.lines.get(line).unwrap();
         let glyphs = &self.glyphs[line.glyph_range.clone()];
         let g = glyphs.binary_search_by(|g| {
             if x_position < g.glyph.position.x {
@@ -324,7 +342,7 @@ impl TextLayout {
                 Ordering::Equal
             }
         });
-        let byte_index = match g {
+        match g {
             Ok(i) => {
                 // round to nearest
                 let middle = {
@@ -341,8 +359,15 @@ impl TextLayout {
             Err(0) => line.byte_range.start,
             Err(i) if i == glyphs.len() => glyphs.last().unwrap().byte_range.start,
             _ => unreachable!(),
-        };
-        Some(byte_index)
+        }
+    }
+
+    /// Return the byte index for the caret located closest to the given vertical and horizontal
+    /// position, in pixels.
+    pub fn byte_index_from_position(&self, x: f32, y: f32) -> usize {
+        let line = self.line_from_y_position(y);
+        let index = self.byte_index_from_x_position(line, x);
+        index
     }
 
     /// Removes the specified range in the string, and replaces it with the given string. This

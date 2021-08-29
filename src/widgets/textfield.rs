@@ -5,14 +5,14 @@ use std::{
 };
 
 use copypasta::{ClipboardContext, ClipboardProvider};
-use winit::event::VirtualKeyCode;
+use winit::{event::VirtualKeyCode, window::CursorIcon};
 
 use crate::{
     graphics::Graphic,
     style::TextFieldStyle,
     text::layout::TextLayout,
     text::{editor::TextEditor, Span},
-    Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseInfo,
+    Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseEvent, MouseInfo,
 };
 
 pub trait TextFieldCallback {
@@ -52,7 +52,6 @@ pub struct TextField<C: TextFieldCallback> {
     /// When there is no scroll, its value is -MARGIN.
     x_scroll: f32,
     on_focus: bool,
-    mouse_x: f32,
     /// If it is non zero, the mouse is being dragged. 1 for single click, 2 for double click, etc...
     mouse_down: u8,
     drag_start: usize,
@@ -72,7 +71,6 @@ impl<C: TextFieldCallback> TextField<C> {
             this_width: 0.0,
             x_scroll: 0.0,
             on_focus: false,
-            mouse_x: 0.0,
             mouse_down: 0,
             drag_start: 0,
             style,
@@ -263,102 +261,84 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     }
 
     fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
-        // use MouseButton::*;
-        // match mouse.event {
-        //     MouseEvent::Enter => {
-        //         ctx.set_cursor(CursorIcon::Text);
-        //     }
-        //     MouseEvent::Exit => {
-        //         ctx.set_cursor(CursorIcon::Default);
-        //     }
-        //     MouseEvent::Down(Left) => {
-        //         if let Some(event_id) = self.blink_event.take() {
-        //             ctx.cancel_scheduled_event(event_id);
-        //         }
-        //         if self.blink {
-        //             self.update_carret(this, ctx, false);
-        //         }
-
-        //         let left = ctx.get_rect(this)[0] - self.x_scroll;
-        //         let x = self.mouse_x - left;
-        //         let caret = self.get_caret_index_at_pos(0, x);
-        //         if caret == self.drag_start {
-        //             match mouse.click_count {
-        //                 0 => unreachable!(),
-        //                 1 => {
-        //                     self.caret_index = caret;
-        //                     self.mouse_down = 1;
-        //                     self.selection_index = None;
-        //                 }
-        //                 2 => {
-        //                     let caret = self.caret_index;
-        //                     self.caret_index = self.get_token_start(caret);
-        //                     self.mouse_down = 2;
-        //                     self.selection_index = Some(self.get_token_end(caret));
-        //                 }
-        //                 3..=u8::MAX => {
-        //                     self.select_all(this, ctx);
-        //                 }
-        //             }
-        //         } else {
-        //             if mouse.click_count > 1 {
-        //                 ctx.reset_click_count_to_one();
-        //             }
-        //             self.caret_index = caret;
-        //             self.mouse_down = 1;
-        //             self.selection_index = None;
-        //         }
-        //         self.drag_start = caret;
-        //         self.update_carret(this, ctx, true);
-        //         ctx.send_event(event::LockOver);
-        //     }
-        //     MouseEvent::Up(Left) => {
-        //         self.mouse_down = 0;
-        //         ctx.send_event(event::UnlockOver);
-        //     }
-        //     MouseEvent::Moved => {
-        //         let [x, _] = mouse.pos;
-        //         self.mouse_x = x;
-        //         match self.mouse_down {
-        //             0 => {}
-        //             1 => {
-        //                 let left = ctx.get_rect(this)[0] - self.x_scroll;
-        //                 let x = self.mouse_x - left;
-        //                 let caret_index = self.get_caret_index_at_pos(0, x);
-        //                 if caret_index == self.caret_index {
-        //                     return;
-        //                 }
-        //                 if let Some(selection_index) = self.selection_index {
-        //                     if caret_index == selection_index {
-        //                         self.selection_index = None;
-        //                     }
-        //                 } else {
-        //                     self.selection_index = Some(self.caret_index);
-        //                 }
-        //                 self.caret_index = caret_index;
-        //                 self.update_carret(this, ctx, true);
-        //             }
-        //             2..=u8::MAX => {
-        //                 let left = ctx.get_rect(this)[0] - self.x_scroll;
-        //                 let x = self.mouse_x - left;
-        //                 let caret_index = self.get_caret_index_at_pos(0, x);
-        //                 let selection_index = self.selection_index.unwrap_or(caret_index);
-        //                 let caret_index = if selection_index > caret_index {
-        //                     self.selection_index = Some(self.get_token_end(self.drag_start));
-        //                     self.get_token_start(caret_index)
-        //                 } else {
-        //                     self.selection_index = Some(self.get_token_start(self.drag_start));
-        //                     self.get_token_end(caret_index)
-        //                 };
-        //                 self.caret_index = caret_index;
-        //                 self.update_carret(this, ctx, true);
-        //             }
-        //         }
-        //     }
-        //     MouseEvent::Up(_) => {}
-        //     MouseEvent::Down(_) => {}
-        //     MouseEvent::None => {}
-        // }
+        use crate::MouseButton::*;
+        let label_rect = *ctx.get_rect(self.label);
+        let anchor_x = if let Graphic::Text(x) = ctx.get_graphic_mut(self.label) {
+            let anchor = x.get_align_anchor(label_rect);
+            anchor[0]
+        } else {
+            panic!("TextField label graphic is not Text");
+        };
+        let text_layout = self.get_layout(ctx);
+        match mouse.event {
+            MouseEvent::Enter => {
+                ctx.set_cursor(CursorIcon::Text);
+            }
+            MouseEvent::Exit => {
+                ctx.set_cursor(CursorIcon::Default);
+            }
+            MouseEvent::Down(Left) => {
+                let x = mouse.pos[0] - anchor_x;
+                let byte_index = text_layout.byte_index_from_position(x, 0.0);
+                if byte_index == self.drag_start {
+                    match mouse.click_count {
+                        0 => unreachable!(),
+                        1 => {
+                            self.editor
+                                .move_cursor_to_byte_index(byte_index, false, text_layout);
+                            self.mouse_down = 1;
+                        }
+                        2 => {
+                            self.editor
+                                .select_words_at_byte_range(byte_index..byte_index, text_layout);
+                            self.mouse_down = 2;
+                        }
+                        3..=u8::MAX => {
+                            self.editor.select_all(text_layout);
+                            self.mouse_down = 3;
+                        }
+                    }
+                } else {
+                    self.editor
+                        .move_cursor_to_byte_index(byte_index, false, text_layout);
+                    self.mouse_down = 1;
+                    if mouse.click_count > 1 {
+                        ctx.reset_click_count_to_one();
+                    }
+                }
+                self.drag_start = byte_index;
+                if let Some(event_id) = self.blink_event.take() {
+                    ctx.cancel_scheduled_event(event_id);
+                }
+                self.update_carret(this, ctx, true);
+                ctx.lock_cursor(true);
+            }
+            MouseEvent::Up(Left) => {
+                self.mouse_down = 0;
+                ctx.lock_cursor(false);
+            }
+            MouseEvent::Moved => match self.mouse_down {
+                0 => {}
+                1 => {
+                    let x = mouse.pos[0] - anchor_x;
+                    let byte_index = text_layout.byte_index_from_position(x, 0.0);
+                    self.editor
+                        .move_cursor_to_byte_index(byte_index, true, text_layout);
+                    self.update_carret(this, ctx, true);
+                }
+                2..=u8::MAX => {
+                    let x = mouse.pos[0] - anchor_x;
+                    let byte_index = text_layout.byte_index_from_position(x, 0.0);
+                    dbg!(&byte_index);
+                    self.editor
+                        .select_words_at_byte_range(self.drag_start..byte_index, text_layout);
+                    self.update_carret(this, ctx, true);
+                }
+            },
+            MouseEvent::Up(_) => {}
+            MouseEvent::Down(_) => {}
+            MouseEvent::None => {}
+        }
     }
 
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
@@ -376,6 +356,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     }
 
     fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
+        use crate::text::editor::HorizontalMotion::*;
         if let Some(event_id) = self.blink_event.take() {
             ctx.cancel_scheduled_event(event_id);
         }
@@ -417,42 +398,50 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                         }
                     }
                 }
-                // VirtualKeyCode::A => {
-                //     if modifiers.ctrl() {
-                //         self.select_all(this, ctx);
-                //     }
-                // }
+                VirtualKeyCode::A => {
+                    if modifiers.ctrl() {
+                        self.editor.select_all(text_layout);
+                    }
+                }
                 VirtualKeyCode::Return => {
                     let mut text = self.text(ctx).to_owned();
                     self.callback.on_submit(this, ctx, &mut text);
                 }
                 VirtualKeyCode::Back => {
-                    self.editor.delete_hor(-1, fonts, text_layout);
+                    if modifiers.ctrl() {
+                        self.editor.delete_hor(Words(-1), fonts, text_layout);
+                    } else {
+                        self.editor.delete_hor(Cluster(-1), fonts, text_layout);
+                    }
                     self.update_text(this, ctx);
                     let text = self.text(ctx).to_owned();
                     self.callback.on_change(this, ctx, &text);
                 }
                 VirtualKeyCode::Delete => {
-                    self.editor.delete_hor(1, fonts, text_layout);
+                    if modifiers.ctrl() {
+                        self.editor.delete_hor(Words(1), fonts, text_layout);
+                    } else {
+                        self.editor.delete_hor(Cluster(1), fonts, text_layout);
+                    }
                     self.update_text(this, ctx);
                 }
                 VirtualKeyCode::Left => {
                     if modifiers.ctrl() {
                         self.editor
-                            .move_cursor_hor(-2, modifiers.shift(), text_layout);
+                            .move_cursor_hor(Words(-1), modifiers.shift(), text_layout);
                     } else {
                         self.editor
-                            .move_cursor_hor(-1, modifiers.shift(), text_layout);
+                            .move_cursor_hor(Cluster(-1), modifiers.shift(), text_layout);
                     }
                     self.update_carret(this, ctx, true);
                 }
                 VirtualKeyCode::Right => {
                     if modifiers.ctrl() {
                         self.editor
-                            .move_cursor_hor(2, modifiers.shift(), text_layout);
+                            .move_cursor_hor(Words(1), modifiers.shift(), text_layout);
                     } else {
                         self.editor
-                            .move_cursor_hor(1, modifiers.shift(), text_layout);
+                            .move_cursor_hor(Cluster(1), modifiers.shift(), text_layout);
                     }
                     self.update_carret(this, ctx, true);
                 }
