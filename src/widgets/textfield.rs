@@ -413,7 +413,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                         if let Ok(text) = clipboard.get_contents() {
                             let text = text.replace(|x: char| x.is_control(), "");
                             self.editor.insert_text(&text, fonts, text_layout);
-                            self.update_carret(this, ctx, true);
+                            self.update_text(this, ctx);
                         }
                     }
                 }
