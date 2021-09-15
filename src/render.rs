@@ -377,6 +377,8 @@ impl GuiRender {
 
         if is_animating {
             self.last_anim_draw = Some(Instant::now());
+        } else {
+            ctx.clear_dirty();
         }
 
         (&self.last_sprites, is_animating)

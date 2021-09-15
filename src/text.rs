@@ -686,7 +686,7 @@ impl Text {
         anchor
     }
 
-    fn update_glyphs(&mut self, rect: &mut Rect, fonts: &Fonts) {
+    fn update_glyphs(&mut self, rect: &Rect, fonts: &Fonts) {
         use crate::text::layout::Alignment::*;
         let anchor_pos = self.get_align_anchor(*rect.get_rect());
         self.last_pos = anchor_pos;
@@ -736,7 +736,7 @@ impl Text {
 
     pub fn get_glyphs_and_rects(
         &mut self,
-        rect: &mut Rect,
+        rect: &Rect,
         fonts: &Fonts,
     ) -> (&[FontGlyph], &[ColorRect]) {
         let dirty_flags = rect.get_render_dirty_flags();

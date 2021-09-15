@@ -148,6 +148,13 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Clear all internal dirty flags from this context. This is called after rendering the gui.
+    //TODO: a RenderContext must be created, and this function only need to exist there
+    pub fn clear_dirty(&mut self) {
+        self.render_dirty = false;
+        self.dirtys.clear();
+    }
+
     // TODO: this should not return a reference?
     pub fn get_rect(&self, id: Id) -> &[f32; 4] {
         &self.gui.controls[id].rect.rect

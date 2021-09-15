@@ -103,7 +103,7 @@ impl Rect {
 
     /// Get the dirty flags. The dirty flags keep track if some values have changed
     /// since last call to clear_dirty_flags.
-    pub fn get_render_dirty_flags(&mut self) -> RenderDirtyFlags {
+    pub fn get_render_dirty_flags(&self) -> RenderDirtyFlags {
         self.render_dirty_flags
     }
 

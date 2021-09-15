@@ -115,6 +115,7 @@ fn main() {
                 // gui receive events
                 gui.handle_event(&event);
                 if gui.render_is_dirty() {
+                    println!("Is dirty!");
                     window.request_redraw();
                 }
                 if let Some(cursor) = gui.cursor_change() {

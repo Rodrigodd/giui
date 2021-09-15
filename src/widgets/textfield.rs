@@ -329,7 +329,6 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 2..=u8::MAX => {
                     let x = mouse.pos[0] - anchor_x;
                     let byte_index = text_layout.byte_index_from_position(x, 0.0);
-                    dbg!(&byte_index);
                     self.editor
                         .select_words_at_byte_range(self.drag_start..byte_index, text_layout);
                     self.update_carret(this, ctx, true);
