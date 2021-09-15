@@ -4,8 +4,10 @@ use crate::{
     graphics::{Graphic, Sprite},
     Color, Id, RenderDirtyFlags,
 };
-use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
+// use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
+use ab_glyph::{Font, GlyphId};
 use std::{ops::Range, time::Instant};
+use texture_cache::{Cached, LruTextureCache, RectEntry};
 
 #[derive(Debug)]
 /// A glyph and a font_id
@@ -20,8 +22,30 @@ pub trait GuiRenderer {
     fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]);
 }
 
+#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+struct GlyphKey {
+    font_id: usize,
+    glyph: GlyphId,
+    sub_pixel: (u8, u8),
+}
+impl GlyphKey {
+    fn new(f: FontId, g: &ab_glyph::Glyph) -> Self {
+        const SUB_PIXEL_PRECISION: u32 = 8;
+        GlyphKey {
+            font_id: f.index(),
+            glyph: g.id,
+            sub_pixel: (
+                (((g.position.x * SUB_PIXEL_PRECISION as f32).round() as u32) % SUB_PIXEL_PRECISION)
+                    as u8,
+                (((g.position.y * SUB_PIXEL_PRECISION as f32).round() as u32) % SUB_PIXEL_PRECISION)
+                    as u8,
+            ),
+        }
+    }
+}
+
 pub struct GuiRender {
-    draw_cache: DrawCache,
+    draw_cache: LruTextureCache<GlyphKey, [f32; 4]>,
     font_texture: u32,
     white_texture: u32,
     last_sprites: Vec<Sprite>,
@@ -33,9 +57,7 @@ pub struct GuiRender {
 impl GuiRender {
     pub fn new(font_texture: u32, white_texture: u32, font_texture_size: [u32; 2]) -> Self {
         //TODO: change this to default dimensions, and allow resizing
-        let draw_cache = DrawCacheBuilder::default()
-            .dimensions(font_texture_size[0], font_texture_size[1])
-            .build();
+        let draw_cache = LruTextureCache::new(font_texture_size[0], font_texture_size[1]);
         Self {
             draw_cache,
             font_texture,
@@ -102,43 +124,80 @@ impl GuiRender {
         let fonts = ctx.get_fonts();
 
         let mut font_texture_valid = true;
-        loop {
-            // queue all glyphs for cache
-            let mut parents = vec![Id::ROOT_ID];
-            while let Some(parent) = parents.pop() {
-                parents.extend(ctx.get_active_children(parent).iter());
-                if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(parent) {
-                    let (glyphs, _) = text.get_glyphs_and_rects(rect, fonts);
-                    for glyph in glyphs {
-                        self.draw_cache
-                            .queue_glyph(glyph.font_id.index(), glyph.glyph.clone());
-                    }
+
+        // queue all glyphs for cache
+
+        let mut queue = Vec::new();
+        let mut add_to_queue = |f: FontId, g: ab_glyph::Glyph| {
+            let outline = match fonts.get(f).unwrap().outline_glyph(g.clone()) {
+                Some(x) => x,
+                None => return,
+            };
+            let bounds = outline.px_bounds();
+            let width = bounds.width() as u32;
+            let height = bounds.height() as u32;
+            queue.push(RectEntry {
+                width,
+                height,
+                key: GlyphKey::new(f, &g),
+                value: [
+                    (bounds.min.x - g.position.x) / g.scale.x,
+                    (bounds.min.y - g.position.y) / g.scale.y,
+                    (bounds.max.x - g.position.x) / g.scale.x,
+                    (bounds.max.y - g.position.y) / g.scale.y,
+                ],
+                entry_data: outline,
+            })
+        };
+
+        let mut parents = vec![Id::ROOT_ID];
+        while let Some(parent) = parents.pop() {
+            parents.extend(ctx.get_active_children(parent).iter());
+            if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(parent) {
+                let (glyphs, _) = text.get_glyphs_and_rects(rect, fonts);
+                for glyph in glyphs {
+                    add_to_queue(glyph.font_id, glyph.glyph.clone());
                 }
             }
+        }
 
-            // update the font_texture
-            let font_texture = self.font_texture;
-            match self.draw_cache.cache_queued(fonts.as_slice(), |r, d| {
-                renderer.update_font_texure(
-                    font_texture,
-                    [r.min[0], r.min[1], r.max[0], r.max[1]],
-                    d,
-                )
-            }) {
-                Ok(CachedBy::Adding) => {}
-                Ok(CachedBy::Reordering) => {
+        loop {
+            // add the glyphs to the cache
+            let added = match self.draw_cache.cache_rects(&mut queue) {
+                Ok(Cached::Added(x) | Cached::Changed(x)) => x,
+                Ok(Cached::Cleared(x)) => {
                     font_texture_valid = false;
+                    x
                 }
                 Err(_) => {
-                    let (width, height) = self.draw_cache.dimensions();
-                    self.draw_cache = DrawCacheBuilder::default()
-                        .dimensions(width * 2, height * 2)
-                        .build();
-                    renderer.resize_font_texture(font_texture, [width * 2, height * 2]);
+                    let width = self.draw_cache.width();
+                    let height = self.draw_cache.height();
+                    self.draw_cache = LruTextureCache::new(width * 2, height * 2);
+                    renderer.resize_font_texture(self.font_texture, [width * 2, height * 2]);
                     font_texture_valid = false;
+                    // retry
                     continue;
                 }
+            };
+
+            // render the glyphs and upload to the texture
+            for entry in &queue[..added] {
+                let rect = self.draw_cache.get_rect(&entry.key).unwrap();
+                let outlined_glyph = &entry.entry_data;
+                let g_width = rect.width as usize;
+                let g_height = rect.height as usize;
+                let mut pixels = vec![0; g_width * g_height];
+                outlined_glyph.draw(|x, y, c| {
+                    let i = y as usize * g_width + x as usize;
+                    pixels[i] = (c * 256.0) as u8;
+                });
+                renderer.update_font_texure(
+                    self.font_texture,
+                    [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height],
+                    &pixels,
+                )
             }
+
             break;
         }
 
@@ -263,14 +322,30 @@ impl GuiRender {
                                 }
                             }
                             for glyph in glyphs {
-                                if let Some((tex_coords, pixel_coords)) = self
+                                if let Some(rect) = self
                                     .draw_cache
-                                    .rect_for(glyph.font_id.index(), &glyph.glyph)
+                                    .get_rect(&GlyphKey::new(glyph.font_id, &glyph.glyph))
                                 {
-                                    if pixel_coords.min.x as f32 > mask[2]
-                                        || pixel_coords.min.y as f32 > mask[3]
-                                        || mask[0] > pixel_coords.max.x as f32
-                                        || mask[1] > pixel_coords.max.y as f32
+                                    // (tex_coords, pixel_coords)
+                                    let tex_width = self.draw_cache.width() as f32;
+                                    let tex_height = self.draw_cache.height() as f32;
+                                    let tex_coords = [
+                                        rect.x as f32 / tex_width,
+                                        rect.y as f32 / tex_height,
+                                        rect.width as f32 / tex_width,
+                                        rect.height as f32 / tex_height,
+                                    ];
+                                    let px_bounds = rect.value;
+                                    let pixel_coords = [
+                                        px_bounds[0] * glyph.glyph.scale.x + glyph.glyph.position.x,
+                                        px_bounds[1] * glyph.glyph.scale.y + glyph.glyph.position.y,
+                                        px_bounds[2] * glyph.glyph.scale.x + glyph.glyph.position.x,
+                                        px_bounds[3] * glyph.glyph.scale.y + glyph.glyph.position.y,
+                                    ];
+                                    if pixel_coords[0] as f32 > mask[2]
+                                        || pixel_coords[1] as f32 > mask[3]
+                                        || mask[0] > pixel_coords[2] as f32
+                                        || mask[1] > pixel_coords[3] as f32
                                     {
                                         // glyph is totally outside the bounds
                                     } else {
@@ -340,8 +415,8 @@ pub fn cut_sprite(sprite: &mut Sprite, bounds: &[f32; 4]) -> bool {
 
 #[inline]
 pub fn to_sprite(
-    tex_coords: ab_glyph::Rect,
-    pixel_coords: ab_glyph::Rect,
+    tex_coords: [f32; 4],
+    pixel_coords: [f32; 4],
     bounds: [f32; 4],
     color: Color,
     font_texture: u32,
@@ -349,18 +424,8 @@ pub fn to_sprite(
     let mut sprite = Sprite {
         texture: font_texture,
         color,
-        rect: [
-            pixel_coords.min.x,
-            pixel_coords.min.y,
-            pixel_coords.max.x,
-            pixel_coords.max.y,
-        ],
-        uv_rect: [
-            tex_coords.min.x,
-            tex_coords.min.y,
-            tex_coords.width(),
-            tex_coords.height(),
-        ],
+        rect: pixel_coords,
+        uv_rect: tex_coords,
     };
 
     cut_sprite(&mut sprite, &bounds);

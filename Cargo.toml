@@ -15,7 +15,7 @@ members = ["./crui-derive"]
 
 [dependencies]
 
-glyph_brush_draw_cache = "0.1"
+texture-cache = { path = "../texture-cache" }
 ab_glyph = "0.2"
 harfbuzz_rs = "2"
 unicode-linebreak = "0.1"

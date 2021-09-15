@@ -6,7 +6,7 @@ pub use crate::text::{Text, TextStyle};
 pub struct Sprite {
     pub texture: u32,
     pub color: Color,
-    /// A rect, in the form [x1, y1, x2, y2].
+    /// A rect, in the form \[x1, y1, x2, y2\].
     pub rect: [f32; 4],
     pub uv_rect: [f32; 4],
 }
