@@ -24,21 +24,27 @@ pub trait GuiRenderer {
 
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
 struct GlyphKey {
-    font_id: usize,
+    font_id: FontId,
     glyph: GlyphId,
     sub_pixel: (u8, u8),
+    scale: (u16, u16),
 }
 impl GlyphKey {
     fn new(f: FontId, g: &ab_glyph::Glyph) -> Self {
         const SUB_PIXEL_PRECISION: u32 = 8;
+        const SCALE_PRECISION: u32 = 8;
         GlyphKey {
-            font_id: f.index(),
+            font_id: f,
             glyph: g.id,
             sub_pixel: (
                 (((g.position.x * SUB_PIXEL_PRECISION as f32).round() as u32) % SUB_PIXEL_PRECISION)
                     as u8,
                 (((g.position.y * SUB_PIXEL_PRECISION as f32).round() as u32) % SUB_PIXEL_PRECISION)
                     as u8,
+            ),
+            scale: (
+                (g.scale.x * SCALE_PRECISION as f32).round() as u16,
+                (g.scale.y * SCALE_PRECISION as f32).round() as u16,
             ),
         }
     }
@@ -141,10 +147,10 @@ impl GuiRender {
                 height,
                 key: GlyphKey::new(f, &g),
                 value: [
-                    (bounds.min.x - g.position.x) / g.scale.x,
-                    (bounds.min.y - g.position.y) / g.scale.y,
-                    (bounds.max.x - g.position.x) / g.scale.x,
-                    (bounds.max.y - g.position.y) / g.scale.y,
+                    bounds.min.x - g.position.x,
+                    bounds.min.y - g.position.y,
+                    bounds.max.x - g.position.x,
+                    bounds.max.y - g.position.y,
                 ],
                 entry_data: outline,
             })
@@ -337,10 +343,10 @@ impl GuiRender {
                                     ];
                                     let px_bounds = rect.value;
                                     let pixel_coords = [
-                                        px_bounds[0] * glyph.glyph.scale.x + glyph.glyph.position.x,
-                                        px_bounds[1] * glyph.glyph.scale.y + glyph.glyph.position.y,
-                                        px_bounds[2] * glyph.glyph.scale.x + glyph.glyph.position.x,
-                                        px_bounds[3] * glyph.glyph.scale.y + glyph.glyph.position.y,
+                                        px_bounds[0] + glyph.glyph.position.x,
+                                        px_bounds[1] + glyph.glyph.position.y,
+                                        px_bounds[2] + glyph.glyph.position.x,
+                                        px_bounds[3] + glyph.glyph.position.y,
                                     ];
                                     if pixel_coords[0] as f32 > mask[2]
                                         || pixel_coords[1] as f32 > mask[3]
