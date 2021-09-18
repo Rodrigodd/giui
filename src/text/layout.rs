@@ -255,10 +255,10 @@ impl TextLayout {
         this
     }
 
-    /// Return a string slice to the text that this TextLayout represents. This contais a extra
-    /// char at the end.
+    /// Return a string slice to the text that this TextLayout represents.
     pub fn text(&self) -> &str {
-        &self.text.string
+        let len = self.text.string.len();
+        &self.text.string[0..len - 1]
     }
 
     /// Return the height of the layouted text, from the top of the first line to the bottom of the

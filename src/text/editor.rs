@@ -171,11 +171,11 @@ impl TextEditor {
                 let byte_index = position.0;
                 if delta_x > 0 {
                     let n = delta_x as usize;
-                    let (offset, _) = text_layout.text()[byte_index..]
+                    let offset = text_layout.text()[byte_index..]
                         .grapheme_indices(true)
-                        .take(n + 1)
-                        .last()
-                        .unwrap();
+                        .nth(n)
+                        .map(|x| x.0)
+                        .unwrap_or(text_layout.text().len() - byte_index);
                     let target = byte_index + offset;
                     ByteIndex(target)
                 } else {
@@ -183,14 +183,10 @@ impl TextEditor {
                     let offset = text_layout.text()[..byte_index]
                         .grapheme_indices(true)
                         .rev()
-                        .take(n)
+                        .nth(n-1)
                         .map(|x| x.0)
-                        .last();
-                    if let Some(offset) = offset {
-                        ByteIndex(offset)
-                    } else {
-                        position
-                    }
+                        .unwrap_or(0);
+                    ByteIndex(offset)
                 }
             }
             HorizontalMotion::Words(delta_x) => {
@@ -206,7 +202,7 @@ impl TextEditor {
                         .take(n)
                         .map(|x| x.0)
                         .last()
-                        .unwrap_or(text_layout.text().len() - 1 - byte_index);
+                        .unwrap_or(text_layout.text().len() - byte_index);
                     let target = byte_index + offset;
                     ByteIndex(target)
                 } else {
@@ -314,7 +310,7 @@ impl TextEditor {
 
     /// Select the entire text.
     pub fn select_all(&mut self, text_layout: &TextLayout) {
-        let len = text_layout.text().len() - 1;
+        let len = text_layout.text().len();
         self.selection.cursor = ByteIndex(0);
         self.selection.anchor = ByteIndex(len);
     }
