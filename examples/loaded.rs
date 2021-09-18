@@ -239,21 +239,21 @@ enum UserEvent {
     Close,
 }
 
-struct NumberField<F: Fn(&mut Context, i32)>(F);
+struct NumberField<F: Fn(&mut Context, i32)>(String, F);
 impl<F: Fn(&mut Context, i32)> TextFieldCallback for NumberField<F> {
-    fn on_submit(&mut self, _this: Id, ctx: &mut Context, text: &mut String) -> bool {
+    fn on_submit(&mut self, _this: Id, ctx: &mut Context, text: &mut String) {
         match text.parse::<i32>() {
             Ok(x) => {
-                (self.0)(ctx, x);
-                true
+                (self.1)(ctx, x);
+                self.0.clone_from(text);
             }
             Err(_) => {
                 if text.chars().any(|c| !c.is_whitespace()) {
-                    false
+                    text.clone_from(&self.0);
                 } else {
                     text.replace_range(.., "0");
-                    (self.0)(ctx, 0);
-                    true
+                    (self.1)(ctx, 0);
+                    self.0.clone_from(text);
                 }
             }
         }
@@ -261,7 +261,7 @@ impl<F: Fn(&mut Context, i32)> TextFieldCallback for NumberField<F> {
 
     fn on_change(&mut self, _: Id, _: &mut Context, _: &str) {}
 
-    fn on_unfocus(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool {
+    fn on_unfocus(&mut self, this: Id, ctx: &mut Context, text: &mut String) {
         self.on_submit(this, ctx, text)
     }
 }
@@ -463,7 +463,6 @@ impl OptionsGui {
                 let options = self.options.clone();
                 move |_, _: &mut Context, text: &mut String| {
                     options.borrow_mut().field_a.clone_from(text);
-                    true
                 }
             },
         );
@@ -472,12 +471,12 @@ impl OptionsGui {
             self.field_b,
             gui,
             "Number".into(),
-            initial_value,
+            initial_value.clone(),
             parent,
             style,
             {
                 let options = self.options.clone();
-                NumberField(move |_, x| options.borrow_mut().field_b = x)
+                NumberField(initial_value, move |_, x| options.borrow_mut().field_b = x)
             },
         );
         self.create_slider(gui, parent, style);
@@ -519,7 +518,7 @@ impl OptionsGui {
             let text_style = style.text_style.clone();
             move |_this: Id, ctx: &mut Context, text: &mut String| {
                 if !text.chars().any(|c| !c.is_whitespace()) {
-                    return true;
+                    return;
                 }
                 let mut borrow = options.borrow_mut();
                 let i = borrow.list.last().map_or(0, |x| x.0) + 1;
@@ -535,7 +534,6 @@ impl OptionsGui {
                     i,
                 );
                 text.clear();
-                true
             }
         })
         .parent(parent)
@@ -746,7 +744,7 @@ impl OptionsGui {
 
         let _min_field = OptionsGui::text_field(self.min, gui, min.to_string(), style, {
             let options = self.options.clone();
-            NumberField(move |ctx, x| {
+            NumberField(min.to_string(), move |ctx, x| {
                 ctx.send_event_to(slider, SetMinValue(x));
                 options.borrow_mut().min = x;
             })
@@ -766,7 +764,7 @@ impl OptionsGui {
         .build();
         let _max_field = OptionsGui::text_field(self.max, gui, max.to_string(), style, {
             let options = self.options.clone();
-            NumberField(move |ctx, x| {
+            NumberField(max.to_string(), move |ctx, x| {
                 ctx.send_event_to(slider, SetMaxValue(x));
                 options.borrow_mut().max = x;
             })

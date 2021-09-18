@@ -15,28 +15,28 @@ use crate::{
     Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseEvent, MouseInfo,
 };
 
+/// The callback that handle the events dispatched by the TextField.
 pub trait TextFieldCallback {
-    fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool;
+    /// Called when the key Enter is pressed in the TextField. The text of the TextField can be
+    /// change, while handling this event.
+    fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String);
+    /// Called ever time the text of the TextField changes.
     fn on_change(&mut self, this: Id, ctx: &mut Context, text: &str);
-    fn on_unfocus(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool;
+    /// Called when the TextField is unfocused. The text of the TextField can be
+    /// change, while handling this event.
+    fn on_unfocus(&mut self, this: Id, ctx: &mut Context, text: &mut String);
 }
-impl<F: FnMut(Id, &mut Context, &mut String) -> bool + 'static> TextFieldCallback for F {
-    fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) -> bool {
+impl<F: FnMut(Id, &mut Context, &mut String) + 'static> TextFieldCallback for F {
+    fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) {
         self(this, ctx, text)
     }
     fn on_change(&mut self, _: Id, _: &mut Context, _: &str) {}
-    fn on_unfocus(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
-        true
-    }
+    fn on_unfocus(&mut self, _: Id, _: &mut Context, _: &mut String) {}
 }
 impl TextFieldCallback for () {
-    fn on_submit(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
-        true
-    }
+    fn on_submit(&mut self, _: Id, _: &mut Context, _: &mut String) {}
     fn on_change(&mut self, _: Id, _: &mut Context, _: &str) {}
-    fn on_unfocus(&mut self, _: Id, _: &mut Context, _: &mut String) -> bool {
-        true
-    }
+    fn on_unfocus(&mut self, _: Id, _: &mut Context, _: &mut String) {}
 }
 
 struct BlinkCaret;
@@ -349,6 +349,12 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
 
             let mut text = self.text(ctx).to_owned();
             self.callback.on_unfocus(this, ctx, &mut text);
+            let fonts = ctx.get_fonts();
+            let text_layout = self.get_layout(ctx);
+            if text != text_layout.text() {
+                self.editor.select_all(text_layout);
+                self.editor.insert_text(&text, fonts, text_layout);
+            }
             self.update_text(this, ctx);
         }
         self.update_carret(this, ctx, true);
@@ -370,6 +376,8 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     .insert_text(ch.encode_utf8(&mut [0; 4]), fonts, text_layout);
                 println!("text: {}", self.text(ctx));
                 self.update_text(this, ctx);
+                let text = self.text(ctx).to_owned();
+                self.callback.on_change(this, ctx, &text);
             }
             KeyboardEvent::Pressed(key_code) => match key_code {
                 VirtualKeyCode::Tab => return false, // allow change focus with tab
@@ -394,6 +402,8 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                             let text = text.replace(|x: char| x.is_control(), "");
                             self.editor.insert_text(&text, fonts, text_layout);
                             self.update_text(this, ctx);
+                            let text = self.text(ctx).to_owned();
+                            self.callback.on_change(this, ctx, &text);
                         }
                     }
                 }
@@ -403,8 +413,13 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     }
                 }
                 VirtualKeyCode::Return => {
-                    let mut text = self.text(ctx).to_owned();
+                    let mut text = text_layout.text().to_owned();
                     self.callback.on_submit(this, ctx, &mut text);
+                    let text_layout = self.get_layout(ctx);
+                    if text != text_layout.text() {
+                        self.editor.select_all(text_layout);
+                        self.editor.insert_text(&text, fonts, text_layout);
+                    }
                 }
                 VirtualKeyCode::Back => {
                     if modifiers.ctrl() {
@@ -423,6 +438,8 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                         self.editor.delete_hor(Cluster(1), fonts, text_layout);
                     }
                     self.update_text(this, ctx);
+                    let text = self.text(ctx).to_owned();
+                    self.callback.on_change(this, ctx, &text);
                 }
                 VirtualKeyCode::Left => {
                     if modifiers.ctrl() {

@@ -893,7 +893,6 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                                 button_style.clone(),
                             );
                             text.clear();
-                            true
                         }
                     },
                 ))
