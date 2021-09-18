@@ -381,20 +381,18 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
             }
             KeyboardEvent::Pressed(key_code) => match key_code {
                 VirtualKeyCode::Tab => return false, // allow change focus with tab
-                // VirtualKeyCode::C | VirtualKeyCode::X => {
-                //     if modifiers.ctrl() {
-                //         if let Some(selection_index) = self.selection_index {
-                //             let a = self.get_byte_range(selection_index).start;
-                //             let b = self.get_byte_range(self.caret_index).start;
-                //             let range = if a < b { a..b } else { b..a };
-                //             let mut cliptobard = ClipboardContext::new().unwrap();
-                //             let _ = cliptobard.set_contents(self.text[range].to_owned());
-                //             if key_code == VirtualKeyCode::X {
-                //                 self.delete_selection(this, ctx);
-                //             }
-                //         }
-                //     }
-                // }
+                VirtualKeyCode::C | VirtualKeyCode::X => {
+                    if modifiers.ctrl() {
+                        let range = self.editor.selection_range();
+                        if !range.is_empty() {
+                            let mut cliptobard = ClipboardContext::new().unwrap();
+                            let _ = cliptobard.set_contents(text_layout.text()[range].to_owned());
+                            if key_code == VirtualKeyCode::X {
+                                self.editor.insert_text("", fonts, text_layout);
+                            }
+                        }
+                    }
+                }
                 VirtualKeyCode::V => {
                     if modifiers.ctrl() {
                         let mut clipboard = ClipboardContext::new().unwrap();
