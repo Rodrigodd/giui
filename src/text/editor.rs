@@ -183,7 +183,7 @@ impl TextEditor {
                     let offset = text_layout.text()[..byte_index]
                         .grapheme_indices(true)
                         .rev()
-                        .nth(n-1)
+                        .nth(n - 1)
                         .map(|x| x.0)
                         .unwrap_or(0);
                     ByteIndex(offset)
@@ -418,7 +418,12 @@ impl TextEditor {
     /// If the selection is empty, delete horizontaly, by the given amount of graphene clusters.
     /// Deletes right if delta_x is positive, and deletes left if delta_x is negative. If there is
     /// selection, the selected text is deleted, and delta_x is ignored.
-    pub fn delete_hor(&mut self, delta_x: HorizontalMotion, fonts: &Fonts, text_layout: &mut TextLayout) {
+    pub fn delete_hor(
+        &mut self,
+        delta_x: HorizontalMotion,
+        fonts: &Fonts,
+        text_layout: &mut TextLayout,
+    ) {
         if self.selection.is_empty() {
             let anchor = self.selection.anchor;
             let anchor = self.offset_byte_index(anchor, delta_x, text_layout);
