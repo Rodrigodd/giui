@@ -61,7 +61,7 @@ impl MenuBehaviour {
             Item::Button(_, _) => {}
             Item::SubMenu(menu) => {
                 let child = ctx.get_active_children(this)[i];
-                let rect = *ctx.get_rect(child);
+                let rect = ctx.get_rect(child);
                 let x = rect[2];
                 let y = rect[1];
 
@@ -180,7 +180,7 @@ impl Behaviour for MenuBehaviour {
                 let children = ctx.get_active_children(this);
                 self.is_over = false;
                 for (i, child) in children.iter().enumerate().rev() {
-                    let rect = *ctx.get_rect(*child);
+                    let rect = ctx.get_rect(*child);
                     if rect[0] < x && x < rect[2] && rect[1] < y && y < rect[3] {
                         if Some(i) != self.over {
                             if let Some(i) = self.over {
@@ -248,7 +248,7 @@ impl MenuBar {
         self.close_menu(ctx);
         ctx.active(self.blocker);
         let child = ctx.get_active_children(this)[i];
-        let rect = *ctx.get_rect(child);
+        let rect = ctx.get_rect(child);
         let x = rect[0];
         let y = rect[3];
 
@@ -319,7 +319,7 @@ impl Behaviour for MenuBar {
                 let children = ctx.get_active_children(this);
                 self.is_over = false;
                 for (i, child) in children.iter().enumerate().rev() {
-                    let rect = *ctx.get_rect(*child);
+                    let rect = ctx.get_rect(*child);
                     if rect[0] < x && x < rect[2] && rect[1] < y && y < rect[3] {
                         if Some(i) != self.over {
                             if self.open.is_some() {

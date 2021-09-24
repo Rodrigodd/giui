@@ -127,9 +127,9 @@ impl<C: TextFieldCallback> TextField<C> {
 
         const MARGIN: f32 = 5.0;
 
-        let this_rect = *ctx.get_rect(this);
+        let this_rect = ctx.get_rect(this);
         self.this_width = this_rect[2] - this_rect[0];
-        let label_rect = *ctx.get_rect(self.label);
+        let label_rect = ctx.get_rect(self.label);
         if let Graphic::Text(x) = ctx.get_graphic_mut(self.label) {
             let anchor = x.get_align_anchor(label_rect);
             caret_pos[0] += anchor[0] - label_rect[0];
@@ -262,7 +262,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
 
     fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use crate::MouseButton::*;
-        let label_rect = *ctx.get_rect(self.label);
+        let label_rect = ctx.get_rect(self.label);
         let anchor_x = if let Graphic::Text(x) = ctx.get_graphic_mut(self.label) {
             let anchor = x.get_align_anchor(label_rect);
             anchor[0]

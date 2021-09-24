@@ -45,13 +45,13 @@ impl Behaviour for ContextMenu {
             }
         } else if event.is::<Repos>() {
             if let Some(menu) = self.open {
-                let desktop = *ctx.get_rect(ctx.get_parent(menu).unwrap());
+                let desktop = ctx.get_rect(ctx.get_parent(menu).unwrap());
 
                 let menu_rect = ctx.get_rect(menu);
                 let width = menu_rect[2] - menu_rect[0];
                 let height = menu_rect[3] - menu_rect[1];
 
-                let mut margins = *ctx.get_margins(menu);
+                let mut margins = ctx.get_margins(menu);
                 if menu_rect[2] > desktop[2] && menu_rect[0] - width > 0.0 {
                     margins[0] -= width;
                     margins[2] = margins[0];

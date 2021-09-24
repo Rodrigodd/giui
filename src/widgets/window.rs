@@ -39,7 +39,7 @@ impl Behaviour for Window {
             MouseEvent::Down(Left) => {
                 self.dragging = true;
                 ctx.send_event(event::LockOver);
-                let mut margins = *ctx.get_margins(this);
+                let mut margins = ctx.get_margins(this);
                 let min_size = ctx.get_min_size(this);
                 if margins[2] - margins[0] < min_size[0] {
                     margins[2] = margins[0] + min_size[0];
@@ -57,7 +57,7 @@ impl Behaviour for Window {
             MouseEvent::Moved => {
                 let [mut x, mut y] = mouse.pos;
                 if !self.dragging {
-                    let rect = *ctx.get_rect(this);
+                    let rect = ctx.get_rect(this);
                     self.state = 0;
                     if self.mouse_pos[0] - rect[0] < 5.0 {
                         self.state |= LEFT;
@@ -110,7 +110,7 @@ impl Behaviour for Window {
                         .expect("A window cannot be the root control");
 
                     // ensure that the window cannot be easily drag out of reach
-                    let desktop = *ctx.get_rect(parent);
+                    let desktop = ctx.get_rect(parent);
                     if x < desktop[0] {
                         x = desktop[0];
                     } else if x > desktop[2] {

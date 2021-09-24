@@ -6,8 +6,8 @@ use std::{
 use winit::{event::ModifiersState, window::CursorIcon};
 
 use crate::{
-    control::ControlBuilderInner, event, font::Fonts, graphics::Graphic, Behaviour, ControlBuilder,
-    Controls, Gui, Id, Layout, Rect,
+    control::ControlBuilderInner, event, font::Fonts, graphics::Graphic, ControlBuilder, Controls,
+    Gui, Id, Rect,
 };
 
 // contains a reference to all the controls, except the behaviour of one control
@@ -47,14 +47,23 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub(crate) fn new_with_mut_behaviour(
-        this: Id,
-        gui: &'a mut Gui,
-    ) -> Option<(&'a mut dyn Behaviour, Self)> {
-        let this_one = unsafe {
-            &mut *(gui.controls.get_mut(this)?.behaviour.as_mut()?.as_mut() as *mut dyn Behaviour)
-        };
-        Some((this_one, Self::new(gui)))
+    /// Destructs the Context in its fields, without Dropping. Drop would automatically call
+    /// Gui::context_drop, but I may need to call it manually.
+    ///
+    /// Returns `(events, events_to, dirtys, render_dirty)`.
+    pub(crate) fn destructs(
+        mut self,
+    ) -> (Vec<Box<dyn Any>>, Vec<(Id, Box<dyn Any>)>, Vec<Id>, bool) {
+        use std::mem;
+        let events = mem::take(&mut self.events);
+        let events_to = mem::take(&mut self.events_to);
+        let dirtys = mem::take(&mut self.dirtys);
+        let render_dirty = self.render_dirty;
+
+        // this will forget 3 Vec's, but they don't have allocations.
+        mem::forget(self);
+
+        (events, events_to, dirtys, render_dirty)
     }
 
     /// Set the value of the type T that is owned by the Gui. Any value set before will be dropped
@@ -139,7 +148,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn get_layouting(&mut self, id: Id) -> &mut Rect {
-        &mut self.gui.controls[id].rect
+        &mut self.gui.controls.get_mut(id).unwrap().rect
     }
 
     pub fn dirty_layout(&mut self, id: Id) {
@@ -155,96 +164,100 @@ impl<'a> Context<'a> {
         self.dirtys.clear();
     }
 
-    // TODO: this should not return a reference?
-    pub fn get_rect(&self, id: Id) -> &[f32; 4] {
-        &self.gui.controls[id].rect.rect
+    pub fn get_rect(&self, id: Id) -> [f32; 4] {
+        self.gui.controls.get(id).unwrap().rect.rect
     }
 
     pub fn get_size(&mut self, id: Id) -> [f32; 2] {
-        self.gui.controls[id].rect.get_size()
+        self.gui.controls.get(id).unwrap().rect.get_size()
     }
 
-    pub fn get_margins(&self, id: Id) -> &[f32; 4] {
-        &self.gui.controls[id].rect.margins
+    pub fn get_margins(&self, id: Id) -> [f32; 4] {
+        self.gui.controls.get(id).unwrap().rect.margins
     }
 
     pub fn set_margins(&mut self, id: Id, margins: [f32; 4]) {
-        self.gui.controls[id].rect.margins = margins;
+        self.gui.controls.get_mut(id).unwrap().rect.margins = margins;
         self.dirty_layout(id);
     }
 
-    pub fn get_anchors(&self, id: Id) -> &[f32; 4] {
-        &self.gui.controls[id].rect.anchors
+    pub fn get_anchors(&self, id: Id) -> [f32; 4] {
+        self.gui.controls.get(id).unwrap().rect.anchors
     }
 
     pub fn set_margin_left(&mut self, id: Id, margin: f32) {
-        self.gui.controls[id].rect.margins[0] = margin;
+        self.gui.controls.get_mut(id).unwrap().rect.margins[0] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_margin_top(&mut self, id: Id, margin: f32) {
-        self.gui.controls[id].rect.margins[1] = margin;
+        self.gui.controls.get_mut(id).unwrap().rect.margins[1] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_margin_right(&mut self, id: Id, margin: f32) {
-        self.gui.controls[id].rect.margins[2] = margin;
+        self.gui.controls.get_mut(id).unwrap().rect.margins[2] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_margin_bottom(&mut self, id: Id, margin: f32) {
-        self.gui.controls[id].rect.margins[3] = margin;
+        self.gui.controls.get_mut(id).unwrap().rect.margins[3] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_anchors(&mut self, id: Id, anchors: [f32; 4]) {
-        self.gui.controls[id].rect.anchors = anchors;
+        self.gui.controls.get_mut(id).unwrap().rect.anchors = anchors;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_left(&mut self, id: Id, anchor: f32) {
-        self.gui.controls[id].rect.anchors[0] = anchor;
+        self.gui.controls.get_mut(id).unwrap().rect.anchors[0] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_top(&mut self, id: Id, anchor: f32) {
-        self.gui.controls[id].rect.anchors[1] = anchor;
+        self.gui.controls.get_mut(id).unwrap().rect.anchors[1] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_right(&mut self, id: Id, anchor: f32) {
-        self.gui.controls[id].rect.anchors[2] = anchor;
+        self.gui.controls.get_mut(id).unwrap().rect.anchors[2] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_bottom(&mut self, id: Id, anchor: f32) {
-        self.gui.controls[id].rect.anchors[3] = anchor;
+        self.gui.controls.get_mut(id).unwrap().rect.anchors[3] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn get_min_size(&self, id: Id) -> [f32; 2] {
-        self.gui.controls[id].rect.get_min_size()
+        self.gui.controls.get(id).unwrap().rect.get_min_size()
     }
 
     pub fn set_min_size(&mut self, id: Id, min_size: [f32; 2]) {
-        self.gui.controls[id].rect.set_min_size(min_size);
+        self.gui
+            .controls
+            .get_mut(id)
+            .unwrap()
+            .rect
+            .set_min_size(min_size);
         self.dirty_layout(id);
     }
 
     pub fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
         self.render_dirty = true;
-        &mut self.gui.controls[id].graphic
+        &mut self.gui.controls.get_mut(id).unwrap().graphic
     }
 
     pub fn set_graphic(&mut self, id: Id, graphic: Graphic) {
-        let control = &mut self.gui.controls[id];
+        let control = self.gui.controls.get_mut(id).unwrap();
         control.graphic = graphic;
         control.rect.dirty_render_dirty_flags();
         self.render_dirty = true;
     }
 
     pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
-        let control = &mut self.gui.controls[id];
+        let control = self.gui.controls.get_mut(id).unwrap();
         if let Graphic::None = control.graphic {
             None
         } else {
@@ -266,7 +279,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn is_focus(&self, id: Id) -> bool {
-        self.gui.controls[id].focus
+        self.gui.controls.get(id).unwrap().focus
     }
 
     /// Set MouseInfo::click_count to 1, wich keep track of consecutives clicks.
@@ -298,11 +311,11 @@ impl<'a> Context<'a> {
     }
 
     pub fn get_parent(&self, id: Id) -> Option<Id> {
-        self.gui.controls[id].parent
+        self.gui.controls.get(id).unwrap().parent
     }
 
     pub fn get_active_children(&self, id: Id) -> Vec<Id> {
-        self.gui.controls.get_active_children(id)
+        self.gui.controls.get_active_children(id).unwrap()
     }
 }
 
@@ -312,52 +325,48 @@ pub struct MinSizeContext<'a> {
     fonts: &'a Fonts,
 }
 impl<'a> MinSizeContext<'a> {
-    pub(crate) fn new(
-        this: Id,
-        controls: &'a mut Controls,
-        fonts: &'a Fonts,
-    ) -> (&'a mut dyn Layout, Self) {
-        let this_one = unsafe { &mut *(controls[this].layout.as_mut() as *mut dyn Layout) };
-        (
-            this_one,
-            Self {
-                this,
-                controls,
-                fonts,
-            },
-        )
+    pub(crate) fn new(this: Id, controls: &'a mut Controls, fonts: &'a Fonts) -> Self {
+        Self {
+            this,
+            controls,
+            fonts,
+        }
     }
 
     pub fn get_fonts(&mut self) -> &'a Fonts {
         self.fonts
     }
 
-    pub fn get_layouting(&self, id: Id) -> &Rect {
-        &self.controls[id].rect
+    pub fn get_layouting(&self, id: Id) -> Option<&Rect> {
+        Some(&self.controls.get(id)?.rect)
     }
 
-    pub fn get_margins(&self, id: Id) -> &[f32; 4] {
-        &self.controls[id].rect.margins
+    pub fn get_margins(&self, id: Id) -> [f32; 4] {
+        self.controls.get(id).unwrap().rect.margins
     }
 
-    pub fn get_anchors(&self, id: Id) -> &[f32; 4] {
-        &self.controls[id].rect.anchors
+    pub fn get_anchors(&self, id: Id) -> [f32; 4] {
+        self.controls.get(id).unwrap().rect.anchors
     }
 
     pub fn get_min_size(&self, id: Id) -> [f32; 2] {
-        self.controls[id].rect.get_min_size()
+        self.controls.get(id).unwrap().rect.get_min_size()
     }
 
     pub fn set_this_min_size(&mut self, min_size: [f32; 2]) {
-        self.controls[self.this].rect.set_min_size(min_size);
+        self.controls
+            .get_mut(self.this)
+            .unwrap()
+            .rect
+            .set_min_size(min_size);
     }
 
-    pub fn get_graphic(&mut self, id: Id) -> &mut Graphic {
-        &mut self.controls[id].graphic
+    pub fn get_graphic(&mut self, id: Id) -> Option<&mut Graphic> {
+        Some(&mut self.controls.get_mut(id)?.graphic)
     }
 
     // pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
-    //     let control = &mut self.controls[id];
+    //     let control = &mut self.controls.get(id).unwrap();
     //     if let Graphic::None = control.graphic {
     //         None
     //     } else {
@@ -366,15 +375,15 @@ impl<'a> MinSizeContext<'a> {
     // }
 
     pub fn is_active(&self, id: Id) -> bool {
-        self.controls[id].active
+        self.controls.get(id).unwrap().active
     }
 
     // pub fn get_parent(&self, id: Id) -> Option<Id> {
-    //     self.controls[id].parent
+    //     self.controls.get(id).unwrap().parent
     // }
 
     pub fn get_active_children(&self, id: Id) -> Vec<Id> {
-        self.controls.get_active_children(id)
+        self.controls.get_active_children(id).unwrap()
     }
 }
 
@@ -386,22 +395,14 @@ pub struct LayoutContext<'a> {
     pub(crate) events: Vec<Box<dyn Any>>,
 }
 impl<'a> LayoutContext<'a> {
-    pub(crate) fn new(
-        this: Id,
-        controls: &'a mut Controls,
-        fonts: &'a Fonts,
-    ) -> (&'a mut dyn Layout, Self) {
-        let this_one = unsafe { &mut *(controls[this].layout.as_mut() as *mut dyn Layout) };
-        (
-            this_one,
-            Self {
-                this,
-                controls,
-                fonts,
-                dirtys: Vec::new(),
-                events: Vec::new(),
-            },
-        )
+    pub(crate) fn new(this: Id, controls: &'a mut Controls, fonts: &'a Fonts) -> Self {
+        Self {
+            this,
+            controls,
+            fonts,
+            dirtys: Vec::new(),
+            events: Vec::new(),
+        }
     }
 
     pub fn create_control(&mut self) -> ControlBuilder {
@@ -423,13 +424,25 @@ impl<'a> LayoutContext<'a> {
                     i += 1;
                 }
                 while let Some(parent) = parents.pop() {
-                    let (layout, mut ctx) =
-                        MinSizeContext::new(parent, &mut self.0.controls, &self.0.fonts);
-                    let mut min_size = layout.compute_min_size(parent, &mut ctx);
-                    let user_min_size = self.0.controls[parent].rect.user_min_size;
+                    let mut min_size = {
+                        let mut layout = self
+                            .controls()
+                            .get_mut(parent)
+                            .unwrap()
+                            .layout
+                            .take()
+                            .unwrap();
+                        let mut ctx =
+                            MinSizeContext::new(parent, &mut self.0.controls, &self.0.fonts);
+                        let min_size = layout.compute_min_size(parent, &mut ctx);
+                        self.controls().get_mut(parent).unwrap().layout = Some(layout);
+                        min_size
+                    };
+                    let parent = self.0.controls.get_mut(parent).unwrap();
+                    let user_min_size = parent.rect.user_min_size;
                     min_size[0] = min_size[0].max(user_min_size[0]);
                     min_size[1] = min_size[1].max(user_min_size[1]);
-                    self.0.controls[parent].rect.min_size = min_size;
+                    parent.rect.min_size = min_size;
                 }
             }
         }
@@ -438,15 +451,19 @@ impl<'a> LayoutContext<'a> {
     }
 
     pub fn set_rect(&mut self, id: Id, rect: [f32; 4]) {
-        self.controls[id].rect.set_rect(rect);
+        self.controls.get_mut(id).unwrap().rect.set_rect(rect);
     }
 
     pub fn set_designed_rect(&mut self, id: Id, rect: [f32; 4]) {
-        self.controls[id].rect.set_designed_rect(rect);
+        self.controls
+            .get_mut(id)
+            .unwrap()
+            .rect
+            .set_designed_rect(rect);
     }
 
     pub fn get_layouting(&self, id: Id) -> &Rect {
-        &self.controls[id].rect
+        &self.controls.get(id).unwrap().rect
     }
 
     pub fn dirty_layout(&mut self, id: Id) {
@@ -463,84 +480,87 @@ impl<'a> LayoutContext<'a> {
         }
     }
 
-    // TODO: Return a reference?
-    pub fn get_rect(&self, id: Id) -> &[f32; 4] {
-        &self.controls[id].rect.rect
+    pub fn get_rect(&self, id: Id) -> [f32; 4] {
+        self.controls.get(id).unwrap().rect.rect
     }
 
     pub fn get_size(&mut self, id: Id) -> [f32; 2] {
-        self.controls[id].rect.get_size()
+        self.controls.get(id).unwrap().rect.get_size()
     }
 
-    pub fn get_margins(&self, id: Id) -> &[f32; 4] {
-        &self.controls[id].rect.margins
+    pub fn get_margins(&self, id: Id) -> [f32; 4] {
+        self.controls.get(id).unwrap().rect.margins
     }
 
     pub fn set_margins(&mut self, id: Id, margins: [f32; 4]) {
-        self.controls[id].rect.margins = margins;
+        self.controls.get_mut(id).unwrap().rect.margins = margins;
         self.dirty_layout(id);
     }
 
-    pub fn get_anchors(&self, id: Id) -> &[f32; 4] {
-        &self.controls[id].rect.anchors
+    pub fn get_anchors(&self, id: Id) -> [f32; 4] {
+        self.controls.get(id).unwrap().rect.anchors
     }
 
     pub fn set_margin_left(&mut self, id: Id, margin: f32) {
-        self.controls[id].rect.margins[0] = margin;
+        self.controls.get_mut(id).unwrap().rect.margins[0] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_margin_top(&mut self, id: Id, margin: f32) {
-        self.controls[id].rect.margins[1] = margin;
+        self.controls.get_mut(id).unwrap().rect.margins[1] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_margin_right(&mut self, id: Id, margin: f32) {
-        self.controls[id].rect.margins[2] = margin;
+        self.controls.get_mut(id).unwrap().rect.margins[2] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_margin_bottom(&mut self, id: Id, margin: f32) {
-        self.controls[id].rect.margins[3] = margin;
+        self.controls.get_mut(id).unwrap().rect.margins[3] = margin;
         self.dirty_layout(id);
     }
 
     pub fn set_anchors(&mut self, id: Id, anchors: [f32; 4]) {
-        self.controls[id].rect.anchors = anchors;
+        self.controls.get_mut(id).unwrap().rect.anchors = anchors;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_left(&mut self, id: Id, anchor: f32) {
-        self.controls[id].rect.anchors[0] = anchor;
+        self.controls.get_mut(id).unwrap().rect.anchors[0] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_top(&mut self, id: Id, anchor: f32) {
-        self.controls[id].rect.anchors[1] = anchor;
+        self.controls.get_mut(id).unwrap().rect.anchors[1] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_right(&mut self, id: Id, anchor: f32) {
-        self.controls[id].rect.anchors[2] = anchor;
+        self.controls.get_mut(id).unwrap().rect.anchors[2] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn set_anchor_bottom(&mut self, id: Id, anchor: f32) {
-        self.controls[id].rect.anchors[3] = anchor;
+        self.controls.get_mut(id).unwrap().rect.anchors[3] = anchor;
         self.dirty_layout(id);
     }
 
     pub fn get_min_size(&self, id: Id) -> [f32; 2] {
-        self.controls[id].rect.get_min_size()
+        self.controls.get(id).unwrap().rect.get_min_size()
     }
 
     pub fn set_min_size(&mut self, id: Id, min_size: [f32; 2]) {
-        self.controls[id].rect.set_min_size(min_size);
+        self.controls
+            .get_mut(id)
+            .unwrap()
+            .rect
+            .set_min_size(min_size);
         self.dirty_layout(id);
     }
 
     pub fn is_active(&self, id: Id) -> bool {
-        self.controls[id].active
+        self.controls.get(id).unwrap().active
     }
 
     /// This only took effect when Controls is dropped
@@ -568,10 +588,10 @@ impl<'a> LayoutContext<'a> {
     }
 
     pub fn get_parent(&self, id: Id) -> Option<Id> {
-        self.controls[id].parent
+        self.controls.get(id).unwrap().parent
     }
 
     pub fn get_active_children(&self, id: Id) -> Vec<Id> {
-        self.controls.get_active_children(id)
+        self.controls.get_active_children(id).unwrap()
     }
 }

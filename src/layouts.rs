@@ -11,6 +11,7 @@ impl Layout for FitText {
         let fonts = ctx.get_fonts();
         let min_size = ctx
             .get_graphic(this)
+            .unwrap()
             .compute_min_size(fonts)
             .unwrap_or([0.0, 0.0]);
         min_size
@@ -35,7 +36,7 @@ impl Layout for MarginLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let mut min_size = [0.0f32, 0.0];
         for child in ctx.get_active_children(this) {
-            let c_min_size = ctx.get_layouting(child).get_min_size();
+            let c_min_size = ctx.get_layouting(child).unwrap().get_min_size();
             min_size[0] = min_size[0].max(c_min_size[0]);
             min_size[1] = min_size[1].max(c_min_size[1]);
         }
@@ -71,7 +72,7 @@ impl Layout for RatioLayout {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let mut min_size = [0.0f32, 0.0];
         for child in ctx.get_active_children(this) {
-            let c_min_size = ctx.get_layouting(child).get_min_size();
+            let c_min_size = ctx.get_layouting(child).unwrap().get_min_size();
             min_size[0] = min_size[0].max(c_min_size[0]);
             min_size[1] = min_size[1].max(c_min_size[1]);
         }
@@ -146,7 +147,7 @@ impl Layout for HBoxLayout {
                 self.margins[0] + self.margins[2] + (children.len() - 1) as f32 * self.spacing;
             let mut min_height: f32 = 0.0;
             for child in children {
-                let [width, height] = ctx.get_layouting(child).get_min_size();
+                let [width, height] = ctx.get_layouting(child).unwrap().get_min_size();
                 min_width += width;
                 min_height = min_height.max(height);
             }
@@ -232,7 +233,7 @@ impl Layout for VBoxLayout {
             let mut min_height: f32 =
                 self.margins[1] + self.margins[3] + (children.len() - 1) as f32 * self.spacing;
             for child in children {
-                let [width, height] = ctx.get_layouting(child).get_min_size();
+                let [width, height] = ctx.get_layouting(child).unwrap().get_min_size();
                 min_width = min_width.max(width);
                 min_height += height;
             }
@@ -333,7 +334,7 @@ impl Layout for GridLayout {
             self.expand.resize(len, false);
             self.weights.resize(len, 0.0);
             for (i, child) in children.into_iter().enumerate() {
-                let rect = ctx.get_layouting(child);
+                let rect = ctx.get_layouting(child).unwrap();
                 let col = i % columns;
                 self.min_sizes[col] = self.min_sizes[col].max(rect.get_min_size()[0]);
                 self.expand[col] |= rect.is_expand_x();

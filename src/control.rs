@@ -1,4 +1,5 @@
-use std::{cell::RefCell, num::NonZeroU32, rc::Rc};
+use std::cell::RefCell;
+use std::{num::NonZeroU32, rc::Rc};
 
 use crate::{graphics::Graphic, Behaviour, Id, Layout, Rect, RectFill};
 
@@ -13,15 +14,19 @@ pub struct ControlBuilder<'a> {
 impl<'a> ControlBuilder<'a> {
     pub(crate) fn new<T: ControlBuilderInner + 'a>(id: Id, mut inner: T) -> Self {
         let controls = inner.controls();
-        assert!(
-            controls[id].state == ControlState::Reserved,
-            "The state of the Control referenced by the Id {} is '{}'. Should have been '{}'",
-            id,
-            controls[id].state,
-            ControlState::Reserved
-        );
-        controls[id].state = ControlState::Building;
-        controls[id].active = true;
+        if let ControlEntry::Reserved {
+            generation,
+            children,
+        } = &mut controls.controls[id.index()]
+        {
+            debug_assert_eq!(*generation, id.generation);
+            let mut control = Control::new(*generation);
+            control.active = true;
+            control.children = std::mem::take(children);
+            controls.controls[id.index()] = ControlEntry::Building { control };
+        } else {
+            panic!("Building Control that isn't in Reserved State")
+        }
         Self {
             inner: Box::new(inner),
             id,
@@ -37,51 +42,55 @@ impl<'a> ControlBuilder<'a> {
         self.id
     }
 
+    fn control(&mut self, id: Id) -> &mut Control {
+        self.inner.controls().get_mut(id).unwrap()
+    }
+
     pub fn anchors(mut self, anchors: [f32; 4]) -> Self {
-        self.inner.controls()[self.id].rect.anchors = anchors;
+        self.control(self.id).rect.anchors = anchors;
         self
     }
     pub fn margins(mut self, margins: [f32; 4]) -> Self {
-        self.inner.controls()[self.id].rect.margins = margins;
+        self.control(self.id).rect.margins = margins;
         self
     }
     pub fn min_size(mut self, min_size: [f32; 2]) -> Self {
-        self.inner.controls()[self.id].rect.user_min_size = min_size;
-        self.inner.controls()[self.id].rect.min_size = min_size;
+        self.control(self.id).rect.user_min_size = min_size;
+        self.control(self.id).rect.min_size = min_size;
         self
     }
     pub fn min_width(mut self, min_width: f32) -> Self {
-        self.inner.controls()[self.id].rect.min_size[0] = min_width;
+        self.control(self.id).rect.min_size[0] = min_width;
         self
     }
     pub fn min_height(mut self, min_height: f32) -> Self {
-        self.inner.controls()[self.id].rect.min_size[1] = min_height;
+        self.control(self.id).rect.min_size[1] = min_height;
         self
     }
     pub fn fill_x(mut self, fill: RectFill) -> Self {
-        self.inner.controls()[self.id].rect.set_fill_x(fill);
+        self.control(self.id).rect.set_fill_x(fill);
         self
     }
     pub fn fill_y(mut self, fill: RectFill) -> Self {
-        self.inner.controls()[self.id].rect.set_fill_y(fill);
+        self.control(self.id).rect.set_fill_y(fill);
         self
     }
     pub fn expand_x(mut self, expand: bool) -> Self {
-        self.inner.controls()[self.id].rect.expand_x = expand;
+        self.control(self.id).rect.expand_x = expand;
         self
     }
     pub fn expand_y(mut self, expand: bool) -> Self {
-        self.inner.controls()[self.id].rect.expand_y = expand;
+        self.control(self.id).rect.expand_y = expand;
         self
     }
     pub fn behaviour<T: Behaviour + 'static>(mut self, behaviour: T) -> Self {
         // TODO: remove this someday
-        debug_assert!(self.inner.controls()[self.id].behaviour.is_none());
-        self.inner.controls()[self.id].behaviour = Some(Box::new(behaviour));
+        debug_assert!(self.control(self.id).behaviour.is_none());
+        self.control(self.id).behaviour = Some(Box::new(behaviour));
         self
     }
     pub fn layout<T: Layout + 'static>(mut self, layout: T) -> Self {
-        self.inner.controls()[self.id].layout = Box::new(layout);
+        self.control(self.id).layout = Some(Box::new(layout));
         self
     }
     pub fn behaviour_and_layout<T: Layout + Behaviour + 'static>(
@@ -92,15 +101,15 @@ impl<'a> ControlBuilder<'a> {
         self.behaviour(x.clone()).layout(x)
     }
     pub fn graphic(mut self, graphic: Graphic) -> Self {
-        self.inner.controls()[self.id].graphic = graphic;
+        self.control(self.id).graphic = graphic;
         self
     }
     pub fn parent(mut self, parent: Id) -> Self {
-        self.inner.controls()[self.id].parent = Some(parent);
+        self.control(self.id).parent = Some(parent);
         self
     }
     pub fn active(mut self, active: bool) -> Self {
-        self.inner.controls()[self.id].active = active;
+        self.control(self.id).active = active;
         self
     }
 
@@ -120,8 +129,7 @@ impl<'a> ControlBuilder<'a> {
         let parent = self.id;
 
         // while creating a child, be sure that it see its parent as deactive
-        let active = self.inner.controls()[parent].active;
-        self.inner.controls()[parent].active = false;
+        let active = std::mem::replace(&mut self.control(parent).active, false);
 
         {
             struct ChildBuilderInner<'a>(&'a mut Controls);
@@ -136,48 +144,168 @@ impl<'a> ControlBuilder<'a> {
         }
 
         // restore the parent active
-        self.inner.controls()[parent].active = active;
+        self.control(parent).active = active;
 
         self
     }
 
-    pub fn build(self) -> Id {
-        let Self { mut inner, id } = self;
+    pub fn build(mut self) -> Id {
+        let id = self.id;
 
-        let controls = inner.controls();
-
-        if let Some(parent) = controls[id].parent {
-            controls[parent].add_child(id);
+        if let Some(parent) = self.control(id).parent {
+            match self.inner.controls().get_mut(parent) {
+                Some(x) => x.add_child(id),
+                // the parent could be in Reserved state
+                None => match &mut self.inner.controls().controls[parent.index()] {
+                    ControlEntry::Reserved { children, .. } => {
+                        children.push(id);
+                    }
+                    _ => panic!("Control's parent state is invalid. It is Free or Take"),
+                },
+            }
         } else {
-            controls[id].parent = Some(Id::ROOT_ID);
-            controls[Id::ROOT_ID].add_child(id);
+            self.control(id).parent = Some(Id::ROOT_ID);
+            self.control(Id::ROOT_ID).add_child(id);
         }
 
-        if controls[id].active
-            && controls[id]
-                .parent
-                .map(|x| controls[x].really_active)
-                .unwrap_or(true)
+        if self.control(id).active
+            && self.control(id).parent.map_or(true, |x| {
+                self.inner
+                    .controls()
+                    .get(x)
+                    .map_or(false, |x| x.really_active)
+            })
         {
-            controls[id].really_active = true;
+            self.control(id).really_active = true;
         }
 
+        let Self { mut inner, id } = self;
         inner.build(id);
         id
     }
 }
-pub(crate) struct Controls {
-    dead_controls: Vec<u32>,
-    controls: Vec<Control>,
+
+pub(crate) enum ControlEntry {
+    /// The entry is free, and can be occupy by a new Control. There is no valid Id pointing to it.
+    Free { free_next: Option<u32> },
+    /// reserve() has been called, so there is Id pointing to it, but the control is not yet alive.
+    /// Can already build controls with this as parent.
+    Reserved {
+        generation: NonZeroU32,
+        children: Vec<Id>,
+    },
+    /// A ControlBuilder for this control has been created, but the control is not yet alive.
+    Building { control: Control },
+    /// The control is alive, and exist in the Gui Tree.
+    Started { control: Control },
+    /// The control has been temporarily taken, to allow transitioning beetween states.
+    Take,
 }
-impl Controls {
-    pub fn get(&self, id: Id) -> Option<&Control> {
-        if let Some(control) = self.controls.get(id.index()) {
-            if control.generation == id.generation {
+
+impl std::fmt::Debug for ControlEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ControlEntry::Free { free_next } => write!(f, "Free {{ free_next: {:?} }}", free_next),
+            ControlEntry::Reserved {
+                generation,
+                children,
+            } => write!(
+                f,
+                "Reserved {{ generation: {:?}, children: {:?} }}",
+                generation, children
+            ),
+            ControlEntry::Building { control } => {
+                write!(f, "Building {{ generation: {:?}, .. }}", control.generation)
+            }
+            ControlEntry::Started { control } => {
+                write!(f, "Started {{ generation: {:?}, .. }}", control.generation)
+            }
+            ControlEntry::Take => write!(f, "Take"),
+        }
+    }
+}
+impl Default for ControlEntry {
+    fn default() -> Self {
+        Self::Take
+    }
+}
+impl ControlEntry {
+    fn get(&self, id: Id) -> Option<&Control> {
+        match self {
+            ControlEntry::Building { control } | ControlEntry::Started { control } => {
+                if control.generation != id.generation {
+                    return None;
+                }
                 Some(control)
-            } else {
+            }
+            ControlEntry::Free { .. } | ControlEntry::Reserved { .. } => None,
+            ControlEntry::Take => {
+                debug_assert!(false, "a entry should not being Take for much time");
                 None
             }
+        }
+    }
+
+    fn get_mut(&mut self, id: Id) -> Option<&mut Control> {
+        match self {
+            ControlEntry::Building { control } | ControlEntry::Started { control } => {
+                if control.generation != id.generation {
+                    return None;
+                }
+                Some(control)
+            }
+            ControlEntry::Free { .. } | ControlEntry::Reserved { .. } => None,
+            ControlEntry::Take => {
+                debug_assert!(false, "a entry should not being Take for much time");
+                None
+            }
+        }
+    }
+}
+
+/// Return the next avaliable generation. The next generation is a global value, which means that a
+/// Id will be unique for every Instance of Controls. In case the value overflows it wraps to 1,
+/// wich means that after 4_294_967_295 generations, invalid Id's are possible.
+fn next_generation() -> NonZeroU32 {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    static GENERATION: AtomicU32 = AtomicU32::new(1);
+    let mut next = GENERATION.fetch_add(1, Ordering::Relaxed);
+    if next == 0 {
+        next = GENERATION.fetch_add(1, Ordering::Relaxed);
+    }
+    NonZeroU32::new(next).unwrap()
+}
+
+pub(crate) struct Controls {
+    free_head: Option<u32>,
+    pub(crate) controls: Vec<ControlEntry>,
+    generation: NonZeroU32,
+}
+impl Controls {
+    /// Create a new Controls, with a single ROOT Control with the given width and height.
+    pub fn new(width: f32, height: f32) -> Self {
+        let root = Control {
+            rect: Rect {
+                anchors: [0.0; 4],
+                margins: [0.0; 4],
+                min_size: [width, height],
+                rect: [0.0, 0.0, width, height],
+                ..Default::default()
+            },
+            active: true,
+            really_active: true,
+            ..Control::new(NonZeroU32::new(1).unwrap())
+        };
+        Self {
+            free_head: None,
+            controls: vec![ControlEntry::Started { control: root }],
+            generation: next_generation(),
+        }
+    }
+
+    pub fn get(&self, id: Id) -> Option<&Control> {
+        if let Some(control) = self.controls.get(id.index()) {
+            control.get(id)
         } else {
             None
         }
@@ -185,33 +313,37 @@ impl Controls {
 
     pub fn get_mut(&mut self, id: Id) -> Option<&mut Control> {
         if let Some(control) = self.controls.get_mut(id.index()) {
-            if control.generation == id.generation {
-                Some(control)
-            } else {
-                None
-            }
+            control.get_mut(id)
         } else {
             None
         }
     }
 
     pub fn reserve(&mut self) -> Id {
-        if let Some(index) = self.dead_controls.pop() {
-            debug_assert!(self.controls[index as usize].state == ControlState::Free);
-            self.controls[index as usize].state = ControlState::Reserved;
-            Id {
-                generation: self.controls[index as usize].generation,
-                index,
+        if let Some(index) = self.free_head {
+            match self.controls[index as usize] {
+                ControlEntry::Free {
+                    free_next: next_free,
+                } => {
+                    self.free_head = next_free;
+                    self.controls[index as usize] = ControlEntry::Reserved {
+                        generation: self.generation,
+                        children: Vec::new(),
+                    };
+                    Id {
+                        generation: self.generation,
+                        index,
+                    }
+                }
+                _ => panic!("Controls is corrupted. Entry in free list is not free"),
             }
         } else {
-            let control = Control {
-                generation: NonZeroU32::new(1).unwrap(),
-                state: ControlState::Reserved,
-                ..Control::default()
-            };
-            self.controls.push(control);
+            self.controls.push(ControlEntry::Reserved {
+                generation: self.generation,
+                children: Vec::new(),
+            });
             Id {
-                generation: NonZeroU32::new(1).unwrap(),
+                generation: self.generation,
                 index: self.controls.len() as u32 - 1,
             }
         }
@@ -219,17 +351,19 @@ impl Controls {
 
     #[allow(clippy::or_fun_call)]
     pub fn remove(&mut self, id: Id) {
-        self[id] = Control {
-            generation: NonZeroU32::new(self[id].generation.get() + 1)
-                .unwrap_or(NonZeroU32::new(1).unwrap()),
-            ..Control::default()
+        self.generation = next_generation();
+        self.controls[id.index()] = ControlEntry::Free {
+            free_next: self.free_head,
         };
-        self.dead_controls.push(id.index);
+        self.free_head = Some(id.index);
     }
 
     pub fn move_to_front(&mut self, id: Id) {
-        if let Some(parent) = self[id].parent {
-            let children = &mut self[parent].children;
+        if let Some(parent) = self.get(id).and_then(|x| x.parent) {
+            let children = &mut self
+                .get_mut(parent)
+                .expect("Control's parent is unintialized")
+                .children;
             let i = children.iter().position(|x| *x == id).unwrap();
             children.remove(i);
             children.push(id);
@@ -237,8 +371,11 @@ impl Controls {
     }
 
     pub fn move_to_back(&mut self, id: Id) {
-        if let Some(parent) = self[id].parent {
-            let children = &mut self[parent].children;
+        if let Some(parent) = self.get(id).and_then(|x| x.parent) {
+            let children = &mut self
+                .get_mut(parent)
+                .expect("Control's parent is unintialized")
+                .children;
             let i = children.iter().position(|x| *x == id).unwrap();
             children.remove(i);
             children.insert(0, id);
@@ -246,12 +383,12 @@ impl Controls {
     }
 
     pub fn is_child(&mut self, parent: Id, child: Id) -> bool {
-        Some(parent) == self[child].parent
+        Some(parent) == self.get(child).and_then(|x| x.parent)
     }
 
     pub fn is_descendant(&mut self, ascendant: Id, descendant: Id) -> bool {
         let mut curr = descendant;
-        while let Some(parent) = self[curr].parent {
+        while let Some(parent) = self.get(curr).and_then(|x| x.parent) {
             if parent == ascendant {
                 return true;
             }
@@ -260,28 +397,35 @@ impl Controls {
         false
     }
 
-    pub fn get_active_children(&self, id: Id) -> Vec<Id> {
-        self[id]
-            .children
-            .iter()
-            .filter(|x| self[**x].active)
-            .cloned()
-            .collect::<Vec<Id>>()
+    pub fn get_active_children(&self, id: Id) -> Option<Vec<Id>> {
+        Some(
+            self.get(id)?
+                .children
+                .iter()
+                .filter(|x| self.get(**x).expect("Parent-child desync").active)
+                .cloned()
+                .collect::<Vec<Id>>(),
+        )
     }
 
-    pub fn get_control_stack(&self, id: Id) -> Vec<Id> {
+    pub fn get_control_stack(&self, id: Id) -> Option<Vec<Id>> {
+        if self.get(id).is_none() {
+            return None;
+        }
         let mut curr = id;
         let mut stack = vec![curr];
-        while let Some(parent) = self[curr].parent {
+        while let Some(parent) = self.get(curr).expect("Parent-child desync").parent {
             curr = parent;
             stack.push(curr);
         }
-        stack
+        Some(stack)
     }
 
+    /// Return the id of the lowest common ancestor of both controls. This is used to only update
+    /// the focus flag of the controls that changed.
     pub fn lowest_common_ancestor(&self, a: Id, b: Id) -> Option<Id> {
-        let a_stack = self.get_control_stack(a);
-        let b_stack = self.get_control_stack(b);
+        let a_stack = self.get_control_stack(a)?;
+        let b_stack = self.get_control_stack(b)?;
         // lowest common anscertor
         a_stack
             .iter()
@@ -292,90 +436,40 @@ impl Controls {
             .map(|(a, _)| *a)
     }
 
-    pub fn tree_starting_at(&self, id: Id) -> Vec<Id> {
-        debug_assert!(self[id].active);
-        if let Some(parent) = self[id].parent {
-            let mut up = self.tree_starting_at(parent);
+    /// Return the state of the vector used to traverse a tree in order, when the next control is
+    /// the given one.
+    pub fn tree_starting_at(&self, id: Id) -> Option<Vec<Id>> {
+        debug_assert!(self.get(id).unwrap().active);
+        if let Some(parent) = self.get(id)?.parent {
+            let mut up = self.tree_starting_at(parent).unwrap();
             up.pop();
-            let children = self.get_active_children(parent);
+            let children = self.get_active_children(parent).unwrap();
             let i = children
                 .iter()
                 .position(|x| *x == id)
                 .expect("Parent/children desync");
             up.extend(children[i..].iter().rev());
-            up
+            Some(up)
         } else {
-            vec![id]
+            Some(vec![id])
         }
     }
-
-    pub fn rev_tree_starting_at(&self, id: Id) -> Vec<Id> {
-        debug_assert!(self[id].active);
-        if let Some(parent) = self[id].parent {
-            let mut up = self.rev_tree_starting_at(parent);
+    /// Return the state of the vector used to traverse a tree in reverse order, when the next
+    /// control is the given one.
+    pub fn rev_tree_starting_at(&self, id: Id) -> Option<Vec<Id>> {
+        debug_assert!(self.get(id).unwrap().active);
+        if let Some(parent) = self.get(id)?.parent {
+            let mut up = self.rev_tree_starting_at(parent).unwrap();
             up.pop();
-            let i = self
-                .get_active_children(parent)
+            let children = self.get_active_children(parent).unwrap();
+            let i = children
                 .iter()
                 .position(|x| *x == id)
                 .expect("Parent/children desync");
-            up.extend(self[parent].children[..=i].iter());
-            up
+            up.extend(children[..=i].iter());
+            Some(up)
         } else {
-            vec![id]
-        }
-    }
-}
-impl std::ops::Index<Id> for Controls {
-    type Output = Control;
-    fn index(&self, id: Id) -> &Self::Output {
-        debug_assert!(
-            self.controls[id.index()].generation == id.generation, "The Control in index {} and generation {} is not alive anymore. Current generation is {}",
-            id.index(),
-            id.generation(),
-            self.controls[id.index()].generation
-        );
-        &self.controls[id.index()]
-    }
-}
-impl std::ops::IndexMut<Id> for Controls {
-    fn index_mut(&mut self, id: Id) -> &mut Self::Output {
-        debug_assert!(
-            self.controls[id.index()].generation == id.generation, "The Control in index {} and generation {} is not alive anymore. Current generation is {}",
-            id.index(),
-            id.generation(),
-            self.controls[id.index()].generation
-        );
-        &mut self.controls[id.index()]
-    }
-}
-impl From<Vec<Control>> for Controls {
-    fn from(controls: Vec<Control>) -> Self {
-        Self {
-            dead_controls: Vec::new(),
-            controls,
-        }
-    }
-}
-
-#[derive(PartialEq, Eq)]
-pub(crate) enum ControlState {
-    /// It is free to be created, there is no valid Id pointing to It.
-    Free,
-    /// reserve() was called, so there is a Id refering it, but the control is not yet alive
-    Reserved,
-    /// A ControlBuilder has been created, refering this Control, but the control is not yet alive
-    Building,
-    /// The control is alive, and exist in the Gui tree.
-    Started,
-}
-impl std::fmt::Display for ControlState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ControlState::Free => write!(f, "Free"),
-            ControlState::Reserved => write!(f, "Reserved"),
-            ControlState::Building => write!(f, "Building"),
-            ControlState::Started => write!(f, "Started"),
+            Some(vec![id])
         }
     }
 }
@@ -385,36 +479,31 @@ pub(crate) struct Control {
     pub(crate) rect: Rect,
     pub(crate) graphic: Graphic,
     pub(crate) behaviour: Option<Box<dyn Behaviour>>,
-    pub(crate) layout: Box<dyn Layout>,
+    // Every control has a layout. This is a Option only to allow to temporarily take owership of it.
+    pub(crate) layout: Option<Box<dyn Layout>>,
     pub(crate) parent: Option<Id>,
     pub(crate) children: Vec<Id>,
     pub(crate) active: bool,
     pub(crate) focus: bool,
     pub(crate) really_active: bool,
-    pub(crate) state: ControlState,
 }
-impl Default for Control {
-    fn default() -> Self {
+impl Control {
+    fn new(generation: NonZeroU32) -> Self {
         Self {
-            generation: NonZeroU32::new(1).unwrap(),
+            generation,
             rect: Default::default(),
             graphic: Default::default(),
             behaviour: Default::default(),
-            layout: Default::default(),
+            layout: Some(Box::new(())),
             parent: Default::default(),
             children: Default::default(),
             focus: Default::default(),
             active: Default::default(),
             really_active: Default::default(),
-            state: ControlState::Free,
         }
     }
 }
 impl Control {
-    pub fn set_layout(&mut self, layout: Box<dyn Layout>) {
-        self.layout = layout;
-    }
-
     pub fn add_child(&mut self, child: Id) {
         if !self.children.iter().any(|x| *x == child) {
             self.children.push(child)

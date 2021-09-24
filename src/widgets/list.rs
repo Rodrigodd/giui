@@ -845,7 +845,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
     }
 
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
-        let this_rect = *ctx.get_rect(this);
+        let this_rect = ctx.get_rect(this);
         // let content_size = ctx.get_min_size(self.content);
         let this_width = this_rect[2] - this_rect[0];
 

@@ -81,11 +81,11 @@ impl Behaviour for ScrollBar {
                 self.dragging = true;
                 ctx.set_graphic(self.handle, self.style.pressed.clone());
                 ctx.send_event(event::LockOver);
-                let handle_rect = *ctx.get_rect(self.handle);
+                let handle_rect = ctx.get_rect(self.handle);
                 let area = ctx
                     .get_parent(self.handle)
                     .expect("the handle of the scrollbar must have a parent");
-                let area_rect = *ctx.get_rect(area);
+                let area_rect = ctx.get_rect(area);
                 self.drag_start = self.mouse_pos;
                 if !self.vertical {
                     let handle_size = handle_rect[2] - handle_rect[0];
@@ -132,11 +132,11 @@ impl Behaviour for ScrollBar {
                 let [x, y] = mouse.pos;
                 self.mouse_pos = if self.vertical { y } else { x };
                 if self.dragging {
-                    let handle_rect = *ctx.get_rect(self.handle);
+                    let handle_rect = ctx.get_rect(self.handle);
                     let area = ctx
                         .get_parent(self.handle)
                         .expect("handle must have a parent");
-                    let area_rect = *ctx.get_rect(area);
+                    let area_rect = ctx.get_rect(area);
 
                     let handle_size = if !self.vertical {
                         handle_rect[2] - handle_rect[0]
@@ -163,7 +163,7 @@ impl Behaviour for ScrollBar {
                         },
                     )
                 } else {
-                    let handle_rect = *ctx.get_rect(self.handle);
+                    let handle_rect = ctx.get_rect(self.handle);
                     if self.mouse_pos < handle_rect[1] || self.mouse_pos > handle_rect[3] {
                         ctx.set_graphic(self.handle, self.style.normal.clone());
                     } else {
@@ -373,7 +373,7 @@ impl Layout for ScrollView {
     }
 
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
-        let this_rect = *ctx.get_rect(this);
+        let this_rect = ctx.get_rect(this);
         let content_size = ctx.get_min_size(self.content);
         let this_width = this_rect[2] - this_rect[0];
         let this_height = this_rect[3] - this_rect[1];
