@@ -266,15 +266,15 @@ impl TextEditor {
         let line = self.get_line_from_byte_index(byte_index, text_layout);
         let line_range = text_layout.lines()[line].byte_range.clone();
         let text = &text_layout.text()[line_range];
-        if byte_index >= text.len() - 1 {
-            return text[0..text.len() - 1]
+        if byte_index >= text.len() {
+            return text
                 .split_word_bound_indices()
                 .rev()
                 .next()
                 .map(|(i, s)| i..i + s.len())
                 .unwrap();
         }
-        text[0..text.len() - 1]
+        text
             .split_word_bound_indices()
             .find_map(|(i, s)| {
                 let range = i..i + s.len();

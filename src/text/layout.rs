@@ -20,12 +20,14 @@ mod test {
 
     fn fonts() -> (Fonts, Vec<FontId>) {
         let mut fonts = Fonts::new();
-        let font_ids = vec![fonts.add(Font::new(include_bytes!(
-            "..\\..\\examples\\CascadiaCode.ttf"
-        ))),
-        fonts.add(Font::new(include_bytes!(
-            "..\\..\\examples\\CascadiaCode.ttf"
-        )))];
+        let font_ids = vec![
+            fonts.add(Font::new(include_bytes!(
+                "..\\..\\examples\\CascadiaCode.ttf"
+            ))),
+            fonts.add(Font::new(include_bytes!(
+                "..\\..\\examples\\CascadiaCode.ttf"
+            ))),
+        ];
         (fonts, font_ids)
     }
 
@@ -98,7 +100,7 @@ mod test {
     fn zero_width() {
         let (fonts, font_ids) = fonts();
         let font_id = font_ids[0];
-        
+
         let text = SpannedString::from_string(
             "0123456".to_string(),
             TextStyle {
@@ -119,7 +121,7 @@ mod test {
     #[test]
     fn multi_style() {
         let (fonts, font_ids) = fonts();
-        
+
         let mut text = SpannedString::from_string(
             "0123456".to_string(),
             TextStyle {
@@ -205,7 +207,7 @@ impl Line {
         self.ascent - self.descent
     }
 
-    /// The width of this line, ignoring the last glyph is it is a whitespace.
+    /// The width of this line, ignoring the last glyph if it is a whitespace.
     pub fn visible_width(&self, glyphs: &[GlyphPosition]) -> f32 {
         if self.glyph_range.is_empty() {
             return self.width;
@@ -388,9 +390,15 @@ impl TextLayout {
 
     /// Return the byte index for the caret located at the given line and horizontal position in
     /// pixels. This is rounded to the closest possible caret position.
-    pub fn byte_index_from_x_position(&self, line: usize, x_position: f32) -> usize {
-        let line = self.lines.get(line).unwrap();
-        let glyphs = &self.glyphs[line.glyph_range.clone()];
+    pub fn byte_index_from_x_position(&self, line_index: usize, x_position: f32) -> usize {
+        let line = self.lines.get(line_index).unwrap();
+        // if it is the last line, add 1 to the glyph_range to account the extra glyph
+        let glyph_range = if line_index == self.lines.len() - 1 {
+            line.glyph_range.start..line.glyph_range.end + 1
+        } else {
+            line.glyph_range.clone()
+        };
+        let glyphs = &self.glyphs[glyph_range];
         let g = glyphs.binary_search_by(|g| {
             if x_position < g.glyph.position.x {
                 Ordering::Greater
@@ -495,6 +503,13 @@ impl TextLayout {
             self.text.string.len()
         );
         self.position_lines();
+
+        // remove extra glyph from the last line
+        let last_line = self.lines.last_mut().unwrap();
+        last_line.width = last_line.visible_width(&self.glyphs);
+        last_line.glyph_range.end -= 1;
+        last_line.byte_range.end -= 1;
+
         self.apply_styles();
     }
 
@@ -575,6 +590,16 @@ impl TextLayout {
 
     /// Move all lines to the right position.
     fn position_lines(&mut self) {
+        // right after calling this function, the extra glyph in the last line is removed.
+        // make sure this is always called before that
+        debug_assert!(
+            {
+                let last_line = self.lines.last().unwrap();
+                last_line.glyph_range.end == self.glyphs.len()
+            },
+            "last_line don't have the extra glyph"
+        );
+
         let height = self.height();
         let mut y = match self.settings.vertical_align {
             Alignment::Start => 0.0,
