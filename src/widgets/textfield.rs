@@ -8,6 +8,7 @@ use copypasta::{ClipboardContext, ClipboardProvider};
 use winit::{event::VirtualKeyCode, window::CursorIcon};
 
 use crate::{
+    event::SetValue,
     graphics::Graphic,
     style::TextFieldStyle,
     text::layout::TextLayout,
@@ -82,20 +83,8 @@ impl<C: TextFieldCallback> TextField<C> {
     fn update_text(&mut self, this: Id, ctx: &mut Context) {
         let fonts = ctx.get_fonts();
         if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {
-            // add a extra char for the sake of the carret at end position.
-            // let display_text = self.text.clone() + " ";
-            // text.set_text(&display_text);
-            // let min_size = text.compute_min_size(fonts).unwrap_or([0.0, 0.0]);
-            // self.text_width = min_size[0];
-            // rect.set_min_size(min_size);
             let text_layout = text.get_layout(fonts, rect).clone();
-            // let glyphs = self.text_layout.glyphs();
-            // if self.caret_index + 1 >= glyphs.len() {
-            //     self.caret_index = glyphs.len().saturating_sub(1);
-            // }
-            // let text_layout = self.editor.text_layout();
             let min_size = text_layout.min_size();
-            // text.set_text_layout(text_layout);
             self.text_width = min_size[0];
             rect.set_min_size(min_size);
             self.update_carret(this, ctx, true);
@@ -226,19 +215,17 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     }
 
     fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
-        // if let Some(SetValue(text)) = event.downcast_ref::<SetValue<String>>() {
-        //     let x = self.get_glyph_pos(self.caret_index)[0];
-        //     self.text.clone_from(text);
-        //     self.previous_text.clone_from(text);
-        //     self.update_text(this, ctx);
-        //     self.selection_index = None;
-        //     self.caret_index = self.get_caret_index_at_pos(0, x);
-        //     self.update_carret(this, ctx, true);
-        //     self.callback.on_change(this, ctx, &self.text);
-        // } else if event.is::<BlinkCaret>() {
-        //     self.blink = !self.blink;
-        //     self.update_carret(this, ctx, false);
-        // }
+        if let Some(SetValue(text)) = event.downcast_ref::<SetValue<String>>() {
+            let fonts = ctx.get_fonts();
+            let text_layout = self.get_layout(ctx);
+            self.editor.select_all(text_layout);
+            self.editor.insert_text(&text, fonts, text_layout);
+            self.update_text(this, ctx);
+            self.callback.on_change(this, ctx, &text);
+        } else if event.is::<BlinkCaret>() {
+            self.blink = !self.blink;
+            self.update_carret(this, ctx, false);
+        }
     }
 
     fn input_flags(&self) -> InputFlags {
