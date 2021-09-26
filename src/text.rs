@@ -205,6 +205,7 @@ impl StyleKind {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum Span {
     FontSize(f32),
     FontId(FontId),
@@ -410,7 +411,7 @@ impl SpannedString {
         }
     }
 
-    pub fn add_shape_span(&mut self, range: Range<usize>, span: Span) {
+    fn add_shape_span(&mut self, range: Range<usize>, span: Span) {
         let mut to_append = Vec::new();
         for shape in &mut self.shape_spans {
             let rb = shape.byte_range.clone();

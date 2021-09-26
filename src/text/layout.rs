@@ -15,20 +15,24 @@ use super::{ShapeSpan, StyleKind, StyleSpan};
 mod test {
     use crate::font::{Font, FontId, Fonts};
     use crate::text::layout::{LayoutSettings, TextLayout};
-    use crate::text::{SpannedString, TextStyle};
+    use crate::text::{Span, SpannedString, TextStyle};
     use crate::Color;
 
-    fn fonts() -> (Fonts, FontId) {
+    fn fonts() -> (Fonts, Vec<FontId>) {
         let mut fonts = Fonts::new();
-        let font_id = fonts.add(Font::new(include_bytes!(
+        let font_ids = vec![fonts.add(Font::new(include_bytes!(
             "..\\..\\examples\\CascadiaCode.ttf"
-        )));
-        (fonts, font_id)
+        ))),
+        fonts.add(Font::new(include_bytes!(
+            "..\\..\\examples\\CascadiaCode.ttf"
+        )))];
+        (fonts, font_ids)
     }
 
     #[test]
     fn layout_empty() {
-        let (fonts, font_id) = fonts();
+        let (fonts, font_ids) = fonts();
+        let font_id = font_ids[0];
         let text = SpannedString::from_string(
             "".to_string(),
             TextStyle {
@@ -47,7 +51,8 @@ mod test {
 
     #[test]
     fn replace_nothing() {
-        let (fonts, font_id) = fonts();
+        let (fonts, font_ids) = fonts();
+        let font_id = font_ids[0];
         let text = SpannedString::from_string(
             "H ".to_string(),
             TextStyle {
@@ -87,6 +92,28 @@ mod test {
         assert_eq!(lines, text_layout.lines);
         assert_eq!(rects, text_layout.rects);
         assert_eq!(min_size, text_layout.min_size);
+    }
+
+    #[test]
+    fn zero_width() {
+        let (fonts, font_ids) = fonts();
+        let font_id = font_ids[0];
+        
+        let text = SpannedString::from_string(
+            "0123456".to_string(),
+            TextStyle {
+                color: Color::WHITE,
+                font_size: 16.0,
+                font_id,
+            },
+        );
+
+        let settings = LayoutSettings {
+            max_width: Some(0.0),
+            horizontal_align: Default::default(),
+            vertical_align: Default::default(),
+        };
+        let _text_layout = TextLayout::new(text, settings, &fonts);
     }
 }
 
@@ -764,6 +791,7 @@ impl LineLayout {
 
     /// Merge all self.line in a single line, and return it. Clears self.line.
     fn form_line(&mut self) -> Line {
+        // I assume that there is always at last on line in self.lines.
         let right_pos = self.glyphs.last().unwrap().right();
         let byte_index = self.lines.last().unwrap().byte_range.end;
 
@@ -792,15 +820,18 @@ impl LineLayout {
         glyph_index: usize,
     ) -> Line {
         assert!(glyph_index > 0);
+        // the pixel position of the break
         let split_pos = glyphs[glyph_index].glyph.position.x;
         let right_pos = glyphs[glyph_index - 1].right();
 
+        // the line to be returned, but the ascent, descent and line gap need to be computed while
+        // merging with the others lines
         let mut curr_line = lines[0].clone();
         curr_line.byte_range.end = byte_index;
         curr_line.glyph_range.end = glyph_index;
         curr_line.width = right_pos - curr_line.x;
 
-        // if split happens in the first line
+        // if split happens in the first line, no need to compute ascent, etc
         let line = &lines[0];
         if line.byte_range.contains(&byte_index) {
             let mut split = line.clone();
@@ -834,7 +865,6 @@ impl LineLayout {
 
                 merge_line(&mut curr_line, line);
 
-                // lines.insert(l + 1, split);
                 lines[l] = split;
                 break;
             }
@@ -843,7 +873,7 @@ impl LineLayout {
         }
 
         // remove marked lines
-        lines.retain(|line| line.width == REMOVE);
+        lines.retain(|line| line.width != REMOVE);
 
         curr_line
     }
@@ -867,6 +897,7 @@ impl LineLayout {
             };
             let right_pos = right - self.lines[0].x;
             if right_pos > max_width {
+                // find the last possible break position, if it exist
                 let mut prev_break = None;
                 let byte_index = glyph.byte_range.start;
                 while let Some(&next) = linebreaks.front() {
@@ -882,6 +913,7 @@ impl LineLayout {
                     prev_break = None;
                 }
 
+                // find the glyph index of the break point, or fallback to this glyph as breakpoint
                 let (break_byte, break_glyph) = if let Some(prev_break) = prev_break {
                     let glyph_index = self.glyphs[..=g]
                         .iter()
@@ -895,6 +927,7 @@ impl LineLayout {
                     (byte_index, g)
                 };
 
+                // break the line
                 let value =
                     Self::form_line_until(&self.glyphs, &mut self.lines, break_byte, break_glyph);
                 lines.push(value);
