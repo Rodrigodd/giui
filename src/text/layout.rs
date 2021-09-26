@@ -115,6 +115,37 @@ mod test {
         };
         let _text_layout = TextLayout::new(text, settings, &fonts);
     }
+
+    #[test]
+    fn multi_style() {
+        let (fonts, font_ids) = fonts();
+        
+        let mut text = SpannedString::from_string(
+            "0123456".to_string(),
+            TextStyle {
+                color: Color::WHITE,
+                font_size: 16.0,
+                font_id: font_ids[0],
+            },
+        );
+
+        let settings = LayoutSettings {
+            max_width: Some(20.0),
+            horizontal_align: Default::default(),
+            vertical_align: Default::default(),
+        };
+        let text_layout = TextLayout::new(text.clone(), settings.clone(), &fonts);
+
+        let other_style = Span::FontId(font_ids[1]);
+        text.add_span(0..1, other_style);
+        text.add_span(2..3, other_style);
+        text.add_span(4..5, other_style);
+        text.add_span(6..7, other_style);
+
+        let text_layout2 = TextLayout::new(text, settings, &fonts);
+
+        assert_eq!(text_layout.lines(), text_layout2.lines());
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -846,6 +877,8 @@ impl LineLayout {
 
         // remove mark
         const REMOVE: f32 = -10_000.0;
+
+        lines[0].width = REMOVE;
 
         let merge_line = |curr_line: &mut Line, line: &mut Line| {
             curr_line.ascent = curr_line.ascent.max(line.ascent);
