@@ -357,6 +357,8 @@ impl Controls {
         self.free_head = Some(id.index);
     }
 
+    /// Move the Control with the given Id, to the last position in the children vector of its
+    /// parent, making it render in front of all of its siblings.
     pub fn move_to_front(&mut self, id: Id) {
         if let Some(parent) = self.get(id).and_then(|x| x.parent) {
             let children = &mut self
@@ -364,11 +366,12 @@ impl Controls {
                 .expect("Control's parent is unintialized")
                 .children;
             let i = children.iter().position(|x| *x == id).unwrap();
-            children.remove(i);
-            children.push(id);
+            children[i..].rotate_left(1);
         }
     }
 
+    /// Move the Control with the given Id, to the first position in the children vector of its
+    /// parent, making it render behind all of its siblings.
     pub fn move_to_back(&mut self, id: Id) {
         if let Some(parent) = self.get(id).and_then(|x| x.parent) {
             let children = &mut self
@@ -376,8 +379,7 @@ impl Controls {
                 .expect("Control's parent is unintialized")
                 .children;
             let i = children.iter().position(|x| *x == id).unwrap();
-            children.remove(i);
-            children.insert(0, id);
+            children[..=i].rotate_right(1);
         }
     }
 
