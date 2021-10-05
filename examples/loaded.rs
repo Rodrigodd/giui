@@ -55,7 +55,7 @@ use crui::{
         ScrollBar, ScrollView, Select, SetMaxValue, SetMinValue, SetSelected, Slider,
         SliderCallback, TabButton, TextField, TextFieldCallback, Toggle, ViewLayout,
     },
-    Color, Context, ControlBuilder, Gui, Id, RectFill,
+    BuilderContext, Color, Context, ControlBuilder, Gui, Id, RectFill,
 };
 use sprite_render::{GLSpriteRender, SpriteRender};
 use winit::{
@@ -396,7 +396,7 @@ impl OptionsGui {
         let surface = gui
             .create_control_reserved(this.surface)
             .layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
-            .build();
+            .build(gui);
 
         this.create_menu_bar(surface, gui, proxy, style);
         let tab_selected = this.options.borrow().tab_selected;
@@ -406,7 +406,7 @@ impl OptionsGui {
             gui,
             this.pages[0],
             page0_cont,
-            |cb| {
+            |cb, _| {
                 cb.graphic(
                     style
                         .menu
@@ -422,7 +422,7 @@ impl OptionsGui {
         .expand_y(true)
         .parent(surface)
         .active(false)
-        .build();
+        .build(gui);
         this.create_page0(gui, page0_cont, style);
         let page1 = gui
             .create_control_reserved(this.pages[1])
@@ -438,7 +438,7 @@ impl OptionsGui {
             .parent(surface)
             .active(false)
             .layout(VBoxLayout::new(10.0, [10.0; 4], -1))
-            .build();
+            .build(gui);
 
         this.create_page1(gui, page1, style);
         this.create_popup(gui, style);
@@ -538,13 +538,13 @@ impl OptionsGui {
         })
         .parent(parent)
         .min_size([0.0, 24.0])
-        .build();
+        .build(gui);
         let id = gui.reserve_id();
         scroll_view(
             gui,
             id,
             list,
-            |cb| {
+            |cb, _| {
                 cb.graphic(style.list_background.clone())
                     .layout(VBoxLayout::new(2.0, [2.0; 4], -1))
             },
@@ -552,7 +552,7 @@ impl OptionsGui {
         )
         .expand_y(true)
         .parent(parent)
-        .build();
+        .build(gui);
         let mut ctx = gui.get_context();
         for (i, text) in self.options.borrow().list.iter() {
             create_item(
@@ -583,7 +583,7 @@ impl OptionsGui {
             .behaviour(Blocker::new(move |_, ctx| {
                 ctx.send_event_to(menu, CloseMenu)
             }))
-            .build();
+            .build(gui);
         use Item::*;
         gui.create_control_reserved(menu)
             .graphic(style.menu.button.normal.clone())
@@ -626,7 +626,7 @@ impl OptionsGui {
             ))
             .layout(HBoxLayout::new(0.0, [0.0; 4], -1))
             .parent(surface)
-            .build()
+            .build(gui)
     }
 
     fn create_tabs(&self, surface: Id, gui: &mut Gui, style: &StyleSheet) -> Id {
@@ -634,7 +634,7 @@ impl OptionsGui {
             .create_control()
             .layout(HBoxLayout::new(0.0, [0.0; 4], -1))
             .parent(surface)
-            .build();
+            .build(gui);
         let tab_group = ButtonGroup::new({
             let options = self.options.clone();
             let tabs = self.tabs;
@@ -653,7 +653,7 @@ impl OptionsGui {
             style,
         )
         .parent(line)
-        .build();
+        .build(gui);
         OptionsGui::tab_button(
             self.tabs[1],
             gui,
@@ -664,7 +664,7 @@ impl OptionsGui {
             style,
         )
         .parent(line)
-        .build();
+        .build(gui);
         drop(tab_group);
         line
     }
@@ -677,14 +677,14 @@ impl OptionsGui {
         label: String,
         tab_group: ButtonGroup,
         style: &StyleSheet,
-    ) -> ControlBuilder<'a> {
+    ) -> ControlBuilder {
         let button = id;
         let graphic = Text::new(label, (0, 0), style.text_style.clone()).into();
         gui.create_control()
             .graphic(graphic)
             .parent(button)
             .layout(FitText)
-            .build();
+            .build(gui);
         gui.create_control_reserved(button)
             .layout(MarginLayout::new([2.0; 4]))
             .behaviour(TabButton::new(
@@ -709,18 +709,18 @@ impl OptionsGui {
             .create_control()
             .layout(HBoxLayout::new(2.0, [2.0, 2.0, 2.0, 2.0], -1))
             .parent(parent)
-            .build();
+            .build(gui);
         let _text = gui
             .create_control()
             .graphic(Text::new(name, (-1, 0), style.text_style.clone()).into())
             .layout(FitText)
             .expand_x(true)
             .parent(line)
-            .build();
+            .build(gui);
         OptionsGui::text_field(id, gui, initial_value, style, callback)
             .min_size([100.0, 24.0])
             .parent(line)
-            .build();
+            .build(gui);
     }
 
     fn create_slider(&self, gui: &mut Gui, parent: Id, style: &StyleSheet) {
@@ -733,12 +733,12 @@ impl OptionsGui {
             .min_size([0.0, 24.0])
             .graphic(Text::new(initial_value.to_string(), (0, 0), style.text_style.clone()).into())
             .parent(parent)
-            .build();
+            .build(gui);
         let line = gui
             .create_control()
             .layout(HBoxLayout::new(2.0, [2.0, 2.0, 2.0, 2.0], -1))
             .parent(parent)
-            .build();
+            .build(gui);
 
         let slider = self.slider;
 
@@ -751,7 +751,7 @@ impl OptionsGui {
         })
         .min_size([50.0, 18.0])
         .parent(line)
-        .build();
+        .build(gui);
         let slider = OptionsGui::slider(slider, gui, min, max, initial_value, style, {
             let options = self.options.clone();
             move |_, ctx: &mut Context, value: i32| {
@@ -761,7 +761,7 @@ impl OptionsGui {
         })
         .expand_x(true)
         .parent(line)
-        .build();
+        .build(gui);
         let _max_field = OptionsGui::text_field(self.max, gui, max.to_string(), style, {
             let options = self.options.clone();
             NumberField(max.to_string(), move |ctx, x| {
@@ -771,7 +771,7 @@ impl OptionsGui {
         })
         .min_size([50.0, 18.0])
         .parent(line)
-        .build();
+        .build(gui);
     }
 
     fn create_check<F: Fn(Id, &mut Context, bool) + 'static>(
@@ -798,7 +798,7 @@ impl OptionsGui {
                 .margins([5.0, -10.0, 25.0, 10.0])
                 .graphic(graphic)
                 .parent(toggle)
-                .build()
+                .build(gui)
         };
         let marker = gui
             .create_control()
@@ -813,7 +813,7 @@ impl OptionsGui {
                     .with_color([0, 0, 0, 255].into()),
             )
             .parent(background)
-            .build();
+            .build(gui);
         gui.create_control_reserved(id)
             .behaviour(Toggle::new(
                 background,
@@ -825,7 +825,7 @@ impl OptionsGui {
             ))
             .min_size([0.0, 30.0])
             .parent(parent)
-            .build();
+            .build(gui);
 
         let graphic = Text::new(name, (-1, 0), style.text_style.clone()).into();
         gui.create_control()
@@ -833,7 +833,7 @@ impl OptionsGui {
             .margins([30.0, 0.0, 0.0, 0.0])
             .graphic(graphic)
             .parent(toggle)
-            .build();
+            .build(gui);
     }
 
     fn create_dropdown(&self, gui: &mut Gui, parent: Id, style: &StyleSheet) {
@@ -841,14 +841,14 @@ impl OptionsGui {
             .create_control()
             .layout(HBoxLayout::new(2.0, [2.0, 2.0, 2.0, 2.0], -1))
             .parent(parent)
-            .build();
+            .build(gui);
         let _text = gui
             .create_control()
             .graphic(Text::new("Dropdown".into(), (-1, 0), style.text_style.clone()).into())
             .layout(FitText)
             .expand_x(true)
             .parent(line)
-            .build();
+            .build(gui);
         let initial_value = self.options.borrow().dropdown;
         OptionsGui::dropdown(
             self.dropdown,
@@ -866,7 +866,7 @@ impl OptionsGui {
         .min_size([100.0, 24.0])
         .parent(line)
         .expand_x(true)
-        .build();
+        .build(gui);
     }
 
     fn create_popup(&self, gui: &mut Gui, style: &StyleSheet) {
@@ -874,7 +874,7 @@ impl OptionsGui {
             .create_control_reserved(self.popup)
             .graphic(style.popup_background.clone())
             .active(false)
-            .build();
+            .build(gui);
         let popup_window = gui
             .create_control()
             .anchors([0.5, 0.5, 0.5, 0.5])
@@ -882,17 +882,17 @@ impl OptionsGui {
             .graphic(style.popup_window.clone())
             .layout(VBoxLayout::new(5.0, [0.0; 4], -1))
             .parent(self.popup)
-            .build();
+            .build(gui);
         let popup_header = gui
             .create_control()
             .graphic(style.popup_header.clone())
             .min_size([0.0, 20.0])
             .parent(popup_window)
-            .build();
+            .build(gui);
         gui.create_control_reserved(self.popup_title)
             .graphic(Text::new("PopUp Title".into(), (-1, 0), style.text_style.clone()).into())
             .parent(popup_header)
-            .build();
+            .build(gui);
         gui.create_control_reserved(self.popup_text)
             .graphic(
                 Text::new(
@@ -904,12 +904,12 @@ impl OptionsGui {
             )
             .expand_y(true)
             .parent(popup_window)
-            .build();
+            .build(gui);
         let button_area = gui
             .create_control()
             .min_size([75.0, 30.0])
             .parent(popup_window)
-            .build();
+            .build(gui);
         let ok_button = gui
             .create_control()
             .behaviour(Button::new(style.button.clone(), true, move |_, ctx| {
@@ -919,12 +919,12 @@ impl OptionsGui {
             .fill_x(crui::RectFill::ShrinkCenter)
             .fill_y(crui::RectFill::ShrinkCenter)
             .parent(button_area)
-            .build();
+            .build(gui);
         let _ok_button_text = gui
             .create_control()
             .graphic(Text::new("Ok".into(), (0, 0), style.text_style.clone()).into())
             .parent(ok_button)
-            .build();
+            .build(gui);
     }
 
     fn text_field<'a, C: TextFieldCallback + 'static>(
@@ -933,7 +933,7 @@ impl OptionsGui {
         initial_value: String,
         style: &StyleSheet,
         callback: C,
-    ) -> ControlBuilder<'a> {
+    ) -> ControlBuilder {
         let input_box = id;
         let caret = gui
             .create_control()
@@ -946,12 +946,12 @@ impl OptionsGui {
                     .with_color([0, 0, 0, 255].into()),
             )
             .parent(input_box)
-            .build();
+            .build(gui);
         let input_text = gui
             .create_control()
             .graphic(Text::new(initial_value, (-1, 0), style.text_style.clone()).into())
             .parent(input_box)
-            .build();
+            .build(gui);
         gui.create_control_reserved(input_box)
             .behaviour(TextField::new(
                 caret,
@@ -969,7 +969,7 @@ impl OptionsGui {
         initial_value: i32,
         style: &StyleSheet,
         callback: C,
-    ) -> ControlBuilder<'a> {
+    ) -> ControlBuilder {
         let slider = id;
         let slide_area = gui
             .create_control()
@@ -984,7 +984,7 @@ impl OptionsGui {
                     .with_color([170, 170, 170, 255].into()),
             )
             .parent(slider)
-            .build();
+            .build(gui);
         let handle = gui
             .create_control()
             .anchors([0.5, 0.5, 0.5, 0.5])
@@ -998,7 +998,7 @@ impl OptionsGui {
                     .with_color([200, 200, 200, 255].into()),
             )
             .parent(slider)
-            .build();
+            .build(gui);
         gui.create_control_reserved(slider).behaviour(Slider::new(
             handle,
             slide_area,
@@ -1017,7 +1017,7 @@ impl OptionsGui {
         initial_value: usize,
         style: &StyleSheet,
         callback: F,
-    ) -> ControlBuilder<'a> {
+    ) -> ControlBuilder {
         let float_menu = {
             let menu = gui.reserve_id();
             let blocker = gui
@@ -1026,7 +1026,7 @@ impl OptionsGui {
                 .behaviour(Blocker::new(move |_, ctx| {
                     ctx.send_event_to(menu, CloseMenu)
                 }))
-                .build();
+                .build(gui);
             let menu = gui
                 .create_control_reserved(menu)
                 .active(false)
@@ -1041,7 +1041,7 @@ impl OptionsGui {
                             .layout(MarginLayout::new([4.0, 4.0, 4.0, 4.0]))
                             .parent(this)
                             // .min_size([10.0, 25.0])
-                            .build();
+                            .build(ctx);
                         let _text = ctx
                             .create_control()
                             .margins([10.0, 0.0, -10.0, 0.0])
@@ -1050,13 +1050,13 @@ impl OptionsGui {
                             )
                             .layout(FitText)
                             .parent(id)
-                            .build();
+                            .build(ctx);
                         id
                     }
                 }))
                 .layout(VBoxLayout::new(0.0, [1.0, 1.0, 1.0, 1.0], -1))
                 .min_size([0.0, 80.0])
-                .build();
+                .build(gui);
             menu
         };
         let text = gui
@@ -1071,7 +1071,7 @@ impl OptionsGui {
                 .into(),
             )
             .parent(id)
-            .build();
+            .build(gui);
         gui.create_control_reserved(id)
             .min_size([0.0, 25.0])
             .behaviour(Dropdown::new(
@@ -1104,17 +1104,20 @@ fn create_item(
         .graphic(background)
         .parent(list)
         .layout(HBoxLayout::new(0.0, [5.0, 0.0, 5.0, 0.0], 0))
-        .build();
+        .build(ctx);
     // TODO: there must be a better way of set the minsize of the control above,
     // instead of relying in a child.
-    ctx.create_control().min_height(35.0).parent(item).build();
+    ctx.create_control()
+        .min_height(35.0)
+        .parent(item)
+        .build(ctx);
     let _text = ctx
         .create_control()
         .parent(item)
         .graphic(Text::new(text, (-1, 0), text_style).into())
         .layout(FitText)
         .expand_x(true)
-        .build();
+        .build(ctx);
     let _button = ctx
         .create_control()
         .parent(item)
@@ -1129,23 +1132,23 @@ fn create_item(
         .min_size([15.0, 15.0])
         .fill_x(RectFill::ShrinkCenter)
         .fill_y(RectFill::ShrinkCenter)
-        .build();
+        .build(ctx);
 }
 
 fn scroll_view<'a>(
     gui: &'a mut Gui,
     id: Id,
     content: Id,
-    content_builder: impl for<'b> FnOnce(ControlBuilder<'b>) -> ControlBuilder<'b>,
+    content_builder: impl for<'b> FnOnce(ControlBuilder, &mut dyn BuilderContext) -> ControlBuilder,
     style: &StyleSheet,
-) -> ControlBuilder<'a> {
+) -> ControlBuilder {
     let scroll_view = id;
     let view = gui
         .create_control()
         .graphic(Graphic::None)
         .parent(scroll_view)
         .layout(ViewLayout::new(false, true))
-        .build();
+        .build(gui);
     let v_scroll_bar_handle = gui.reserve_id();
     let v_scroll_bar = gui
         .create_control()
@@ -1158,11 +1161,11 @@ fn scroll_view<'a>(
             true,
             style.scroll_handle.clone(),
         ))
-        .build();
+        .build(gui);
     let v_scroll_bar_handle = gui
         .create_control_reserved(v_scroll_bar_handle)
         .parent(v_scroll_bar)
-        .build();
+        .build(gui);
 
     // gui.get_context().set_parent(content, view);
 
@@ -1177,5 +1180,5 @@ fn scroll_view<'a>(
     gui.create_control_reserved(scroll_view)
         .behaviour(behaviour_layout.clone())
         .layout(behaviour_layout)
-        .child_reserved(content, content_builder)
+        .child_reserved(content, gui, content_builder)
 }

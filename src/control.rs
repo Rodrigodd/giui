@@ -3,38 +3,31 @@ use std::{num::NonZeroU32, rc::Rc};
 
 use crate::{graphics::Graphic, Behaviour, Id, Layout, Rect, RectFill};
 
-pub(crate) trait ControlBuilderInner {
-    fn controls(&mut self) -> &mut Controls;
-    fn build(&mut self, id: Id);
-}
-pub struct ControlBuilder<'a> {
-    id: Id,
-    inner: Box<dyn ControlBuilderInner + 'a>,
-}
-impl<'a> ControlBuilder<'a> {
-    pub(crate) fn new<T: ControlBuilderInner + 'a>(id: Id, mut inner: T) -> Self {
-        let controls = inner.controls();
-        if let ControlEntry::Reserved {
-            generation,
-            children,
-        } = &mut controls.controls[id.index()]
-        {
-            debug_assert_eq!(*generation, id.generation);
-            let mut control = Control::new(*generation);
-            control.active = true;
-            control.children = std::mem::take(children);
-            controls.controls[id.index()] = ControlEntry::Building { control };
-        } else {
-            panic!("Building Control that isn't in Reserved State")
-        }
-        Self {
-            inner: Box::new(inner),
-            id,
-        }
+pub trait BuilderContext {
+    fn create_control(&mut self) -> ControlBuilder {
+        let id = self.controls().reserve();
+        self.create_control_reserved(id)
     }
-
-    pub fn reserve(&mut self) -> Id {
-        self.inner.controls().reserve()
+    fn create_control_reserved(&mut self, id: Id) -> ControlBuilder {
+        ControlBuilder::new(id)
+    }
+    fn controls(&mut self) -> &mut Controls;
+    fn build(&mut self, id: Id, control: Control);
+    fn reserve(&mut self) -> Id {
+        self.controls().reserve()
+    }
+}
+pub struct ControlBuilder {
+    id: Id,
+    control: Control,
+}
+impl ControlBuilder {
+    /// Create a new ControlBuilder, that build a Control with the given Id. The given Id must be a
+    /// reserved Id, with no other control already build with this Id.
+    pub(crate) fn new(id: Id) -> Self {
+        let mut control = Control::new(id.generation);
+        control.active = true;
+        Self { id, control }
     }
 
     /// Return the Id of the control that this ControlBuilder is building
@@ -42,55 +35,51 @@ impl<'a> ControlBuilder<'a> {
         self.id
     }
 
-    fn control(&mut self, id: Id) -> &mut Control {
-        self.inner.controls().get_mut(id).unwrap()
-    }
-
     pub fn anchors(mut self, anchors: [f32; 4]) -> Self {
-        self.control(self.id).rect.anchors = anchors;
+        self.control.rect.anchors = anchors;
         self
     }
     pub fn margins(mut self, margins: [f32; 4]) -> Self {
-        self.control(self.id).rect.margins = margins;
+        self.control.rect.margins = margins;
         self
     }
     pub fn min_size(mut self, min_size: [f32; 2]) -> Self {
-        self.control(self.id).rect.user_min_size = min_size;
-        self.control(self.id).rect.min_size = min_size;
+        self.control.rect.user_min_size = min_size;
+        self.control.rect.min_size = min_size;
         self
     }
     pub fn min_width(mut self, min_width: f32) -> Self {
-        self.control(self.id).rect.min_size[0] = min_width;
+        self.control.rect.min_size[0] = min_width;
         self
     }
     pub fn min_height(mut self, min_height: f32) -> Self {
-        self.control(self.id).rect.min_size[1] = min_height;
+        self.control.rect.min_size[1] = min_height;
         self
     }
     pub fn fill_x(mut self, fill: RectFill) -> Self {
-        self.control(self.id).rect.set_fill_x(fill);
+        self.control.rect.set_fill_x(fill);
         self
     }
     pub fn fill_y(mut self, fill: RectFill) -> Self {
-        self.control(self.id).rect.set_fill_y(fill);
+        self.control.rect.set_fill_y(fill);
         self
     }
     pub fn expand_x(mut self, expand: bool) -> Self {
-        self.control(self.id).rect.expand_x = expand;
+        self.control.rect.expand_x = expand;
         self
     }
     pub fn expand_y(mut self, expand: bool) -> Self {
-        self.control(self.id).rect.expand_y = expand;
+        self.control.rect.expand_y = expand;
         self
     }
     pub fn behaviour<T: Behaviour + 'static>(mut self, behaviour: T) -> Self {
         // TODO: remove this someday
-        debug_assert!(self.control(self.id).behaviour.is_none());
-        self.control(self.id).behaviour = Some(Box::new(behaviour));
+        debug_assert!(self.control.behaviour.is_none());
+        self.control.behaviour = Some(Box::new(behaviour));
         self
     }
     pub fn layout<T: Layout + 'static>(mut self, layout: T) -> Self {
-        self.control(self.id).layout = Some(Box::new(layout));
+        self.control.layout = Some(Box::new(layout));
         self
     }
     pub fn behaviour_and_layout<T: Layout + Behaviour + 'static>(
@@ -101,86 +90,80 @@ impl<'a> ControlBuilder<'a> {
         self.behaviour(x.clone()).layout(x)
     }
     pub fn graphic(mut self, graphic: Graphic) -> Self {
-        self.control(self.id).graphic = graphic;
+        self.control.graphic = graphic;
         self
     }
     pub fn parent(mut self, parent: Id) -> Self {
-        self.control(self.id).parent = Some(parent);
+        self.control.parent = Some(parent);
         self
     }
     pub fn active(mut self, active: bool) -> Self {
-        self.control(self.id).active = active;
+        self.control.active = active;
         self
     }
 
-    pub fn child<F>(mut self, create_child: F) -> Self
+    pub fn child<F>(self, ctx: &mut dyn BuilderContext, create_child: F) -> Self
     where
-        F: for<'b> FnOnce(ControlBuilder<'b>) -> ControlBuilder<'b>,
+        F: FnOnce(ControlBuilder, &mut dyn BuilderContext) -> ControlBuilder,
     {
-        let id = self.inner.controls().reserve();
-        self.child_reserved(id, create_child)
+        let id = ctx.controls().reserve();
+        self.child_reserved(id, ctx, create_child)
     }
 
-    pub fn child_reserved<F>(mut self, id: Id, create_child: F) -> Self
+    pub fn child_reserved<F>(self, id: Id, ctx: &mut dyn BuilderContext, create_child: F) -> Self
     where
-        F: for<'b> FnOnce(ControlBuilder<'b>) -> ControlBuilder<'b>,
+        F: FnOnce(ControlBuilder, &mut dyn BuilderContext) -> ControlBuilder,
     {
-        // let id = self.inner.controls().reserve();
         let parent = self.id;
 
-        // while creating a child, be sure that it see its parent as deactive
-        let active = std::mem::replace(&mut self.control(parent).active, false);
-
         {
-            struct ChildBuilderInner<'a>(&'a mut Controls);
-            impl ControlBuilderInner for ChildBuilderInner<'_> {
+            struct ChildBuilderContext<'a>(&'a mut Controls);
+            impl BuilderContext for ChildBuilderContext<'_> {
                 fn controls(&mut self) -> &mut Controls {
                     self.0
                 }
-                fn build(&mut self, _id: Id) {}
+                fn build(&mut self, id: Id, control: Control) {
+                    self.0.add_builded_control(id, control);
+                }
             }
-            let child_builder = ControlBuilder::new(id, ChildBuilderInner(self.inner.controls()));
-            (create_child)(child_builder).parent(parent).build();
+            let mut ctx = ChildBuilderContext(ctx.controls());
+            let child_builder = ControlBuilder::new(id);
+            (create_child)(child_builder, &mut ctx)
+                .parent(parent)
+                .build(&mut ctx);
         }
-
-        // restore the parent active
-        self.control(parent).active = active;
 
         self
     }
 
-    pub fn build(mut self) -> Id {
-        let id = self.id;
+    pub fn build(mut self, ctx: &mut impl BuilderContext) -> Id {
+        // append childs that was created with this control as parent, by using the reserved Id.
+        match &mut ctx.controls().controls[self.id.index()] {
+            ControlEntry::Reserved { children, .. } => self.control.children.append(children),
+            _ => unreachable!(),
+        }
 
-        if let Some(parent) = self.control(id).parent {
-            match self.inner.controls().get_mut(parent) {
-                Some(x) => x.add_child(id),
-                // the parent could be in Reserved state
-                None => match &mut self.inner.controls().controls[parent.index()] {
-                    ControlEntry::Reserved { children, .. } => {
-                        children.push(id);
-                    }
-                    _ => panic!("Control's parent state is invalid. It is Free or Take"),
-                },
+        if let Some(parent) = self.control.parent {
+            match &mut ctx.controls().controls[parent.index()] {
+                ControlEntry::Reserved { children, .. } => {
+                    children.push(self.id);
+                }
+                ControlEntry::Builded { control, .. } | ControlEntry::Started { control, .. } => {
+                    control.add_child(self.id)
+                }
+                _ => panic!("Control's parent state is invalid. It is Free or Take"),
             }
         } else {
-            self.control(id).parent = Some(Id::ROOT_ID);
-            self.control(Id::ROOT_ID).add_child(id);
+            // The ROOT_ID is always in Started state.
+            self.control.parent = Some(Id::ROOT_ID);
+            ctx.controls()
+                .get_mut(Id::ROOT_ID)
+                .unwrap()
+                .add_child(self.id);
         }
 
-        if self.control(id).active
-            && self.control(id).parent.map_or(true, |x| {
-                self.inner
-                    .controls()
-                    .get(x)
-                    .map_or(false, |x| x.really_active)
-            })
-        {
-            self.control(id).really_active = true;
-        }
-
-        let Self { mut inner, id } = self;
-        inner.build(id);
+        let Self { id, control } = self;
+        ctx.build(id, control);
         id
     }
 }
@@ -194,8 +177,9 @@ pub(crate) enum ControlEntry {
         generation: NonZeroU32,
         children: Vec<Id>,
     },
-    /// A ControlBuilder for this control has been created, but the control is not yet alive.
-    Building { control: Control },
+    /// This control has been builded, but the control is not yet alive. The control already exist
+    /// in the Gui Tree.
+    Builded { control: Control },
     /// The control is alive, and exist in the Gui Tree.
     Started { control: Control },
     /// The control has been temporarily taken, to allow transitioning beetween states.
@@ -214,7 +198,7 @@ impl std::fmt::Debug for ControlEntry {
                 "Reserved {{ generation: {:?}, children: {:?} }}",
                 generation, children
             ),
-            ControlEntry::Building { control } => {
+            ControlEntry::Builded { control } => {
                 write!(f, "Building {{ generation: {:?}, .. }}", control.generation)
             }
             ControlEntry::Started { control } => {
@@ -232,7 +216,7 @@ impl Default for ControlEntry {
 impl ControlEntry {
     fn get(&self, id: Id) -> Option<&Control> {
         match self {
-            ControlEntry::Building { control } | ControlEntry::Started { control } => {
+            ControlEntry::Builded { control } | ControlEntry::Started { control } => {
                 if control.generation != id.generation {
                     return None;
                 }
@@ -248,7 +232,7 @@ impl ControlEntry {
 
     fn get_mut(&mut self, id: Id) -> Option<&mut Control> {
         match self {
-            ControlEntry::Building { control } | ControlEntry::Started { control } => {
+            ControlEntry::Builded { control } | ControlEntry::Started { control } => {
                 if control.generation != id.generation {
                     return None;
                 }
@@ -276,7 +260,8 @@ fn next_generation() -> NonZeroU32 {
     NonZeroU32::new(next).unwrap()
 }
 
-pub(crate) struct Controls {
+#[doc(hidden)]
+pub struct Controls {
     free_head: Option<u32>,
     pub(crate) controls: Vec<ControlEntry>,
     generation: NonZeroU32,
@@ -346,6 +331,20 @@ impl Controls {
                 generation: self.generation,
                 index: self.controls.len() as u32 - 1,
             }
+        }
+    }
+
+    /// Change a control from reserved state to builded state
+    pub fn add_builded_control(&mut self, id: Id, control: Control) {
+        match &mut self.controls[id.index()] {
+            ControlEntry::Free { .. } | ControlEntry::Take | ControlEntry::Builded { .. } => {
+                panic!("start a control while not in reserved state")
+            }
+            ControlEntry::Reserved { generation, .. } => {
+                assert_eq!(control.generation, *generation);
+                self.controls[id.index()] = ControlEntry::Builded { control };
+            }
+            ControlEntry::Started { .. } => panic!("Control already started"),
         }
     }
 
@@ -474,7 +473,8 @@ impl Controls {
     }
 }
 
-pub(crate) struct Control {
+#[doc(hidden)]
+pub struct Control {
     pub(crate) generation: NonZeroU32,
     pub(crate) rect: Rect,
     pub(crate) graphic: Graphic,

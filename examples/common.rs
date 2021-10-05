@@ -37,7 +37,7 @@ fn main() {
                     )
                     .into(),
                 )
-                .build();
+                .build(gui);
             HelloWord
         }
     }

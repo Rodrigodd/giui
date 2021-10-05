@@ -72,7 +72,7 @@ impl MenuBehaviour {
                     .behaviour(MenuBehaviour::new(menu.clone(), self.style.clone(), this))
                     .graphic(self.style.button.normal.clone())
                     .layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
-                    .build();
+                    .build(ctx);
                 self.open = Some(menu);
             }
         }
@@ -87,33 +87,33 @@ impl Behaviour for MenuBehaviour {
                         .create_control()
                         .parent(this)
                         .min_size([0.0, 5.0])
-                        .build();
+                        .build(ctx);
                     let _dash = ctx
                         .create_control()
                         .graphic(self.style.separator.clone())
                         .parent(item)
                         .margins([8.0, 2.0, -8.0, -2.0])
-                        .build();
+                        .build(ctx);
                 }
                 Item::Button(text, _) => {
                     let item = ctx
                         .create_control()
                         .parent(this)
                         .layout(MarginLayout::new([18.0, 2.0, 18.0, 2.0]))
-                        .build();
+                        .build(ctx);
                     let _text = ctx
                         .create_control()
                         .parent(item)
                         .graphic(Text::new(text.clone(), (-1, 0), self.style.text.clone()).into())
                         .layout(FitText)
-                        .build();
+                        .build(ctx);
                 }
                 Item::SubMenu(menu) => {
                     let item = ctx
                         .create_control()
                         .parent(this)
                         .layout(HBoxLayout::new(0.0, [18.0, 2.0, 2.0, 2.0], -1))
-                        .build();
+                        .build(ctx);
                     let _text = ctx
                         .create_control()
                         .parent(item)
@@ -122,14 +122,14 @@ impl Behaviour for MenuBehaviour {
                         )
                         .layout(FitText)
                         .expand_x(true)
-                        .build();
+                        .build(ctx);
                     let _arrow = ctx
                         .create_control()
                         .min_size([16.0, 16.0])
                         .fill_y(RectFill::ShrinkCenter)
                         .graphic(self.style.arrow.clone())
                         .parent(item)
-                        .build();
+                        .build(ctx);
                 }
             }
         }
@@ -263,7 +263,7 @@ impl MenuBar {
             ))
             .graphic(self.style.button.normal.clone())
             .layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
-            .build();
+            .build(ctx);
         self.open = Some(menu);
     }
 }
@@ -275,12 +275,12 @@ impl Behaviour for MenuBar {
                 .parent(this)
                 .layout(MarginLayout::new([2.0, 2.0, 2.0, 2.0]))
                 .graphic(self.style.button.normal.clone())
-                .build();
+                .build(ctx);
             ctx.create_control()
                 .parent(item)
                 .graphic(Text::new(menu.name.clone(), (0, 0), self.style.text.clone()).into())
                 .layout(FitText)
-                .build();
+                .build(ctx);
         }
     }
 

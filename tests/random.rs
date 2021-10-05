@@ -109,7 +109,7 @@ fn build_random_gui(gui: &mut Gui, rng: &mut SmallRng) -> Vec<Id> {
             )),
             _ => unreachable!(),
         };
-        ids.push(builder.build());
+        ids.push(builder.build(gui));
     }
     ids
 }

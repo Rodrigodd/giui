@@ -156,7 +156,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .graphic(graphic)
             .margins([3.0, 6.0, 6.0, 9.0])
             .layout(MarginLayout::new([3.0, 3.0, 3.0, 3.0]))
-            .build();
+            .build(gui);
         let graphic = Text::new(
             "This is a Hover".to_owned(),
             (-1, 0),
@@ -173,7 +173,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .graphic(graphic)
             .parent(hover)
             .layout(FitText)
-            .build();
+            .build(gui);
 
         (hover, label)
     };
@@ -181,7 +181,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
     let surface = gui
         .create_control()
         .layout(VBoxLayout::new(0.0, [0.0; 4], -1))
-        .build();
+        .build(gui);
     let _menubar = {
         let menu = gui.reserve_id();
         // TODO: the menu_bar's blocker espect that I know the size of menu_bar
@@ -192,7 +192,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .behaviour(Blocker::new(move |_, ctx| {
                 ctx.send_event_to(menu, CloseMenu)
             }))
-            .build();
+            .build(gui);
         use Item::*;
 
         gui.create_control_reserved(menu)
@@ -296,23 +296,23 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             ))
             .layout(HBoxLayout::new(0.0, [0.0; 4], -1))
             .parent(surface)
-            .build()
+            .build(gui)
     };
 
     let header = gui
         .create_control()
         .layout(HBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
         .parent(surface)
-        .build();
+        .build(gui);
 
     let page_area = gui
         .create_control()
         .margins([0.0, 45.0, 0.0, 0.0])
         .parent(surface)
         .expand_y(true)
-        .build();
+        .build(gui);
     let page_1 = {
-        let page_1 = gui.create_control().parent(page_area).build();
+        let page_1 = gui.create_control().parent(page_area).build(gui);
         let menu = gui
             .create_control()
             .anchors([0.0, 0.0, 0.0, 1.0])
@@ -320,13 +320,13 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .graphic(style.page_painel.clone())
             .layout(VBoxLayout::new(5.0, [5.0, 5.0, 5.0, 5.0], -1))
             .parent(page_1)
-            .build();
+            .build(gui);
         let right_painel = gui
             .create_control()
             .margins([200.0, 0.0, 0.0, 0.0])
             .graphic(style.page_painel.clone())
             .parent(page_1)
-            .build();
+            .build(gui);
         let top_text = {
             let text_box = gui
                 .create_control()
@@ -334,7 +334,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .margins([15.0, 15.0, -15.0, -7.5])
                 .graphic(style.painel.clone().with_color([200, 200, 200, 255].into()))
                 .parent(right_painel)
-                .build();
+                .build(gui);
             let text = "This is a example text. Please, don't mind me. Continue doing what you need to do. If you cannot ignore this text, I don't mind.".to_owned();
             let graphic = Text::new(
                 text,
@@ -351,7 +351,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .anchors([0.0, 0.0, 1.0, 1.0])
                 .graphic(graphic)
                 .parent(text_box)
-                .build()
+                .build(gui)
         };
         let bottom_text = {
             let text_box = gui
@@ -360,7 +360,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .margins([15.0, 7.5, -15.0, -15.0])
                 .graphic(style.painel.clone().with_color([200, 200, 200, 255].into()))
                 .parent(right_painel)
-                .build();
+                .build(gui);
             let text = "This is another example text. Please, also don't mind me. Continue doing what you was doing. If you cannot ignore this text, I don't mind either.".to_owned();
             let graphic = Text::new(
                 text,
@@ -378,7 +378,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .margins([5.0, 5.0, -5.0, -5.0])
                 .graphic(graphic)
                 .parent(text_box)
-                .build();
+                .build(gui);
             text_box
         };
 
@@ -391,7 +391,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
         )
         .min_size([0.0, 30.0])
         .parent(menu)
-        .build();
+        .build(gui);
         // {
         //     let button = gui
         //         .create_control()
@@ -400,7 +400,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
         //         })))
         //         .min_size([0.0, 30.0])
         //         .parent(menu)
-        //         .build();
+        //         .build(gui);
         //     let graphic =
         //         Text::new([40, 40, 100, 255], "My Button".to_owned(), 16.0, (0, 0)).into();
         //     gui.create_control()
@@ -408,7 +408,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
         //         .margins([0.0, 0.0, 0.0, 0.0])
         //         .graphic(graphic)
         //         .parent(button)
-        //         .build();
+        //         .build(gui);
         //     button
         // };
         let _slider = {
@@ -431,21 +431,21 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                         }
                     },
                 ))
-                .build();
+                .build(gui);
             let _slide_area = gui
                 .create_control_reserved(slide_area)
                 .anchors([0.0, 0.5, 1.0, 0.5])
                 .margins([10.0, -3.0, -10.0, 3.0])
                 .graphic(style.painel.clone().with_color([170, 170, 170, 255].into()))
                 .parent(slider)
-                .build();
+                .build(gui);
             let _handle = gui
                 .create_control_reserved(handle)
                 .anchors([0.5, 0.5, 0.5, 0.5])
                 .margins([-3.0, -14.0, 3.0, 14.0])
                 .graphic(style.painel.clone().with_color([200, 200, 200, 255].into()))
                 .parent(slider)
-                .build();
+                .build(gui);
 
             slider
         };
@@ -471,7 +471,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                         }
                     },
                 ))
-                .build();
+                .build(gui);
 
             let background = {
                 let graphic = style.white.clone().with_color([200, 200, 200, 255].into());
@@ -480,7 +480,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     .margins([5.0, -10.0, 25.0, 10.0])
                     .graphic(graphic)
                     .parent(toggle)
-                    .build()
+                    .build(gui)
             };
             let _marker = gui
                 .create_control_reserved(marker)
@@ -488,7 +488,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 // .margins([-9.0, -9.0, 9.0, 9.0])
                 .graphic(style.marker_icon.clone())
                 .parent(background)
-                .build();
+                .build(gui);
 
             let graphic = Text::new(
                 "Bottom Text".to_owned(),
@@ -506,7 +506,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .margins([30.0, 0.0, 0.0, 0.0])
                 .graphic(graphic)
                 .parent(toggle)
-                .build();
+                .build(gui);
 
             toggle
         };
@@ -519,7 +519,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     .behaviour(Blocker::new(move |_, ctx| {
                         ctx.send_event_to(menu, CloseMenu)
                     }))
-                    .build();
+                    .build(gui);
                 let menu = gui
                     .create_control_reserved(menu)
                     .active(false)
@@ -534,7 +534,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                                 .layout(MarginLayout::new([4.0, 4.0, 4.0, 4.0]))
                                 .parent(this)
                                 // .min_size([10.0, 25.0])
-                                .build();
+                                .build(ctx);
                             let _text = ctx
                                 .create_control()
                                 .margins([10.0, 0.0, -10.0, 0.0])
@@ -553,13 +553,13 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                                 )
                                 .layout(FitText)
                                 .parent(id)
-                                .build();
+                                .build(ctx);
                             id
                         }
                     }))
                     .layout(VBoxLayout::new(0.0, [1.0, 1.0, 1.0, 1.0], -1))
                     .min_size([0.0, 80.0])
-                    .build();
+                    .build(gui);
                 menu
             };
 
@@ -583,7 +583,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     },
                     style.button_style.clone(),
                 ))
-                .build();
+                .build(gui);
             let _text = gui
                 .create_control_reserved(text)
                 .margins([10.0, 0.0, -10.0, 0.0])
@@ -601,7 +601,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     .into(),
                 )
                 .parent(my_dropdown)
-                .build();
+                .build(gui);
 
             my_dropdown
         };
@@ -613,7 +613,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .graphic(style.page_painel.clone())
             .parent(page_area)
             .layout(GridLayout::new([10.0, 15.0], [10.0, 10.0, 10.0, 10.0], 3))
-            .build();
+            .build(gui);
 
         let create_vbox = |gui: &mut Gui, expand: [bool; 2], align: i8| {
             gui.create_control()
@@ -622,7 +622,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .expand_y(expand[1])
                 .graphic(style.painel.clone().with_color([100, 100, 100, 255].into()))
                 .layout(VBoxLayout::new(5.0, [0.0, 0.0, 0.0, 0.0], align))
-                .build()
+                .build(gui)
         };
 
         let create_rect = |gui: &mut Gui,
@@ -655,7 +655,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     ),
                 ))
                 .parent(parent)
-                .build();
+                .build(gui);
             let graphic = Text::new(
                 format!("{}x{}", min_size[0], min_size[1]),
                 (0, 0),
@@ -667,7 +667,10 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 },
             )
             .into();
-            gui.create_control().graphic(graphic).parent(rect).build();
+            gui.create_control()
+                .graphic(graphic)
+                .parent(rect)
+                .build(gui);
             rect
         };
 
@@ -825,14 +828,14 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .graphic(style.page_painel.clone())
             .parent(page_area)
             .layout(VBoxLayout::new(5.0, [10.0, 10.0, 10.0, 10.0], -1))
-            .build();
+            .build(gui);
         let list = gui.reserve_id();
         let _input_box = {
             let hbox = gui
                 .create_control()
                 .parent(page_3)
                 .layout(HBoxLayout::new(0.0, Default::default(), -1))
-                .build();
+                .build(gui);
             let _label = gui
                 .create_control()
                 .graphic(
@@ -850,7 +853,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 )
                 .layout(FitText)
                 .parent(hbox)
-                .build();
+                .build(gui);
             let caret = gui.reserve_id();
             let input_text = gui.reserve_id();
             let input_box = gui
@@ -896,13 +899,13 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                         }
                     },
                 ))
-                .build();
+                .build(gui);
             let _caret = gui
                 .create_control_reserved(caret)
                 .anchors([0.0, 0.0, 0.0, 0.0])
                 .graphic(style.white.clone().with_color([0, 0, 0, 255].into()))
                 .parent(input_box)
-                .build();
+                .build(gui);
             let _input_text = gui
                 .create_control_reserved(input_text)
                 .graphic(
@@ -919,7 +922,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     .into(),
                 )
                 .parent(input_box)
-                .build();
+                .build(gui);
             input_box
         };
         let scroll_view = gui.reserve_id();
@@ -928,7 +931,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .graphic(Graphic::None)
             .parent(scroll_view)
             .layout(ViewLayout::new(true, true))
-            .build();
+            .build(gui);
         let h_scroll_bar_handle = gui.reserve_id();
         let h_scroll_bar = gui
             .create_control()
@@ -941,13 +944,13 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 style.button_style.clone(),
             ))
             .parent(scroll_view)
-            .build();
+            .build(gui);
         let h_scroll_bar_handle = gui
             .create_control_reserved(h_scroll_bar_handle)
             .min_size([20.0, 20.0])
             .graphic(style.white.clone().with_color([220, 220, 220, 255].into()))
             .parent(h_scroll_bar)
-            .build();
+            .build(gui);
         let v_scroll_bar_handle = gui.reserve_id();
         let v_scroll_bar = gui
             .create_control()
@@ -960,18 +963,18 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 true,
                 style.button_style.clone(),
             ))
-            .build();
+            .build(gui);
         let v_scroll_bar_handle = gui
             .create_control_reserved(v_scroll_bar_handle)
             .min_size([20.0, 20.0])
             .graphic(style.white.clone().with_color([220, 220, 220, 255].into()))
             .parent(v_scroll_bar)
-            .build();
+            .build(gui);
         let list = gui
             .create_control_reserved(list)
             .layout(VBoxLayout::new(3.0, [5.0, 5.0, 5.0, 5.0], -1))
             .parent(view)
-            .build();
+            .build(gui);
 
         let _scroll_view = gui
             .create_control_reserved(scroll_view)
@@ -984,7 +987,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 Some((h_scroll_bar, h_scroll_bar_handle)),
                 Some((v_scroll_bar, v_scroll_bar_handle)),
             ))
-            .build();
+            .build(gui);
 
         let mut seed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1010,7 +1013,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .create_control()
             .parent(page_area)
             .layout(RatioLayout::new(1.0, (0, 0)))
-            .build();
+            .build(gui);
         let font_texture = 1; // TODO
         let graphic = Texture::new(font_texture, [0.0, 0.0, 1.0, 1.0]).into();
         gui.create_control()
@@ -1041,11 +1044,11 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 ))
             }))
             .parent(page_4)
-            .build();
+            .build(gui);
         page_4
     };
     let page_na = {
-        let page_na = gui.create_control().parent(page_area).build();
+        let page_na = gui.create_control().parent(page_area).build(gui);
         let graphic = Text::new(
             "This tab page is yet not avaliable. In fact, it is not even planned what will have in this page, sorry...".to_owned(),
             (0, -1),
@@ -1059,7 +1062,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .margins([15.0, 15.0, -15.0, -15.0])
             .graphic(graphic)
             .parent(page_na)
-            .build();
+            .build(gui);
         page_na
     };
     let _tabs = {
@@ -1078,7 +1081,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     selected,
                     style.tab_style.clone(),
                 ))
-                .build();
+                .build(gui);
             let graphic = Text::new(
                 label,
                 (0, 0),
@@ -1094,7 +1097,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .graphic(graphic)
                 .parent(button)
                 .layout(FitText)
-                .build();
+                .build(gui);
             button
         };
         create_button(gui, page_1, true, "Random Controls".to_owned());
@@ -1111,14 +1114,14 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .behaviour(widgets::Window::new())
             .layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
             .graphic(style.painel.clone())
-            .build();
+            .build(gui);
         let header = gui
             .create_control()
             .graphic(style.painel.clone().with_color([0, 0, 255, 255].into()))
             .layout(HBoxLayout::new(2.0, [2.0, 2.0, 2.0, 2.0], -1))
             .fill_y(RectFill::ShrinkStart)
             .parent(window)
-            .build();
+            .build(gui);
         let _title = gui
             .create_control()
             .graphic(Graphic::from(Text::new(
@@ -1134,7 +1137,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .layout(FitText)
             .parent(header)
             .expand_x(true)
-            .build();
+            .build(gui);
         let _close_button = gui
             .create_control()
             .behaviour(Button::new(style.close_button, true, move |_this, ctx| {
@@ -1142,20 +1145,20 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             }))
             .parent(header)
             .min_size([20.0, 20.0])
-            .build();
+            .build(gui);
         let content = gui
             .create_control()
             .layout(MarginLayout::new([5.0, 5.0, 5.0, 5.0]))
             .parent(window)
             .expand_y(true)
-            .build();
+            .build(gui);
         let content = gui
             .create_control()
             .behaviour(Blocker::new(|_, _| ()))
             .layout(VBoxLayout::new(15.0, [10.0, 10.0, 10.0, 10.0], -1))
             .parent(content)
             .expand_y(true)
-            .build();
+            .build(gui);
         let _text = gui
             .create_control()
             .graphic(Graphic::from(Text::new(
@@ -1171,7 +1174,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .layout(FitText)
             .parent(content)
             .expand_y(true)
-            .build();
+            .build(gui);
         create_button(
             gui,
             "OK".to_string(),
@@ -1182,7 +1185,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
         .min_size([40.0, 25.0])
         .parent(content)
         .fill_x(RectFill::ShrinkCenter)
-        .build();
+        .build(gui);
         window
     };
 }
@@ -1202,7 +1205,7 @@ fn create_item(
         .graphic(painel.clone().with_color(color))
         .parent(list)
         .layout(HBoxLayout::new(0.0, [5.0, 0.0, 5.0, 0.0], 0))
-        .build();
+        .build(ctx);
     let _text = ctx
         .create_control()
         .parent(item)
@@ -1221,7 +1224,7 @@ fn create_item(
         )
         .layout(FitText)
         .expand_x(true)
-        .build();
+        .build(ctx);
     let _button = ctx
         .create_control()
         .parent(item)
@@ -1232,7 +1235,7 @@ fn create_item(
         .min_size([15.0, 15.0])
         .fill_x(RectFill::ShrinkCenter)
         .fill_y(RectFill::ShrinkCenter)
-        .build();
+        .build(ctx);
 }
 
 fn create_button<F: Fn(Id, &mut Context) + 'static>(
@@ -1244,7 +1247,7 @@ fn create_button<F: Fn(Id, &mut Context) + 'static>(
 ) -> ControlBuilder {
     let button_id: Id = gui.reserve_id();
     gui.create_control_reserved(button_id)
-        .child(|x| {
+        .child(gui, |x, _| {
             // text
             x.graphic(
                 Text::new(

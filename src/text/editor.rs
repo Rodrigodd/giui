@@ -274,8 +274,7 @@ impl TextEditor {
                 .map(|(i, s)| i..i + s.len())
                 .unwrap();
         }
-        text
-            .split_word_bound_indices()
+        text.split_word_bound_indices()
             .find_map(|(i, s)| {
                 let range = i..i + s.len();
                 if range.contains(&byte_index) {

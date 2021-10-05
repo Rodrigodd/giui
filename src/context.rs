@@ -6,8 +6,8 @@ use std::{
 use winit::{event::ModifiersState, window::CursorIcon};
 
 use crate::{
-    control::ControlBuilderInner, event, font::Fonts, graphics::Graphic, ControlBuilder, Controls,
-    Gui, Id, Rect,
+    control::BuilderContext, event, font::Fonts, graphics::Graphic, Control, ControlBuilder,
+    Controls, Gui, Id, Rect,
 };
 
 // contains a reference to all the controls, except the behaviour of one control
@@ -20,6 +20,15 @@ pub struct Context<'a> {
     pub(crate) events_to: Vec<(Id, Box<dyn Any>)>,
     pub(crate) dirtys: Vec<Id>,
     pub(crate) render_dirty: bool,
+}
+impl BuilderContext for Context<'_> {
+    fn controls(&mut self) -> &mut Controls {
+        &mut self.gui.controls
+    }
+    fn build(&mut self, id: Id, control: Control) {
+        self.gui.controls.add_builded_control(id, control);
+        self.send_event(event::StartControl { id });
+    }
 }
 impl<'a> Drop for Context<'a> {
     fn drop(&mut self) {
@@ -88,18 +97,7 @@ impl<'a> Context<'a> {
 
     pub fn create_control(&mut self) -> ControlBuilder {
         let id = self.gui.controls.reserve();
-
-        struct Builder<'a, 'b>(&'b mut Context<'a>);
-        impl ControlBuilderInner for Builder<'_, '_> {
-            fn controls(&mut self) -> &mut Controls {
-                &mut self.0.gui.controls
-            }
-            fn build(&mut self, id: Id) {
-                self.0.send_event(event::CreateControl { id });
-            }
-        }
-
-        ControlBuilder::new(id, Builder(self))
+        ControlBuilder::new(id)
     }
 
     pub fn modifiers(&self) -> ModifiersState {
@@ -394,6 +392,43 @@ pub struct LayoutContext<'a> {
     pub(crate) dirtys: Vec<Id>,
     pub(crate) events: Vec<Box<dyn Any>>,
 }
+impl BuilderContext for LayoutContext<'_> {
+    fn controls(&mut self) -> &mut Controls {
+        &mut self.controls
+    }
+    fn build(&mut self, id: Id, control: Control) {
+        self.events.push(Box::new(event::StartControl { id }));
+        self.controls.add_builded_control(id, control);
+
+        let mut parents = vec![id];
+        // post order traversal
+        let mut i = 0;
+        while i != parents.len() {
+            parents.extend(self.get_active_children(parents[i]).iter().rev());
+            i += 1;
+        }
+        while let Some(parent) = parents.pop() {
+            let mut min_size = {
+                let mut layout = self
+                    .controls()
+                    .get_mut(parent)
+                    .unwrap()
+                    .layout
+                    .take()
+                    .unwrap();
+                let mut ctx = MinSizeContext::new(parent, &mut self.controls, &self.fonts);
+                let min_size = layout.compute_min_size(parent, &mut ctx);
+                self.controls().get_mut(parent).unwrap().layout = Some(layout);
+                min_size
+            };
+            let parent = self.controls.get_mut(parent).unwrap();
+            let user_min_size = parent.rect.user_min_size;
+            min_size[0] = min_size[0].max(user_min_size[0]);
+            min_size[1] = min_size[1].max(user_min_size[1]);
+            parent.rect.min_size = min_size;
+        }
+    }
+}
 impl<'a> LayoutContext<'a> {
     pub(crate) fn new(this: Id, controls: &'a mut Controls, fonts: &'a Fonts) -> Self {
         Self {
@@ -408,46 +443,7 @@ impl<'a> LayoutContext<'a> {
     pub fn create_control(&mut self) -> ControlBuilder {
         let id = self.controls.reserve();
 
-        struct Builder<'a, 'b>(&'b mut LayoutContext<'a>);
-        impl ControlBuilderInner for Builder<'_, '_> {
-            fn controls(&mut self) -> &mut Controls {
-                &mut self.0.controls
-            }
-            fn build(&mut self, id: Id) {
-                self.0.events.push(Box::new(event::CreateControl { id }));
-
-                let mut parents = vec![id];
-                // post order traversal
-                let mut i = 0;
-                while i != parents.len() {
-                    parents.extend(self.0.get_active_children(parents[i]).iter().rev());
-                    i += 1;
-                }
-                while let Some(parent) = parents.pop() {
-                    let mut min_size = {
-                        let mut layout = self
-                            .controls()
-                            .get_mut(parent)
-                            .unwrap()
-                            .layout
-                            .take()
-                            .unwrap();
-                        let mut ctx =
-                            MinSizeContext::new(parent, &mut self.0.controls, &self.0.fonts);
-                        let min_size = layout.compute_min_size(parent, &mut ctx);
-                        self.controls().get_mut(parent).unwrap().layout = Some(layout);
-                        min_size
-                    };
-                    let parent = self.0.controls.get_mut(parent).unwrap();
-                    let user_min_size = parent.rect.user_min_size;
-                    min_size[0] = min_size[0].max(user_min_size[0]);
-                    min_size[1] = min_size[1].max(user_min_size[1]);
-                    parent.rect.min_size = min_size;
-                }
-            }
-        }
-
-        ControlBuilder::new(id, Builder(self))
+        ControlBuilder::new(id)
     }
 
     pub fn set_rect(&mut self, id: Id, rect: [f32; 4]) {

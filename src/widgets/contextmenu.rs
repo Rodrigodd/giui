@@ -33,7 +33,7 @@ impl Behaviour for ContextMenu {
                 ctx.send_event_to(this, CloseMenu)
             }))
             .active(false)
-            .build();
+            .build(ctx);
         self.blocker = Some(blocker);
     }
 
@@ -88,7 +88,7 @@ impl Behaviour for ContextMenu {
                         ))
                         .graphic(self.style.button.normal.clone())
                         .layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
-                        .build();
+                        .build(ctx);
                     self.open = Some(menu);
                     // when 'this' receive the event 'Repos', the 'menu' will already have its size defined.
                     ctx.send_event_to(this, Repos);

@@ -9,7 +9,7 @@ use crui::{
     layouts::MarginLayout,
     style::{OnFocusStyle, SelectionColor, TextFieldStyle},
     widgets::{TextField, TextFieldCallback},
-    Color, ControlBuilder, Gui,
+    BuilderContext, Color, ControlBuilder, Gui,
 };
 use sprite_render::{GLSpriteRender, SpriteRender};
 use winit::event_loop::EventLoop;
@@ -31,9 +31,10 @@ fn main() {
             let surface = gui
                 .create_control()
                 .layout(MarginLayout::new([20.0; 4]))
-                .build();
+                .build(gui);
             text_field(
                 gui.create_control(),
+                gui,
                 "Hello Word!".to_string(),
                 TextFieldStyle {
                     background: OnFocusStyle {
@@ -50,7 +51,7 @@ fn main() {
                 (),
             )
             .parent(surface)
-            .build();
+            .build(gui);
             TextField
         }
     }
@@ -59,14 +60,15 @@ fn main() {
 }
 
 fn text_field<'a, C: TextFieldCallback + 'static>(
-    mut cb: ControlBuilder<'a>,
+    cb: ControlBuilder,
+    ctx: &mut impl BuilderContext,
     initial_value: String,
     style: TextFieldStyle,
     font_id: FontId,
     callback: C,
-) -> ControlBuilder<'a> {
-    let caret = cb.reserve();
-    let input_text = cb.reserve();
+) -> ControlBuilder {
+    let caret = ctx.reserve();
+    let input_text = ctx.reserve();
 
     cb.behaviour(TextField::new(
         caret,
@@ -76,7 +78,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
     ))
     .min_size([0.0, 28.0])
     .expand_y(false)
-    .child_reserved(caret, |cb| {
+    .child_reserved(caret, ctx, |cb, _| {
         cb.anchors([0.0, 0.0, 0.0, 0.0]).graphic(
             style
                 .background
@@ -85,7 +87,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
                 .with_color([0, 0, 0, 255].into()),
         )
     })
-    .child_reserved(input_text, |cb| {
+    .child_reserved(input_text, ctx, |cb, _| {
         cb.graphic(
             Text::new(
                 initial_value,

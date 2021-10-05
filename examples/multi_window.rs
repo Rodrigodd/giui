@@ -318,7 +318,7 @@ fn create_gui(
     let surface = gui
         .create_control()
         .layout(VBoxLayout::new(10.0, [10.0; 4], -1))
-        .build();
+        .build(gui);
 
     let button = gui
         .create_control()
@@ -364,7 +364,7 @@ fn create_gui(
         .fill_x(crui::RectFill::ShrinkCenter)
         .fill_y(crui::RectFill::ShrinkEnd)
         .expand_y(true)
-        .build();
+        .build(gui);
     let _text = gui
         .create_control()
         .graphic(
@@ -382,7 +382,7 @@ fn create_gui(
         )
         .layout(FitText)
         .parent(button)
-        .build();
+        .build(gui);
 
     let button = gui
         .create_control()
@@ -422,7 +422,7 @@ fn create_gui(
         .fill_x(crui::RectFill::ShrinkCenter)
         .fill_y(crui::RectFill::ShrinkStart)
         .expand_y(true)
-        .build();
+        .build(gui);
     let _text = gui
         .create_control()
         .graphic(
@@ -440,5 +440,5 @@ fn create_gui(
         )
         .layout(FitText)
         .parent(button)
-        .build();
+        .build(gui);
 }

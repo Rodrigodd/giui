@@ -77,7 +77,7 @@ fn main() {
     let _text = gui
         .create_control()
         .graphic(Text::from_spanned_string(text, (0, 0)).into())
-        .build();
+        .build(&mut gui);
 
     // resize everthing to the screen size
     resize(

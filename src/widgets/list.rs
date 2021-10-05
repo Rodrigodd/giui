@@ -55,7 +55,7 @@ impl CreatedItem {
     }
 }
 
-pub struct List<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<'a>> {
+pub struct List<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> {
     space: f32,
     margins: [f32; 4],
     content_width: f32,
@@ -77,7 +77,7 @@ pub struct List<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> Cont
     focused: Option<CreatedItem>,
     create_item: F,
 }
-impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<'a>> List<T, F> {
+impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> List<T, F> {
     /// v_scroll must be a descendant of this
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -184,7 +184,9 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 height
             }
             None => {
-                let id = (self.create_item)(&self.items[i], this, ctx.create_control()).build();
+                let id = (self.create_item)(&self.items[i], this, ctx.create_control())
+                    .parent(this)
+                    .build(ctx);
                 // println!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
                 let bottom_margin = if i + 1 == self.items.len() {
@@ -283,7 +285,9 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 y
             }
             None => {
-                let id = (self.create_item)(&self.items[i], this, ctx.create_control()).build();
+                let id = (self.create_item)(&self.items[i], this, ctx.create_control())
+                    .parent(this)
+                    .build(ctx);
                 // println!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
                 let bottom_margin = if i + 1 == self.items.len() {
@@ -379,7 +383,9 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
                 height
             }
             None => {
-                let id = (self.create_item)(&self.items[i], this, ctx.create_control()).build();
+                let id = (self.create_item)(&self.items[i], this, ctx.create_control())
+                    .parent(this)
+                    .build(ctx);
                 // println!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
                 let bottom_margin = if i + 1 == self.items.len() {
@@ -664,7 +670,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
         }
     }
 }
-impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<'a>> Behaviour
+impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Behaviour
     for List<T, F>
 {
     fn on_start(&mut self, _this: Id, ctx: &mut Context) {
@@ -826,9 +832,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<
         }
     }
 }
-impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder<'a>) -> ControlBuilder<'a>> Layout
-    for List<T, F>
-{
+impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Layout for List<T, F> {
     fn compute_min_size(&mut self, _this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let mut min_size = ctx.get_min_size(self.view);
 

@@ -1,10 +1,10 @@
 use crate::{
     context::{Context, LayoutContext, MinSizeContext},
-    control::ControlBuilderInner,
+    control::BuilderContext,
     font::Fonts,
     graphics::Graphic,
     util::WithPriority,
-    ControlBuilder, ControlEntry, Controls, LayoutDirtyFlags, Rect,
+    Control, ControlBuilder, ControlEntry, Controls, LayoutDirtyFlags, Rect,
 };
 use keyed_priority_queue::KeyedPriorityQueue;
 use std::{
@@ -35,7 +35,7 @@ pub mod event {
     pub struct RemoveControl {
         pub id: Id,
     }
-    pub struct CreateControl {
+    pub struct StartControl {
         pub id: Id,
     }
     pub struct SetValue<T>(pub T);
@@ -270,30 +270,30 @@ impl Gui {
     }
 
     /// Create a control with a predetermined id, id that can be obtained by the method reserve_id().
-    pub fn create_control_reserved<'a>(&'a mut self, reserved_id: Id) -> ControlBuilder<'a> {
-        struct Builder<'a>(&'a mut Gui);
-        impl ControlBuilderInner for Builder<'_> {
+    pub fn create_control_reserved(&mut self, reserved_id: Id) -> ControlBuilder {
+        impl BuilderContext for Gui {
             fn controls(&mut self) -> &mut Controls {
-                &mut self.0.controls
+                &mut self.controls
             }
-            fn build(&mut self, id: Id) {
-                self.0.add_control(id);
+            fn build(&mut self, id: Id, control: Control) {
+                self.controls.add_builded_control(id, control);
+                self.start_control(id);
             }
         }
 
-        ControlBuilder::new(reserved_id, Builder(self))
+        ControlBuilder::new(reserved_id)
     }
 
-    fn add_control(&mut self, id: Id) -> Id {
+    fn start_control(&mut self, id: Id) -> Id {
         match std::mem::take(&mut self.controls.controls[id.index()]) {
             ControlEntry::Free { .. } | ControlEntry::Take | ControlEntry::Reserved { .. } => {
                 panic!("A added control should be in building state")
             }
             ControlEntry::Started { control } => {
                 self.controls.controls[id.index()] = ControlEntry::Started { control };
-                println!("double add {}", id)
+                println!("double start {}", id)
             }
-            ControlEntry::Building { control } => {
+            ControlEntry::Builded { mut control } => {
                 println!(
                     "add control {:<10} {}",
                     id.to_string(),
@@ -309,7 +309,12 @@ impl Gui {
                     self.lazy_events.push_back(LazyEvent::OnStart(id));
                 }
 
-                if control.really_active {
+                if control.active
+                    && control.parent.map_or(true, |x| {
+                        self.controls.get(x).map_or(false, |x| x.really_active)
+                    })
+                {
+                    control.really_active = true;
                     debug_assert!(control.active);
                     self.lazy_events.push_back(LazyEvent::OnActive(id));
                 }
@@ -319,7 +324,7 @@ impl Gui {
                 let children = self.controls.get(id).unwrap().children.clone();
                 for child in children {
                     println!("add child {}", child);
-                    self.add_control(child);
+                    self.start_control(child);
                 }
             }
         }
@@ -532,8 +537,8 @@ impl Gui {
             self.over_is_locked = false;
         } else if let Some(event::RequestFocus { id }) = event.downcast_ref() {
             self.set_focus(Some(*id));
-        } else if let Some(event::CreateControl { id }) = event.downcast_ref() {
-            self.add_control(*id);
+        } else if let Some(event::StartControl { id }) = event.downcast_ref() {
+            self.start_control(*id);
         } else if let Some(cursor) = event.downcast_ref::<CursorIcon>() {
             self.change_cursor = Some(*cursor);
         }
@@ -1196,8 +1201,8 @@ impl Gui {
                             parents.extend(self.get_active_children(id).iter().rev());
                             self.controls.remove(id);
                         }
-                    } else if let Some(event::CreateControl { id }) = event.downcast_ref() {
-                        self.add_control(*id);
+                    } else if let Some(event::StartControl { id }) = event.downcast_ref() {
+                        self.start_control(*id);
                     }
                 }
                 for dirty in dirtys {
@@ -1288,8 +1293,8 @@ impl Gui {
                         self.active_control(*id)
                     } else if let Some(event::RemoveControl { id }) = event.downcast_ref() {
                         self.remove_control(*id);
-                    } else if let Some(event::CreateControl { id }) = event.downcast_ref() {
-                        self.add_control(*id);
+                    } else if let Some(event::StartControl { id }) = event.downcast_ref() {
+                        self.start_control(*id);
                     }
                 }
             }
@@ -1339,6 +1344,7 @@ pub trait Layout {
     }
     /// Update the position and size of its children.
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
+        // default implementation use anchor and margins for layouting
         let rect = ctx.get_rect(this);
         let size = [rect[2] - rect[0], rect[3] - rect[1]];
         let pos: [f32; 2] = [rect[0], rect[1]];
