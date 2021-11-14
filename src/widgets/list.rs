@@ -1,3 +1,4 @@
+use crate::BuilderContext;
 use crate::{
     util::cmp_float, widgets::SetScrollPosition, Behaviour, Context, ControlBuilder, Id,
     InputFlags, KeyboardEvent, Layout, LayoutContext, MinSizeContext,
@@ -8,7 +9,7 @@ use winit::event::VirtualKeyCode;
 
 use super::ScrollBar;
 
-pub struct SetList<T>(pub Vec<T>);
+pub struct UpdateItems;
 
 #[derive(Default)]
 pub struct ListViewLayout {
@@ -55,7 +56,20 @@ impl CreatedItem {
     }
 }
 
-pub struct List<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> {
+#[allow(unused_variables)]
+pub trait ListBuilder {
+    fn item_count(&mut self, ctx: &mut dyn BuilderContext) -> usize;
+    fn create_item<'a>(
+        &mut self,
+        index: usize,
+        list_id: Id,
+        cb: ControlBuilder,
+        ctx: &mut dyn BuilderContext,
+    ) -> ControlBuilder;
+    fn update_item(&mut self, index: usize, item_id: Id, ctx: &mut dyn BuilderContext) {}
+}
+
+pub struct List<C: ListBuilder> {
     space: f32,
     margins: [f32; 4],
     content_width: f32,
@@ -71,13 +85,12 @@ pub struct List<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlB
     v_scroll_bar_handle: Id,
     h_scroll_bar: Id,
     h_scroll_bar_handle: Id,
-    items: Vec<T>,
     last_created_items: BTreeMap<usize, CreatedItem>,
     created_items: BTreeMap<usize, CreatedItem>,
     focused: Option<CreatedItem>,
-    create_item: F,
+    builder: C,
 }
-impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> List<T, F> {
+impl<C: ListBuilder> List<C> {
     /// v_scroll must be a descendant of this
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -89,8 +102,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         v_scroll_bar_handle: Id,
         h_scroll_bar: Id,
         h_scroll_bar_handle: Id,
-        items: Vec<T>,
-        create_item: F,
+        builder: C,
     ) -> Self {
         Self {
             // TODO: spacing and margins must be paramenters
@@ -109,18 +121,17 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
             v_scroll_bar_handle,
             h_scroll_bar,
             h_scroll_bar_handle,
-            items,
             focused: None,
             last_created_items: BTreeMap::new(),
             created_items: BTreeMap::new(),
-            create_item,
+            builder,
         }
     }
 
     fn create_item(
         &mut self,
         i: usize,
-        this: Id,
+        list_id: Id,
         y: f32,
         ctx: &mut LayoutContext,
         view_rect: [f32; 4],
@@ -128,9 +139,11 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         if self.focused.as_ref().map_or(false, |x| x.i == i) {
             let x = self.focused.as_mut().unwrap();
             let id = x.id;
+            self.builder.update_item(x.i, id, ctx);
+            ctx.recompute_min_size(id);
             // println!("move focused {}", id);
             let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-            let bottom_margin = if i + 1 == self.items.len() {
+            let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                 self.margins[3]
             } else {
                 self.space
@@ -150,17 +163,19 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
             ctx.move_to_front(id);
             x.y = y - view_rect[1];
             x.height = height;
-            self.created_items.insert(i, x.clone());
             self.last_created_items.remove(&i);
+            self.created_items.insert(i, x.clone());
             return height;
         }
 
         match self.last_created_items.remove(&i) {
             Some(mut x) => {
                 let id = x.id;
+                self.builder.update_item(x.i, id, ctx);
+                ctx.recompute_min_size(id);
                 // println!("move {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() {
+                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
                 } else {
                     self.space
@@ -184,12 +199,14 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
                 height
             }
             None => {
-                let id = (self.create_item)(&self.items[i], this, ctx.create_control())
-                    .parent(this)
+                let id = self
+                    .builder
+                    .create_item(i, list_id, ctx.create_control(), ctx)
+                    .parent(self.view)
                     .build(ctx);
                 // println!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() {
+                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
                 } else {
                     self.space
@@ -216,7 +233,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
     fn create_item_at(
         &mut self,
         start_y: f32,
-        this: Id,
+        list_id: Id,
         ctx: &mut LayoutContext,
         view_rect: [f32; 4],
     ) -> f32 {
@@ -225,9 +242,11 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         if self.focused.as_ref().map_or(false, |x| x.i == i) {
             let x = self.focused.as_mut().unwrap();
             let id = x.id;
+            self.builder.update_item(x.i, id, ctx);
+            ctx.recompute_min_size(id);
             // println!("move focused {}", id);
             let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-            let bottom_margin = if i + 1 == self.items.len() {
+            let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                 self.margins[3]
             } else {
                 self.space
@@ -257,9 +276,11 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         match self.last_created_items.remove(&i) {
             Some(mut x) => {
                 let id = x.id;
+                self.builder.update_item(x.i, id, ctx);
+                ctx.recompute_min_size(id);
                 // println!("move {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() {
+                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
                 } else {
                     self.space
@@ -285,12 +306,14 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
                 y
             }
             None => {
-                let id = (self.create_item)(&self.items[i], this, ctx.create_control())
-                    .parent(this)
+                let id = self
+                    .builder
+                    .create_item(i, list_id, ctx.create_control(), ctx)
+                    .parent(self.view)
                     .build(ctx);
                 // println!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() {
+                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
                 } else {
                     self.space
@@ -319,7 +342,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
     fn create_item_from_bottom(
         &mut self,
         i: usize,
-        this: Id,
+        list_id: Id,
         y: f32,
         ctx: &mut LayoutContext,
         view_rect: [f32; 4],
@@ -327,9 +350,11 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         if self.focused.as_ref().map_or(false, |x| x.i == i) {
             let x = self.focused.as_mut().unwrap();
             let id = x.id;
+            self.builder.update_item(x.i, id, ctx);
+            ctx.recompute_min_size(id);
             // println!("move focused {}", id);
             let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-            let bottom_margin = if i + 1 == self.items.len() {
+            let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                 self.margins[3]
             } else {
                 self.space
@@ -357,9 +382,11 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         match self.last_created_items.remove(&i) {
             Some(mut x) => {
                 let id = x.id;
+                self.builder.update_item(x.i, id, ctx);
+                ctx.recompute_min_size(id);
                 // println!("move {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() {
+                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
                 } else {
                     self.space
@@ -383,12 +410,14 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
                 height
             }
             None => {
-                let id = (self.create_item)(&self.items[i], this, ctx.create_control())
-                    .parent(this)
+                let id = self
+                    .builder
+                    .create_item(i, list_id, ctx.create_control(), ctx)
+                    .parent(self.view)
                     .build(ctx);
                 // println!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.items.len() {
+                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
                 } else {
                     self.space
@@ -415,7 +444,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         }
     }
 
-    fn create_items_from_top(&mut self, view_rect: [f32; 4], this: Id, ctx: &mut LayoutContext) {
+    fn create_items_from_top(&mut self, view_rect: [f32; 4], list_id: Id, ctx: &mut LayoutContext) {
         // println!("create from top!");
 
         self.last_created_items.append(&mut self.created_items);
@@ -430,12 +459,12 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         // create items below, if necessary
         while y < view_rect[3] {
             // there is not enough items to fill the view
-            if i >= self.items.len() {
-                self.end_y = self.items.len() as f32;
+            if i >= self.builder.item_count(ctx) {
+                self.end_y = self.builder.item_count(ctx) as f32;
                 // println!("end at {}", self.end_y);
                 return;
             }
-            height = self.create_item(i, this, y, ctx, view_rect);
+            height = self.create_item(i, list_id, y, ctx, view_rect);
             y += height;
             i += 1;
         }
@@ -457,24 +486,29 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         }
     }
 
-    fn create_items_from_bottom(&mut self, view_rect: [f32; 4], this: Id, ctx: &mut LayoutContext) {
+    fn create_items_from_bottom(
+        &mut self,
+        view_rect: [f32; 4],
+        list_id: Id,
+        ctx: &mut LayoutContext,
+    ) {
         self.last_rect = view_rect;
-        self.end_y = self.items.len() as f32;
+        self.end_y = self.builder.item_count(ctx) as f32;
 
         // println!("create items from_bottom");
 
         self.last_created_items.append(&mut self.created_items);
 
-        let mut i = self.items.len() - 1;
+        let mut i = self.builder.item_count(ctx) - 1;
         let mut y = view_rect[3];
 
         while y > view_rect[1] {
-            let height = self.create_item_from_bottom(i, this, y, ctx, view_rect);
+            let height = self.create_item_from_bottom(i, list_id, y, ctx, view_rect);
             y -= height;
             // if the top item don't fill the view yet, create the items from top
             if i == 0 {
                 if y > view_rect[1] {
-                    return self.create_items_from_top(view_rect, this, ctx);
+                    return self.create_items_from_top(view_rect, list_id, ctx);
                 }
                 break;
             }
@@ -501,35 +535,35 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         &mut self,
         start_y: f32,
         view_rect: [f32; 4],
-        this: Id,
+        list_id: Id,
         ctx: &mut LayoutContext,
     ) {
         if cmp_float(start_y, 0.0) {
-            return self.create_items_from_top(view_rect, this, ctx);
+            return self.create_items_from_top(view_rect, list_id, ctx);
         }
         // println!("create from zero!");
 
         self.start_y = start_y;
         let mut i = self.start_y as usize;
 
-        if i >= self.items.len() {
-            return self.create_items_from_bottom(view_rect, this, ctx);
+        if i >= self.builder.item_count(ctx) {
+            return self.create_items_from_bottom(view_rect, list_id, ctx);
         }
 
-        let mut y = self.create_item_at(start_y, this, ctx, view_rect);
+        let mut y = self.create_item_at(start_y, list_id, ctx, view_rect);
         i += 1;
 
-        if i >= self.items.len() && y < view_rect[3] {
-            return self.create_items_from_bottom(view_rect, this, ctx);
+        if i >= self.builder.item_count(ctx) && y < view_rect[3] {
+            return self.create_items_from_bottom(view_rect, list_id, ctx);
         }
 
         while y < view_rect[3] {
-            let height = self.create_item(i, this, y, ctx, view_rect);
+            let height = self.create_item(i, list_id, y, ctx, view_rect);
             y += height;
             i += 1;
-            if i >= self.items.len() {
+            if i >= self.builder.item_count(ctx) {
                 if y < view_rect[3] {
-                    return self.create_items_from_bottom(view_rect, this, ctx);
+                    return self.create_items_from_bottom(view_rect, list_id, ctx);
                 }
                 break;
             }
@@ -552,7 +586,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         }
     }
 
-    fn create_items(&mut self, view_rect: [f32; 4], this: Id, ctx: &mut LayoutContext) {
+    fn create_items(&mut self, view_rect: [f32; 4], list_id: Id, ctx: &mut LayoutContext) {
         let same_rect = cmp_float(view_rect[0], self.last_rect[0])
             && cmp_float(view_rect[1], self.last_rect[1])
             && cmp_float(view_rect[2], self.last_rect[2])
@@ -562,7 +596,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
             && cmp_float(0.0, self.delta_y)
             && self.set_y.is_none()
             && cmp_float(self.last_delta_x, self.delta_x)
-            && !self.items.is_empty()
+            && self.builder.item_count(ctx) > 0
         {
             return;
         }
@@ -576,9 +610,9 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         self.delta_y = 0.0;
 
         if self.last_created_items.is_empty() {
-            self.create_items_from_top(view_rect, this, ctx);
+            self.create_items_from_top(view_rect, list_id, ctx);
         } else if let Some(y) = self.set_y.take() {
-            self.create_items_from_a_start_y(y, view_rect, this, ctx);
+            self.create_items_from_a_start_y(y, view_rect, list_id, ctx);
         } else {
             if delta_y < 0.0 {
                 // create items above
@@ -587,10 +621,10 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
                 let mut y = start_control.y + view_rect[1] - delta_y;
                 while y > view_rect[1] {
                     if i == 0 {
-                        return self.create_items_from_top(view_rect, this, ctx);
+                        return self.create_items_from_top(view_rect, list_id, ctx);
                     }
                     i -= 1;
-                    let height = self.create_item_from_bottom(i, this, y, ctx, view_rect);
+                    let height = self.create_item_from_bottom(i, list_id, y, ctx, view_rect);
                     y -= height;
                 }
             }
@@ -599,18 +633,18 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
             let start_control = self.last_created_items.get(&i).unwrap();
             let mut y = start_control.y + view_rect[1] - delta_y;
 
-            if i >= self.items.len() && y < view_rect[3] {
-                return self.create_items_from_bottom(view_rect, this, ctx);
+            if i >= self.builder.item_count(ctx) && y < view_rect[3] {
+                return self.create_items_from_bottom(view_rect, list_id, ctx);
             }
 
             // create items below, if necessary
             while y <= view_rect[3] {
-                let height = self.create_item(i, this, y, ctx, view_rect);
+                let height = self.create_item(i, list_id, y, ctx, view_rect);
                 y += height;
                 i += 1;
-                if i >= self.items.len() {
+                if i >= self.builder.item_count(ctx) {
                     if y < view_rect[3] {
-                        return self.create_items_from_bottom(view_rect, this, ctx);
+                        return self.create_items_from_bottom(view_rect, list_id, ctx);
                     }
                     break;
                 }
@@ -670,9 +704,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lis
         }
     }
 }
-impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Behaviour
-    for List<T, F>
-{
+impl<C: ListBuilder> Behaviour for List<C> {
     fn on_start(&mut self, _this: Id, ctx: &mut Context) {
         ctx.move_to_front(self.h_scroll_bar);
         ctx.move_to_front(self.v_scroll_bar);
@@ -722,8 +754,8 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Beh
         // ctx.set_anchor_left(self.h_scroll_bar_handle, start);
         // ctx.set_anchor_right(self.h_scroll_bar_handle, end);
 
-        // let mut start = self.start_y / self.items.len() as f32;
-        // let mut end = (self.end_y / self.items.len() as f32).min(1.0);
+        // let mut start = self.start_y / self.create_item.item_count() as f32;
+        // let mut end = (self.end_y / self.create_item.item_count() as f32).min(1.0);
         // let gap = handle_min_height - (end - start) * view_height;
 
         // if gap > 0.0 {
@@ -741,21 +773,17 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Beh
                 let total_size = self.content_width - ctx.get_size(self.view)[0];
                 self.delta_x = event.value.max(0.0) * total_size;
             } else {
-                let total_size = self.items.len() as f32 - (self.end_y - self.start_y);
+                let total_size = self.builder.item_count(ctx) as f32 - (self.end_y - self.start_y);
                 self.set_y = Some(event.value.max(0.0) * total_size);
                 // println!("set y to {:?}", self.set_y);
             }
             ctx.dirty_layout(self.view);
             ctx.dirty_layout(this);
-        } else if event.is::<SetList<T>>() {
-            self.items = event.downcast::<SetList<T>>().unwrap().0;
-            self.set_y = Some(0.0);
-            for (_, x) in self.created_items.iter() {
-                // println!("remove {}", x.id);
-                ctx.remove(x.id);
-            }
-            self.focused = None;
-            self.created_items.clear();
+        } else if event.is::<UpdateItems>() {
+            // TODO: I add this set_y here, to force a update, but i don't know if this will go
+            // wrong!!
+            println!("update list items");
+            self.set_y = Some(self.start_y);
             ctx.dirty_layout(this);
         }
     }
@@ -771,7 +799,9 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Beh
         }
 
         // if items are all displayed, there is no need for vertical scroll
-        if cmp_float(self.start_y, 0.0) && cmp_float(self.end_y, self.items.len() as f32) {
+        if cmp_float(self.start_y, 0.0)
+            && cmp_float(self.end_y, self.builder.item_count(ctx) as f32)
+        {
             return;
         }
 
@@ -832,7 +862,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Beh
         }
     }
 }
-impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Layout for List<T, F> {
+impl<C: ListBuilder> Layout for List<C> {
     fn compute_min_size(&mut self, _this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let mut min_size = ctx.get_min_size(self.view);
 
@@ -882,7 +912,7 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lay
         }
 
         // layout the items in the view
-        self.create_items(view_rect, self.view, ctx);
+        self.create_items(view_rect, this, ctx);
 
         for (_, x) in self.last_created_items.iter() {
             if self.focused.as_ref().map_or(false, |f| x.id == f.id) {
@@ -907,8 +937,8 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lay
         self.last_created_items.clear();
 
         // if all the items are displayed in the view, there is no need for vertical bar
-        let v_active =
-            !(cmp_float(self.start_y, 0.0) && cmp_float(self.end_y, self.items.len() as f32));
+        let v_active = !(cmp_float(self.start_y, 0.0)
+            && cmp_float(self.end_y, self.builder.item_count(ctx) as f32));
 
         if !v_active {
             v_scroll_bar_size = 0.0;
@@ -990,8 +1020,8 @@ impl<T: 'static, F: for<'a> FnMut(&T, Id, ControlBuilder) -> ControlBuilder> Lay
         if v_active {
             let view_height = view_rect[3] - view_rect[1];
 
-            let start = self.start_y / self.items.len() as f32;
-            let end = (self.end_y / self.items.len() as f32).min(1.0);
+            let start = self.start_y / self.builder.item_count(ctx) as f32;
+            let end = (self.end_y / self.builder.item_count(ctx) as f32).min(1.0);
 
             ScrollBar::set_anchors(ctx, self.v_scroll_bar_handle, true, start, end, view_height);
         }

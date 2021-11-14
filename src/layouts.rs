@@ -120,6 +120,7 @@ impl Layout for RatioLayout {
     }
 }
 
+#[derive(Default)]
 pub struct HBoxLayout {
     spacing: f32,
     margins: [f32; 4],

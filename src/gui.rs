@@ -225,25 +225,33 @@ impl Gui {
     /// Set the value of the type T that is owned by the Gui. Any value set before will be dropped
     /// and replaced.
     pub fn set<T: Any + 'static>(&mut self, value: T) {
-        self.resources.insert(TypeId::of::<T>(), Box::new(value));
+        let v: Box<dyn Any + 'static> = Box::new(value);
+        let type_id = TypeId::of::<T>();
+        self.resources.insert(type_id, v);
     }
 
-    /// Get a reference to the value of type T that is owned by the Gui. If the value was not set
-    /// by Gui::set, this returns None.
+    /// Get a reference to the value of type T that is owned by the Gui.
     /// # Panics
     /// Panics if the value was not set before hand
     pub fn get<T: Any + 'static>(&self) -> &T {
-        self.resources
-            .get(&TypeId::of::<T>())
-            .expect("The type need to be added with Gui::set before hand.")
+        self.get_from_type_id(TypeId::of::<T>())
             .downcast_ref()
             .expect("The type for get<T> must be T")
     }
 
-    /// Get a mutable reference to the value of type T that is owned by the Gui. If the value was
-    /// not set by Gui::set, this returns None.
+    /// Get a reference to the value of type T that is owned by the Gui.
     /// # Panics
-    /// Panics if the value was not set before hand
+    /// Panics if the value was not set beforehand
+    pub fn get_from_type_id(&self, type_id: TypeId) -> &dyn Any {
+        &**self
+            .resources
+            .get(&type_id)
+            .expect("The type need to be added with Gui::set beforehand")
+    }
+
+    /// Get a mutable reference to the value of type T that is owned by the Gui.
+    /// # Panics
+    /// Panics if the value was not set beforehand
     pub fn get_mut<T: Any + 'static>(&mut self) -> &mut T {
         self.resources
             .get_mut(&TypeId::of::<T>())
@@ -272,9 +280,20 @@ impl Gui {
     /// Create a control with a predetermined id, id that can be obtained by the method reserve_id().
     pub fn create_control_reserved(&mut self, reserved_id: Id) -> ControlBuilder {
         impl BuilderContext for Gui {
-            fn controls(&mut self) -> &mut Controls {
+            fn get_from_type_id(&self, type_id: TypeId) -> &dyn Any {
+                self.get_from_type_id(type_id)
+            }
+            fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
+                self.get_graphic(id).unwrap()
+            }
+            fn controls(&self) -> &Controls {
+                &self.controls
+            }
+
+            fn controls_mut(&mut self) -> &mut Controls {
                 &mut self.controls
             }
+
             fn build(&mut self, id: Id, control: Control) {
                 self.controls.add_builded_control(id, control);
                 self.start_control(id);
@@ -1152,7 +1171,12 @@ impl Gui {
             {
                 let (events, dirtys) = {
                     let mut layout = self.controls.get_mut(id).unwrap().layout.take().unwrap();
-                    let mut ctx = LayoutContext::new(id, &mut self.controls, &self.fonts);
+                    let mut ctx = LayoutContext::new(
+                        id,
+                        &mut self.controls,
+                        &mut self.resources,
+                        &self.fonts,
+                    );
                     layout.update_layouts(id, &mut ctx);
                     let LayoutContext { events, dirtys, .. } = ctx;
                     self.controls.get_mut(id).unwrap().layout = Some(layout);
@@ -1279,7 +1303,12 @@ impl Gui {
                         .layout
                         .take()
                         .unwrap();
-                    let mut ctx = LayoutContext::new(parent, &mut self.controls, &self.fonts);
+                    let mut ctx = LayoutContext::new(
+                        parent,
+                        &mut self.controls,
+                        &mut self.resources,
+                        &self.fonts,
+                    );
                     layout.update_layouts(parent, &mut ctx);
                     let LayoutContext { events, dirtys, .. } = ctx;
                     self.controls.get_mut(parent).unwrap().layout = Some(layout);

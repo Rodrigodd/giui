@@ -1,22 +1,51 @@
+use std::any::{Any, TypeId};
 use std::cell::RefCell;
 use std::{num::NonZeroU32, rc::Rc};
 
 use crate::{graphics::Graphic, Behaviour, Id, Layout, Rect, RectFill};
 
 pub trait BuilderContext {
+    /// Get a reference to the value of type T that is owned by the Gui.
+    /// # Panics
+    /// Panics if the value was not set before hand
+    fn get_from_type_id(&self, type_id: TypeId) -> &dyn Any;
+
     fn create_control(&mut self) -> ControlBuilder {
-        let id = self.controls().reserve();
+        let id = self.controls_mut().reserve();
         self.create_control_reserved(id)
     }
+
     fn create_control_reserved(&mut self, id: Id) -> ControlBuilder {
         ControlBuilder::new(id)
     }
-    fn controls(&mut self) -> &mut Controls;
-    fn build(&mut self, id: Id, control: Control);
+
     fn reserve(&mut self) -> Id {
-        self.controls().reserve()
+        self.controls_mut().reserve()
+    }
+
+    fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic;
+
+    fn get_active_children(&self, id: Id) -> Vec<Id> {
+        self.controls().get_active_children(id).unwrap()
+    }
+
+    #[doc(hidden)]
+    fn controls(&self) -> &Controls;
+    #[doc(hidden)]
+    fn controls_mut(&mut self) -> &mut Controls;
+    #[doc(hidden)]
+    fn build(&mut self, id: Id, control: Control);
+}
+impl<'a> dyn BuilderContext + 'a {
+    /// Get a reference to the value of type T that is owned by the Gui.
+    /// # Panics
+    /// Panics if the value was not set before hand
+    pub fn get<T: Any + 'static>(&self) -> &T {
+        let value = self.get_from_type_id(TypeId::of::<T>());
+        value.downcast_ref::<T>().unwrap()
     }
 }
+
 pub struct ControlBuilder {
     id: Id,
     control: Control,
@@ -106,7 +135,7 @@ impl ControlBuilder {
     where
         F: FnOnce(ControlBuilder, &mut dyn BuilderContext) -> ControlBuilder,
     {
-        let id = ctx.controls().reserve();
+        let id = ctx.controls_mut().reserve();
         self.child_reserved(id, ctx, create_child)
     }
 
@@ -119,32 +148,42 @@ impl ControlBuilder {
         {
             struct ChildBuilderContext<'a>(&'a mut Controls);
             impl BuilderContext for ChildBuilderContext<'_> {
-                fn controls(&mut self) -> &mut Controls {
+                fn controls(&self) -> &Controls {
+                    self.0
+                }
+                fn controls_mut(&mut self) -> &mut Controls {
                     self.0
                 }
                 fn build(&mut self, id: Id, control: Control) {
                     self.0.add_builded_control(id, control);
                 }
+
+                fn get_graphic_mut(&mut self, _: Id) -> &mut Graphic {
+                    unimplemented!()
+                }
+
+                fn get_from_type_id(&self, _: TypeId) -> &dyn Any {
+                    unimplemented!()
+                }
             }
-            let mut ctx = ChildBuilderContext(ctx.controls());
             let child_builder = ControlBuilder::new(id);
-            (create_child)(child_builder, &mut ctx)
+            (create_child)(child_builder, ctx)
                 .parent(parent)
-                .build(&mut ctx);
+                .build(&mut ChildBuilderContext(ctx.controls_mut()));
         }
 
         self
     }
 
-    pub fn build(mut self, ctx: &mut impl BuilderContext) -> Id {
+    pub fn build(mut self, ctx: &mut (impl BuilderContext + ?Sized)) -> Id {
         // append childs that was created with this control as parent, by using the reserved Id.
-        match &mut ctx.controls().controls[self.id.index()] {
+        match &mut ctx.controls_mut().controls[self.id.index()] {
             ControlEntry::Reserved { children, .. } => self.control.children.append(children),
             _ => unreachable!(),
         }
 
         if let Some(parent) = self.control.parent {
-            match &mut ctx.controls().controls[parent.index()] {
+            match &mut ctx.controls_mut().controls[parent.index()] {
                 ControlEntry::Reserved { children, .. } => {
                     children.push(self.id);
                 }
@@ -156,7 +195,7 @@ impl ControlBuilder {
         } else {
             // The ROOT_ID is always in Started state.
             self.control.parent = Some(Id::ROOT_ID);
-            ctx.controls()
+            ctx.controls_mut()
                 .get_mut(Id::ROOT_ID)
                 .unwrap()
                 .add_child(self.id);

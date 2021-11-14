@@ -1,5 +1,6 @@
 use std::{
     any::{Any, TypeId},
+    collections::HashMap,
     time::Instant,
 };
 
@@ -22,9 +23,20 @@ pub struct Context<'a> {
     pub(crate) render_dirty: bool,
 }
 impl BuilderContext for Context<'_> {
-    fn controls(&mut self) -> &mut Controls {
+    fn get_from_type_id(&self, type_id: TypeId) -> &dyn Any {
+        self.gui.get_from_type_id(type_id)
+    }
+    fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
+        self.get_graphic_mut(id)
+    }
+    fn controls(&self) -> &Controls {
+        &self.gui.controls
+    }
+
+    fn controls_mut(&mut self) -> &mut Controls {
         &mut self.gui.controls
     }
+
     fn build(&mut self, id: Id, control: Control) {
         self.gui.controls.add_builded_control(id, control);
         self.send_event(event::StartControl { id });
@@ -244,6 +256,8 @@ impl<'a> Context<'a> {
 
     pub fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
         self.render_dirty = true;
+        let control = self.gui.controls.get_mut(id).unwrap();
+        control.rect.dirty_render_dirty_flags();
         &mut self.gui.controls.get_mut(id).unwrap().graphic
     }
 
@@ -388,18 +402,104 @@ impl<'a> MinSizeContext<'a> {
 pub struct LayoutContext<'a> {
     this: Id,
     controls: &'a mut Controls,
+    resources: &'a mut HashMap<TypeId, Box<dyn Any>>,
     fonts: &'a Fonts,
     pub(crate) dirtys: Vec<Id>,
     pub(crate) events: Vec<Box<dyn Any>>,
 }
 impl BuilderContext for LayoutContext<'_> {
-    fn controls(&mut self) -> &mut Controls {
-        &mut self.controls
+    fn get_from_type_id(&self, type_id: TypeId) -> &dyn Any {
+        let value = self
+            .resources
+            .get(&type_id)
+            .expect("The type need to be added with Gui::set before hand.");
+        &**value
     }
+    fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
+        let control = self.controls.get_mut(id).unwrap();
+        control.rect.dirty_render_dirty_flags();
+        &mut self.controls.get_mut(id).unwrap().graphic
+    }
+    fn controls(&self) -> &Controls {
+        self.controls
+    }
+
+    fn controls_mut(&mut self) -> &mut Controls {
+        self.controls
+    }
+
     fn build(&mut self, id: Id, control: Control) {
         self.events.push(Box::new(event::StartControl { id }));
         self.controls.add_builded_control(id, control);
 
+        // when a control is created during layout, the min_size need to be immediately
+        // computed
+        if self
+            .controls
+            .get(id)
+            .and_then(|x| x.parent)
+            .map_or(false, |x| {
+                self.controls.get(x).map_or(false, |x| x.really_active)
+            })
+        {
+            self.recompute_min_size(id);
+        }
+    }
+}
+impl<'a> LayoutContext<'a> {
+    pub(crate) fn new(
+        this: Id,
+        controls: &'a mut Controls,
+        resources: &'a mut HashMap<TypeId, Box<dyn Any>>,
+        fonts: &'a Fonts,
+    ) -> Self {
+        Self {
+            this,
+            controls,
+            resources,
+            fonts,
+            dirtys: Vec::new(),
+            events: Vec::new(),
+        }
+    }
+
+    /// Set the value of the type T that is owned by the Gui. Any value set before will be dropped
+    /// and replaced.
+    pub fn set<T: Any + 'static>(&mut self, value: T) {
+        self.resources.insert(TypeId::of::<T>(), Box::new(value));
+    }
+
+    /// Get a reference to the value of type T that is owned by the Gui.
+    /// # Panics
+    /// Panics if the value was not set before hand
+    pub fn get<T: Any + 'static>(&self) -> &T {
+        self.resources
+            .get(&TypeId::of::<T>())
+            .expect("The type need to be added with Gui::set before hand.")
+            .downcast_ref()
+            .expect("The type for get<T> must be T")
+    }
+
+    /// Get a mutable reference to the value of type T that is owned by the Gui.
+    /// # Panics
+    /// Panics if the value was not set before hand
+    pub fn get_mut<T: Any + 'static>(&mut self) -> &mut T {
+        self.resources
+            .get_mut(&TypeId::of::<T>())
+            .expect("The type need to be added with Gui::set before hand.")
+            .downcast_mut()
+            .expect("The type for get<T> must be T")
+    }
+
+    pub fn create_control(&mut self) -> ControlBuilder {
+        let id = self.controls.reserve();
+
+        ControlBuilder::new(id)
+    }
+
+    /// Recompute the layout of a control, and all of its children. This is need when modifing a
+    /// control during layout.
+    pub fn recompute_min_size(&mut self, id: Id) {
         let mut parents = vec![id];
         // post order traversal
         let mut i = 0;
@@ -410,7 +510,7 @@ impl BuilderContext for LayoutContext<'_> {
         while let Some(parent) = parents.pop() {
             let mut min_size = {
                 let mut layout = self
-                    .controls()
+                    .controls_mut()
                     .get_mut(parent)
                     .unwrap()
                     .layout
@@ -418,7 +518,7 @@ impl BuilderContext for LayoutContext<'_> {
                     .unwrap();
                 let mut ctx = MinSizeContext::new(parent, &mut self.controls, &self.fonts);
                 let min_size = layout.compute_min_size(parent, &mut ctx);
-                self.controls().get_mut(parent).unwrap().layout = Some(layout);
+                self.controls_mut().get_mut(parent).unwrap().layout = Some(layout);
                 min_size
             };
             let parent = self.controls.get_mut(parent).unwrap();
@@ -427,23 +527,6 @@ impl BuilderContext for LayoutContext<'_> {
             min_size[1] = min_size[1].max(user_min_size[1]);
             parent.rect.min_size = min_size;
         }
-    }
-}
-impl<'a> LayoutContext<'a> {
-    pub(crate) fn new(this: Id, controls: &'a mut Controls, fonts: &'a Fonts) -> Self {
-        Self {
-            this,
-            controls,
-            fonts,
-            dirtys: Vec::new(),
-            events: Vec::new(),
-        }
-    }
-
-    pub fn create_control(&mut self) -> ControlBuilder {
-        let id = self.controls.reserve();
-
-        ControlBuilder::new(id)
     }
 
     pub fn set_rect(&mut self, id: Id, rect: [f32; 4]) {
