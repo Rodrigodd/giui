@@ -310,10 +310,10 @@ impl Gui {
             }
             ControlEntry::Started { control } => {
                 self.controls.controls[id.index()] = ControlEntry::Started { control };
-                println!("double start {}", id)
+                log::trace!("double start {}", id)
             }
             ControlEntry::Builded { mut control } => {
-                println!(
+                log::trace!(
                     "add control {:<10} {}",
                     id.to_string(),
                     control
@@ -342,7 +342,7 @@ impl Gui {
 
                 let children = self.controls.get(id).unwrap().children.clone();
                 for child in children {
-                    println!("add child {}", child);
+                    log::trace!("add child {}", child);
                     self.start_control(child);
                 }
             }
@@ -380,7 +380,7 @@ impl Gui {
             while let Some(id) = parents.pop() {
                 parents.extend(self.get_active_children(id).iter().rev());
                 self.controls.get_mut(id).unwrap().really_active = true;
-                println!("really_active = true for {}", id);
+                log::trace!("really_active = true for {}", id);
                 // If there was already a deactive event queued, we cancel it
                 if let Some(i) = self
                     .lazy_events
@@ -436,7 +436,7 @@ impl Gui {
                     self.set_focus(None);
                 }
                 self.controls.get_mut(id).unwrap().really_active = false;
-                println!("really_active = false for {}", id);
+                log::trace!("really_active = false for {}", id);
                 // If there was already a active event queued, we cancel it
                 if let Some(i) = self
                     .lazy_events
@@ -651,29 +651,6 @@ impl Gui {
         }
     }
 
-    pub fn start(&mut self) {
-        self.update_all_layouts();
-        fn print_tree(branchs: String, id: Id, gui: &mut Gui) {
-            let childs = gui.controls.get_active_children(id).unwrap();
-            let len = childs.len();
-            for (i, child) in childs.iter().enumerate() {
-                println!(
-                    "{}{}━━{}",
-                    branchs,
-                    if i + 1 == len { "┗" } else { "┣" },
-                    child
-                );
-                if i + 1 == len {
-                    print_tree(branchs.clone() + "   ", *child, gui)
-                } else {
-                    print_tree(branchs.clone() + "┃  ", *child, gui)
-                };
-            }
-        }
-        println!("{:?}", Id::ROOT_ID);
-        print_tree("".into(), Id::ROOT_ID, self);
-    }
-
     pub fn handle_event(&mut self, event: &WindowEvent) {
         self.lazy_update();
         match event {
@@ -800,7 +777,7 @@ impl Gui {
     }
 
     pub fn set_focus(&mut self, id: Option<Id>) {
-        println!(
+        log::trace!(
             "set focus to {}",
             id.map(|x| x.to_string())
                 .unwrap_or_else(|| "None".to_string())
@@ -961,19 +938,19 @@ impl Gui {
                 match event {
                     LazyEvent::OnStart(id) => {
                         if self.controls.get(id).is_none() {
-                            println!("starting {}, but already removed", id);
+                            log::info!("starting {}, but already removed", id);
                             continue;
                         }
                         // TODO: on_start must receive a context that do not exposure the broke layout
-                        println!("starting {}", id);
+                        log::trace!("starting {}", id);
                         self.call_event_no_lazy(id, |this, id, ctx| this.on_start(id, ctx));
                     }
                     LazyEvent::OnRemove(id) => {
                         if self.controls.get(id).is_none() {
-                            println!("removing {}, but already removed", id);
+                            log::info!("removing {}, but already removed", id);
                             continue;
                         }
-                        println!("removing {}", id);
+                        log::trace!("removing {}", id);
 
                         if self.controls.get(id).unwrap().active {
                             // only deactive if it is not the ROOT_ID
@@ -1024,7 +1001,7 @@ impl Gui {
                                 self.current_focus = None;
                             }
 
-                            println!("remove {}", id);
+                            log::trace!("remove {}", id);
                             if self.controls.get(id).unwrap().really_active {
                                 self.update_layout(); // TODO: remotion is quadradic?
                                 self.call_event_no_lazy(id, |this, id, ctx| {
@@ -1049,7 +1026,7 @@ impl Gui {
                     }
                     LazyEvent::OnActive(id) => {
                         if self.controls.get(id).is_none() {
-                            println!("activing {}, but already removed", id);
+                            log::info!("activing {}, but already removed", id);
                             continue;
                         }
                         debug_assert!(
@@ -1068,14 +1045,14 @@ impl Gui {
                             continue;
                         }
 
-                        println!("activing {}", id);
+                        log::trace!("activing {}", id);
                         self.call_event_no_lazy(id, |this, id, ctx| this.on_active(id, ctx));
 
                         let mut tree = self.controls.get_active_children(id).unwrap();
                         tree.reverse();
                         while let Some(id) = tree.pop() {
                             if !self.controls.get(id).unwrap().really_active {
-                                println!("active {}", id);
+                                log::trace!("active {}", id);
                                 tree.extend(
                                     self.controls.get_active_children(id).unwrap().iter().rev(),
                                 );
@@ -1088,7 +1065,7 @@ impl Gui {
                     }
                     LazyEvent::OnDeactive(id) => {
                         if self.controls.get(id).is_none() {
-                            println!("deactiving {}, but already removed", id);
+                            log::info!("deactiving {}, but already removed", id);
                             continue;
                         }
                         debug_assert!(
@@ -1101,7 +1078,7 @@ impl Gui {
                         if !self.controls.get(id).unwrap().really_active {
                             continue;
                         }
-                        println!("deactiving {}", id);
+                        log::trace!("deactiving {}", id);
                         self.call_event_no_lazy(id, |this, id, ctx| this.on_deactive(id, ctx));
                     }
                 }
@@ -1112,13 +1089,13 @@ impl Gui {
             if self.lazy_events.is_empty() {
                 break;
             }
-            println!("lopping!");
+            log::trace!("lazy update is lopping");
         }
     }
 
     pub fn update_layout(&mut self) {
         if !self.dirty_layouts.is_empty() {
-            println!("updating layout for {}", self.dirty_layouts.len());
+            log::trace!("updating layout for {}", self.dirty_layouts.len());
             self.dirty_layouts.clear();
             self.update_all_layouts();
         }

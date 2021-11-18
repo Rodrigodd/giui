@@ -73,12 +73,19 @@ pub struct List<C: ListBuilder> {
     space: f32,
     margins: [f32; 4],
     content_width: f32,
+    /// The amount of horizontal scroll in pixels.
     delta_x: f32,
-    delta_y: f32,
+    /// The amount of horizontal scroll in the last layout.
     last_delta_x: f32,
+    /// The amount of vertical scroll, between 0 and 1, for the next layout
     set_y: Option<f32>,
+    /// The variation of vertical scroll, in items, for the next layout
+    delta_y: f32,
+    /// The position of the top of the view, in items
     start_y: f32,
+    /// The position of the bottom of the view, in items
     end_y: f32,
+    /// The rect for the view, in the last layout
     last_rect: [f32; 4],
     view: Id,
     v_scroll_bar: Id,
@@ -141,7 +148,7 @@ impl<C: ListBuilder> List<C> {
             let id = x.id;
             self.builder.update_item(x.i, id, ctx);
             ctx.recompute_min_size(id);
-            // println!("move focused {}", id);
+            // log::trace!("move focused {}", id);
             let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
             let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                 self.margins[3]
@@ -173,7 +180,7 @@ impl<C: ListBuilder> List<C> {
                 let id = x.id;
                 self.builder.update_item(x.i, id, ctx);
                 ctx.recompute_min_size(id);
-                // println!("move {}", id);
+                // log::trace!("move {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
                 let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
@@ -204,7 +211,7 @@ impl<C: ListBuilder> List<C> {
                     .create_item(i, list_id, ctx.create_control(), ctx)
                     .parent(self.view)
                     .build(ctx);
-                // println!("create {}", id);
+                // log::trace!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
                 let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
@@ -244,7 +251,7 @@ impl<C: ListBuilder> List<C> {
             let id = x.id;
             self.builder.update_item(x.i, id, ctx);
             ctx.recompute_min_size(id);
-            // println!("move focused {}", id);
+            // log::trace!("move focused {}", id);
             let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
             let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                 self.margins[3]
@@ -278,7 +285,7 @@ impl<C: ListBuilder> List<C> {
                 let id = x.id;
                 self.builder.update_item(x.i, id, ctx);
                 ctx.recompute_min_size(id);
-                // println!("move {}", id);
+                // log::trace!("move {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
                 let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
@@ -311,7 +318,7 @@ impl<C: ListBuilder> List<C> {
                     .create_item(i, list_id, ctx.create_control(), ctx)
                     .parent(self.view)
                     .build(ctx);
-                // println!("create {}", id);
+                // log::trace!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
                 let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
@@ -352,7 +359,7 @@ impl<C: ListBuilder> List<C> {
             let id = x.id;
             self.builder.update_item(x.i, id, ctx);
             ctx.recompute_min_size(id);
-            // println!("move focused {}", id);
+            // log::trace!("move focused {}", id);
             let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
             let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                 self.margins[3]
@@ -384,7 +391,7 @@ impl<C: ListBuilder> List<C> {
                 let id = x.id;
                 self.builder.update_item(x.i, id, ctx);
                 ctx.recompute_min_size(id);
-                // println!("move {}", id);
+                // log::trace!("move {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
                 let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
@@ -415,7 +422,7 @@ impl<C: ListBuilder> List<C> {
                     .create_item(i, list_id, ctx.create_control(), ctx)
                     .parent(self.view)
                     .build(ctx);
-                // println!("create {}", id);
+                // log::trace!("create {}", id);
                 let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
                 let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
                     self.margins[3]
@@ -445,7 +452,7 @@ impl<C: ListBuilder> List<C> {
     }
 
     fn create_items_from_top(&mut self, view_rect: [f32; 4], list_id: Id, ctx: &mut LayoutContext) {
-        // println!("create from top!");
+        // log::trace!("create from top!");
 
         self.last_created_items.append(&mut self.created_items);
 
@@ -461,7 +468,7 @@ impl<C: ListBuilder> List<C> {
             // there is not enough items to fill the view
             if i >= self.builder.item_count(ctx) {
                 self.end_y = self.builder.item_count(ctx) as f32;
-                // println!("end at {}", self.end_y);
+                // log::trace!("end at {}", self.end_y);
                 return;
             }
             height = self.create_item(i, list_id, y, ctx, view_rect);
@@ -482,7 +489,7 @@ impl<C: ListBuilder> List<C> {
                 last.y
             );
             self.end_y = last.i as f32 + gap;
-            // println!("end at {}", self.end_y);
+            // log::trace!("end at {}", self.end_y);
         }
     }
 
@@ -495,7 +502,7 @@ impl<C: ListBuilder> List<C> {
         self.last_rect = view_rect;
         self.end_y = self.builder.item_count(ctx) as f32;
 
-        // println!("create items from_bottom");
+        // log::trace!("create items from_bottom");
 
         self.last_created_items.append(&mut self.created_items);
 
@@ -541,7 +548,7 @@ impl<C: ListBuilder> List<C> {
         if cmp_float(start_y, 0.0) {
             return self.create_items_from_top(view_rect, list_id, ctx);
         }
-        // println!("create from zero!");
+        // log::trace!("create from zero!");
 
         self.start_y = start_y;
         let mut i = self.start_y as usize;
@@ -582,7 +589,7 @@ impl<C: ListBuilder> List<C> {
                 last.y
             );
             self.end_y = last.i as f32 + gap;
-            // println!("end at {}", self.end_y);
+            // log::trace!("end at {}", self.end_y);
         }
     }
 
@@ -591,7 +598,7 @@ impl<C: ListBuilder> List<C> {
             && cmp_float(view_rect[1], self.last_rect[1])
             && cmp_float(view_rect[2], self.last_rect[2])
             && cmp_float(view_rect[3], self.last_rect[3]);
-        // println!("delta_y: {}", self.delta_y);
+        // log::trace!("delta_y: {}", self.delta_y);
         if same_rect
             && cmp_float(0.0, self.delta_y)
             && self.set_y.is_none()
@@ -699,8 +706,8 @@ impl<C: ListBuilder> List<C> {
                 gap = gap.clamp(0.0, 1.0 - f32::EPSILON);
                 self.end_y = last.i as f32 + gap;
             }
-            // println!("start at {}", self.start_y);
-            // println!("end at {}", self.end_y);
+            // log::trace!("start at {}", self.start_y);
+            // log::trace!("end at {}", self.end_y);
         }
     }
 }
@@ -775,14 +782,14 @@ impl<C: ListBuilder> Behaviour for List<C> {
             } else {
                 let total_size = self.builder.item_count(ctx) as f32 - (self.end_y - self.start_y);
                 self.set_y = Some(event.value.max(0.0) * total_size);
-                // println!("set y to {:?}", self.set_y);
+                // log::trace!("set y to {:?}", self.set_y);
             }
             ctx.dirty_layout(self.view);
             ctx.dirty_layout(this);
         } else if event.is::<UpdateItems>() {
             // TODO: I add this set_y here, to force a update, but i don't know if this will go
             // wrong!!
-            println!("update list items");
+            log::trace!("update list items");
             self.set_y = Some(self.start_y);
             ctx.dirty_layout(this);
         }
@@ -917,7 +924,7 @@ impl<C: ListBuilder> Layout for List<C> {
         for (_, x) in self.last_created_items.iter() {
             if self.focused.as_ref().map_or(false, |f| x.id == f.id) {
                 // hide the focused outside of the view
-                // println!("hide focused {}", x.id);
+                // log::trace!("hide focused {}", x.id);
                 ctx.set_designed_rect(
                     x.id,
                     [
@@ -930,7 +937,7 @@ impl<C: ListBuilder> Layout for List<C> {
                     ],
                 );
             } else {
-                // println!("remove {}", x.id);
+                // log::trace!("remove {}", x.id);
                 ctx.remove(x.id);
             }
         }

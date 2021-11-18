@@ -358,10 +358,10 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
         let text_layout = self.get_layout(ctx);
         match event {
             KeyboardEvent::Char(ch) => {
-                println!("insert {}", ch);
+                log::trace!("insert {}", ch);
                 self.editor
                     .insert_text(ch.encode_utf8(&mut [0; 4]), fonts, text_layout);
-                println!("text: {}", self.text(ctx));
+                log::trace!("text: {}", self.text(ctx));
                 self.update_text(this, ctx);
                 let text = self.text(ctx).to_owned();
                 self.callback.on_change(this, ctx, &text);

@@ -7,7 +7,9 @@ use std::{any::Any, rc::Rc};
 use winit::event::VirtualKeyCode;
 
 pub struct SetScrollPosition {
+    /// If true, it is setting the vertical scroll. Otherwise the horizontal.
     pub vertical: bool,
+    /// A value between 0 and 1. 0 means at the top, 1 means at the bottom.
     pub value: f32,
 }
 
