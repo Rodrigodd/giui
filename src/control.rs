@@ -78,10 +78,12 @@ impl ControlBuilder {
         self
     }
     pub fn min_width(mut self, min_width: f32) -> Self {
+        self.control.rect.user_min_size[0] = min_width;
         self.control.rect.min_size[0] = min_width;
         self
     }
     pub fn min_height(mut self, min_height: f32) -> Self {
+        self.control.rect.user_min_size[1] = min_height;
         self.control.rect.min_size[1] = min_height;
         self
     }
