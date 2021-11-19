@@ -1,3 +1,5 @@
+// TODO: chace multiple call for builder.item_count()
+
 use crate::BuilderContext;
 use crate::{
     util::cmp_float, widgets::SetScrollPosition, Behaviour, Context, ControlBuilder, Id,
@@ -463,11 +465,13 @@ impl<C: ListBuilder> List<C> {
         let mut height;
         let mut y = view_rect[1];
 
+        let item_count = self.builder.item_count(ctx);
+
         // create items below, if necessary
-        while y < view_rect[3] {
+        while y <= view_rect[3] {
             // there is not enough items to fill the view
-            if i >= self.builder.item_count(ctx) {
-                self.end_y = self.builder.item_count(ctx) as f32;
+            if i >= item_count {
+                self.end_y = item_count as f32;
                 // log::trace!("end at {}", self.end_y);
                 return;
             }
