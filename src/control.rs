@@ -379,7 +379,7 @@ impl Controls {
     pub fn add_builded_control(&mut self, id: Id, control: Control) {
         match &mut self.controls[id.index()] {
             ControlEntry::Free { .. } | ControlEntry::Take | ControlEntry::Builded { .. } => {
-                panic!("start a control while not in reserved state")
+                panic!("added a control while not in reserved state")
             }
             ControlEntry::Reserved { generation, .. } => {
                 assert_eq!(control.generation, *generation);

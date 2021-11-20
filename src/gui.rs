@@ -305,14 +305,35 @@ impl Gui {
 
     fn start_control(&mut self, id: Id) -> Id {
         match std::mem::take(&mut self.controls.controls[id.index()]) {
+            ControlEntry::Take => {
+                panic!("Added a taken control?");
+            }
             ControlEntry::Free { .. } | ControlEntry::Take | ControlEntry::Reserved { .. } => {
                 panic!("A added control should be in building state")
             }
             ControlEntry::Started { control } => {
+                // This happens when the child is builded before its parent, the parent is
+                // a reserved id.
+
+                //return the taken control
                 self.controls.controls[id.index()] = ControlEntry::Started { control };
+
                 log::trace!("double start {}", id)
             }
             ControlEntry::Builded { mut control } => {
+                if self
+                    .controls
+                    .controls
+                    .get(control.parent.unwrap().index())
+                    .map_or(false, |x| !matches!(x, ControlEntry::Started { .. }))
+                {
+                    log::trace!("delayed start of {}, parent don't started yet", id);
+
+                    //return the taken control
+                    self.controls.controls[id.index()] = ControlEntry::Builded { control };
+
+                    return id;
+                }
                 log::trace!(
                     "add control {:<10} {}",
                     id.to_string(),
@@ -333,6 +354,7 @@ impl Gui {
                         self.controls.get(x).map_or(false, |x| x.really_active)
                     })
                 {
+                    log::trace!("really active {}", id);
                     control.really_active = true;
                     debug_assert!(control.active);
                     self.lazy_events.push_back(LazyEvent::OnActive(id));
@@ -375,12 +397,13 @@ impl Gui {
             })
             .unwrap_or(true)
         {
+            log::trace!("really active {}", id);
             self.controls.get_mut(id).unwrap().really_active = true;
             let mut parents = vec![id];
             while let Some(id) = parents.pop() {
                 parents.extend(self.get_active_children(id).iter().rev());
+                log::trace!("really active {}", id);
                 self.controls.get_mut(id).unwrap().really_active = true;
-                log::trace!("really_active = true for {}", id);
                 // If there was already a deactive event queued, we cancel it
                 if let Some(i) = self
                     .lazy_events
@@ -435,8 +458,8 @@ impl Gui {
                 if Some(id) == self.current_focus {
                     self.set_focus(None);
                 }
+                log::trace!("really deactive {}", id);
                 self.controls.get_mut(id).unwrap().really_active = false;
-                log::trace!("really_active = false for {}", id);
                 // If there was already a active event queued, we cancel it
                 if let Some(i) = self
                     .lazy_events
@@ -1056,6 +1079,7 @@ impl Gui {
                                 tree.extend(
                                     self.controls.get_active_children(id).unwrap().iter().rev(),
                                 );
+                                log::trace!("really active {}", id);
                                 self.controls.get_mut(id).unwrap().really_active = true;
                                 self.call_event_no_lazy(id, |this, id, ctx| {
                                     this.on_active(id, ctx)

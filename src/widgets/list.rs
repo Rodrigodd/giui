@@ -220,6 +220,7 @@ impl<C: ListBuilder> List<C> {
                 } else {
                     self.space
                 };
+                assert!(ctx.get_min_size(id)[1] != 0.0);
                 let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
                 ctx.set_designed_rect(
                     id,
