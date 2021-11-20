@@ -1,4 +1,4 @@
-// TODO: chace multiple call for builder.item_count()
+// TODO: call just once builder.item_count() per layout
 
 use crate::BuilderContext;
 use crate::{
@@ -60,7 +60,16 @@ impl CreatedItem {
 
 #[allow(unused_variables)]
 pub trait ListBuilder {
+    /// This receive any event sent to the list control that was not handled.
+    fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {}
+
+    /// The amount of items in the list. This can change dynamically.
     fn item_count(&mut self, ctx: &mut dyn BuilderContext) -> usize;
+
+    /// Used to build the control of the item.
+    ///
+    /// The given ControlBuilder will have the list view set as parent. Any other created control
+    /// should have the given ControlBuilder as its ancestor.
     fn create_item<'a>(
         &mut self,
         index: usize,
@@ -68,6 +77,8 @@ pub trait ListBuilder {
         cb: ControlBuilder,
         ctx: &mut dyn BuilderContext,
     ) -> ControlBuilder;
+
+    /// Used to update a previouly builded control of a item.
     fn update_item(&mut self, index: usize, item_id: Id, ctx: &mut dyn BuilderContext) {}
 }
 
@@ -797,6 +808,8 @@ impl<C: ListBuilder> Behaviour for List<C> {
             log::trace!("update list items");
             self.set_y = Some(self.start_y);
             ctx.dirty_layout(this);
+        } else {
+            self.builder.on_event(event, this, ctx)
         }
     }
 
