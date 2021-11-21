@@ -295,7 +295,7 @@ impl TextLayout {
             .shape_spans
             .last()
             .map_or(text.default.font_size, |x| x.font_size);
-        text.string.push_str(" ");
+        text.string.push_str("\n");
         text.shape_spans.push(ShapeSpan {
             byte_range: len..len + 1,
             font_size: last_font_size,
@@ -352,7 +352,7 @@ impl TextLayout {
     }
 
     /// Return the x y position, in pixels, of the caret when positioned at the given byte index.
-    /// Returns None if it is out of bounds. Notice that a extra glyph is add at the end of the
+    /// Returns None if it is out of bounds. Notice that there is a extra glyph the end of the
     /// represented text, which represents the position of caret for byte_index == text.len().
     pub fn pixel_position_from_byte_index(&self, byte_index: usize) -> Option<[f32; 2]> {
         if self.glyphs.is_empty() {

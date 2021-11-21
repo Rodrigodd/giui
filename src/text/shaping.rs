@@ -13,8 +13,11 @@ pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPo
         let height = extends.ascender - extends.descender;
         style.font_size / height as f32
     };
+
+    let cleanup_text = text.replace(|x: char| x.is_control(), " ");
+    debug_assert_eq!(cleanup_text.len(), text.len());
     // let scale = style.px / ppem;
-    let buffer = UnicodeBuffer::new().add_str(text);
+    let buffer = UnicodeBuffer::new().add_str(&cleanup_text);
     let output = hb_shape(&font, buffer, &[]);
 
     let positions = output.get_glyph_positions();
