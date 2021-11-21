@@ -580,7 +580,7 @@ impl<C: ListBuilder> List<C> {
             return self.create_items_from_bottom(view_rect, list_id, ctx);
         }
 
-        while y < view_rect[3] {
+        while y <= view_rect[3] {
             let height = self.create_item(i, list_id, y, ctx, view_rect);
             y += height;
             i += 1;
