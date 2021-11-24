@@ -778,7 +778,7 @@ impl LineLayout {
             .as_scaled(shape.font_size);
 
         self.height = self.height.max(font.height());
-        self.line_gap = self.height.max(font.line_gap());
+        self.line_gap = self.line_gap.max(font.line_gap());
 
         let current_line = match self.lines.last_mut() {
             Some(last) => {
