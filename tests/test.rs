@@ -2,12 +2,12 @@ use std::sync::Mutex;
 
 use crui::Gui;
 
-use log::{Level, Metadata, Record};
+use log::{Metadata, Record};
 
 struct SimpleLogger(Mutex<Vec<String>>);
 
 impl log::Log for SimpleLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
+    fn enabled(&self, _metadata: &Metadata) -> bool {
         true
     }
 

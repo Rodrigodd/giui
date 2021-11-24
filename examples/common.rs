@@ -48,6 +48,7 @@ fn main() {
 pub struct MyFonts {
     pub notosans: FontId,
     pub consolas: FontId,
+    pub white_texture: u32,
 }
 
 fn resize(
@@ -101,6 +102,7 @@ pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -
             "../examples/NotoSans-Regular.ttf"
         ))),
         consolas: fonts.add(Font::new(include_bytes!("../examples/cour.ttf"))),
+        white_texture,
     };
 
     // create the gui, and the gui_render
