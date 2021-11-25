@@ -12,6 +12,7 @@ members = ["./crui-derive"]
 [features]
 
 # serde = ["serde", "ron"]
+simple_shaping = []
 
 [dependencies]
 

@@ -1,9 +1,10 @@
 use crate::Color;
 use crate::{font::Fonts, text::layout::GlyphPosition, text::ShapeSpan};
 
-use ab_glyph::{point, Glyph, GlyphId};
+use ab_glyph::{point, Glyph, GlyphId, Font as _, ScaleFont as _};
 use harfbuzz_rs::{shape as hb_shape, Face, Font as HbFont, UnicodeBuffer};
 
+#[cfg(not(feature = "simple_shaping"))]
 pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPosition> {
     let bytes = &fonts.get(style.font_id).unwrap().data;
     let face = Face::from_bytes(bytes, 0);
@@ -81,5 +82,61 @@ pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPo
         }
     }
 
+    glyphs
+}
+
+
+#[cfg(feature = "simple_shaping")]
+pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPosition> {
+    let font = fonts
+        .get(style.font_id)
+        .expect("FontId is out of bounds")
+        .as_scaled(style.font_size);
+
+    let mut glyphs: Vec<GlyphPosition> = Vec::new();
+    let mut x = 0.0;
+    for (byte_offset, mut c) in text.char_indices() {
+        if c.is_control() {
+            c = ' ';
+        }
+        let is_whitespace = c.is_whitespace();
+        let mut font = font;
+        let mut glyph = font.scaled_glyph(c);
+        if glyph.id.0 == 0 {
+            while let Some(fallback) = font.font.fallback {
+                font = fonts.get(fallback).unwrap().as_scaled(style.font_size);
+                glyph = font.scaled_glyph(c);
+                if glyph.id.0 != 0 {
+                    break;
+                }
+            }
+        }
+
+        let mut advance = font.h_advance(glyph.id);
+        if !glyphs.is_empty() {
+            let last = glyphs.last_mut().unwrap();
+            last.width += font.kern(last.glyph.id, glyph.id);
+        }
+
+        // if c.is_whitespace() {
+        //     glyph.id = font.glyph_id('·');
+        // }
+
+        glyphs.push(GlyphPosition {
+            // glyph,
+            glyph: Glyph {
+                id: glyph.id,
+                scale: glyph.scale,
+                position: point(x, 0.0),
+            },
+            font_id: font.font.id(),
+            byte_range: byte_offset..byte_offset + c.len_utf8(),
+            width: advance,
+            color: Color::WHITE,
+            is_whitespace,
+        });
+
+	x += advance;
+    }
     glyphs
 }
