@@ -300,7 +300,7 @@ impl Gui {
             }
         }
 
-        ControlBuilder::new(reserved_id)
+        ControlBuilder::new(self, reserved_id)
     }
 
     fn start_control(&mut self, id: Id) -> Id {

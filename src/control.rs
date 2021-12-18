@@ -15,8 +15,10 @@ pub trait BuilderContext {
         self.create_control_reserved(id)
     }
 
+    /// Create a new ControlBuilder, that build a Control with the given Id. The given Id must be a
+    /// reserved Id, with no other control already build with this Id.
     fn create_control_reserved(&mut self, id: Id) -> ControlBuilder {
-        ControlBuilder::new(id)
+        ControlBuilder::new(self, id)
     }
 
     fn reserve(&mut self) -> Id {
@@ -53,7 +55,11 @@ pub struct ControlBuilder {
 impl ControlBuilder {
     /// Create a new ControlBuilder, that build a Control with the given Id. The given Id must be a
     /// reserved Id, with no other control already build with this Id.
-    pub(crate) fn new(id: Id) -> Self {
+    pub(crate) fn new(ctx: &mut (impl BuilderContext + ?Sized), id: Id) -> Self {
+        if let ControlEntry::Reserved { .. } = &mut ctx.controls_mut().controls[id.index()] {
+        } else {
+            panic!("Tried to create a control without a reserved Id")
+        }
         let mut control = Control::new(id.generation);
         control.active = true;
         Self { id, control }
@@ -168,7 +174,7 @@ impl ControlBuilder {
                     unimplemented!()
                 }
             }
-            let child_builder = ControlBuilder::new(id);
+            let child_builder = ControlBuilder::new(ctx, id);
             (create_child)(child_builder, ctx)
                 .parent(parent)
                 .build(&mut ChildBuilderContext(ctx.controls_mut()));

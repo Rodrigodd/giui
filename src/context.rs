@@ -109,7 +109,7 @@ impl<'a> Context<'a> {
 
     pub fn create_control(&mut self) -> ControlBuilder {
         let id = self.gui.controls.reserve();
-        ControlBuilder::new(id)
+        ControlBuilder::new(self, id)
     }
 
     pub fn modifiers(&self) -> ModifiersState {
@@ -494,7 +494,7 @@ impl<'a> LayoutContext<'a> {
     pub fn create_control(&mut self) -> ControlBuilder {
         let id = self.controls.reserve();
 
-        ControlBuilder::new(id)
+        ControlBuilder::new(self, id)
     }
 
     /// Recompute the layout of a control, and all of its children. This is need when modifing a
