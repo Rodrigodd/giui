@@ -800,6 +800,7 @@ impl Gui {
     }
 
     pub fn set_focus(&mut self, id: Option<Id>) {
+        self.lazy_update();
         log::trace!(
             "set focus to {}",
             id.map(|x| x.to_string())
@@ -818,6 +819,7 @@ impl Gui {
                 let mut curr = Some(prev);
                 if curr != lca {
                     while let Some(id) = curr {
+                        log::trace!("unfocus {}", id.to_string());
                         self.call_event(id, |this, id, ctx| this.on_focus_change(false, id, ctx));
                         self.controls.get_mut(id).unwrap().focus = false;
                         curr = self.get_parent(id);
@@ -830,6 +832,7 @@ impl Gui {
                 // call on_focus_change(true, ...) for all control with focus
                 let mut curr = Some(next);
                 while let Some(id) = curr {
+                    log::trace!("focus {}", id.to_string());
                     self.call_event(id, |this, id, ctx| this.on_focus_change(true, id, ctx));
                     self.controls.get_mut(id).unwrap().focus = true;
                     curr = self.get_parent(id);
@@ -839,6 +842,7 @@ impl Gui {
                 self.current_focus = None;
                 let mut curr = Some(prev);
                 while let Some(id) = curr {
+                    log::trace!("unfocus {}", id.to_string());
                     self.call_event(id, |this, id, ctx| this.on_focus_change(false, id, ctx));
                     self.controls.get_mut(id).unwrap().focus = false;
                     curr = self.get_parent(id);
@@ -848,6 +852,7 @@ impl Gui {
                 self.current_focus = Some(next);
                 let mut curr = self.current_focus;
                 while let Some(id) = curr {
+                    log::trace!("focus {}", id.to_string());
                     self.call_event(id, |this, id, ctx| this.on_focus_change(true, id, ctx));
                     self.controls.get_mut(id).unwrap().focus = true;
                     curr = self.get_parent(id);
