@@ -272,7 +272,7 @@ impl TextEditor {
                 .rev()
                 .next()
                 .map(|(i, s)| i..i + s.len())
-                .unwrap();
+                .unwrap(); // TODO: this is panicing
         }
         text.split_word_bound_indices()
             .find_map(|(i, s)| {

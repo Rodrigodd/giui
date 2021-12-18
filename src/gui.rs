@@ -308,7 +308,7 @@ impl Gui {
             ControlEntry::Take => {
                 panic!("Added a taken control?");
             }
-            ControlEntry::Free { .. } | ControlEntry::Take | ControlEntry::Reserved { .. } => {
+            ControlEntry::Free { .. } | ControlEntry::Reserved { .. } => {
                 panic!("A added control should be in building state")
             }
             ControlEntry::Started { control } => {
