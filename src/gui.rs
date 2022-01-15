@@ -567,6 +567,7 @@ impl Gui {
     }
 
     pub fn send_event(&mut self, event: Box<dyn Any>) {
+        log::trace!("send_event");
         if let Some(event::ActiveControl { id }) = event.downcast_ref() {
             self.active_control(*id);
         } else if let Some(event::DeactiveControl { id }) = event.downcast_ref() {
@@ -1026,6 +1027,7 @@ impl Gui {
                                     self.controls.get_mut(id).unwrap().focus = false;
                                     curr = self.get_parent(id);
                                 }
+                                log::trace!("set focus to None, on remove");
                                 self.current_focus = None;
                             }
 
