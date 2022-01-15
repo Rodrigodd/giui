@@ -367,7 +367,21 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 self.callback.on_change(this, ctx, &text);
             }
             KeyboardEvent::Pressed(key_code) => match key_code {
-                VirtualKeyCode::Tab => return false, // allow change focus with tab
+                // TODO: find a better way to escape non text events. (Maybe wait for the new winit
+                // Keyboard input model, issue #753 on winit repo).
+                VirtualKeyCode::Tab
+                | VirtualKeyCode::F1
+                | VirtualKeyCode::F2
+                | VirtualKeyCode::F3
+                | VirtualKeyCode::F4
+                | VirtualKeyCode::F5
+                | VirtualKeyCode::F6
+                | VirtualKeyCode::F7
+                | VirtualKeyCode::F8
+                | VirtualKeyCode::F9
+                | VirtualKeyCode::F10
+                | VirtualKeyCode::F11
+                | VirtualKeyCode::F12 => return false,
                 VirtualKeyCode::C | VirtualKeyCode::X => {
                     if modifiers.ctrl() {
                         let range = self.editor.selection_range();
