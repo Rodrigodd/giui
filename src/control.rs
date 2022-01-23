@@ -27,6 +27,10 @@ pub trait BuilderContext {
 
     fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic;
 
+    fn get_all_children(&self, id: Id) -> &[Id] {
+        self.controls().get_all_children(id).unwrap()
+    }
+
     fn get_active_children(&self, id: Id) -> Vec<Id> {
         self.controls().get_active_children(id).unwrap()
     }
@@ -443,6 +447,10 @@ impl Controls {
             curr = parent;
         }
         false
+    }
+
+    pub fn get_all_children(&self, id: Id) -> Option<&[Id]> {
+        Some(&self.get(id)?.children)
     }
 
     pub fn get_active_children(&self, id: Id) -> Option<Vec<Id>> {

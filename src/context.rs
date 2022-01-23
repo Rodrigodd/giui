@@ -326,6 +326,11 @@ impl<'a> Context<'a> {
         self.gui.controls.get(id).unwrap().parent
     }
 
+    /// Get both active and deactive children
+    pub fn get_all_children(&self, id: Id) -> &[Id] {
+        self.gui.controls.get_all_children(id).unwrap()
+    }
+
     pub fn get_active_children(&self, id: Id) -> Vec<Id> {
         self.gui.controls.get_active_children(id).unwrap()
     }
@@ -393,6 +398,10 @@ impl<'a> MinSizeContext<'a> {
     // pub fn get_parent(&self, id: Id) -> Option<Id> {
     //     self.controls.get(id).unwrap().parent
     // }
+
+    pub fn get_all_children(&self, id: Id) -> &[Id] {
+        self.controls.get_all_children(id).unwrap()
+    }
 
     pub fn get_active_children(&self, id: Id) -> Vec<Id> {
         self.controls.get_active_children(id).unwrap()
@@ -668,6 +677,10 @@ impl<'a> LayoutContext<'a> {
 
     pub fn get_parent(&self, id: Id) -> Option<Id> {
         self.controls.get(id).unwrap().parent
+    }
+
+    pub fn get_all_children(&self, id: Id) -> &[Id] {
+        self.controls.get_all_children(id).unwrap()
     }
 
     pub fn get_active_children(&self, id: Id) -> Vec<Id> {

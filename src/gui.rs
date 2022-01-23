@@ -264,6 +264,10 @@ impl Gui {
         self.controls.get(id).and_then(|x| x.parent)
     }
 
+    fn get_all_children(&self, id: Id) -> &[Id] {
+        self.controls.get_all_children(id).unwrap()
+    }
+
     fn get_active_children(&self, id: Id) -> Vec<Id> {
         self.controls.get_active_children(id).unwrap()
     }
