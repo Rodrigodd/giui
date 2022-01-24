@@ -9,7 +9,7 @@ use crate::text::SpannedString;
 use crate::util::cmp_range;
 use crate::Color;
 
-use super::{ShapeSpan, InnerSpan, Span};
+use super::{InnerSpan, ShapeSpan, Span};
 
 #[cfg(test)]
 mod test {
@@ -330,7 +330,10 @@ impl TextLayout {
     /// Return the with of the layouted text, that is the width of biggest line, ignoring the last
     /// whitespace glyph of each line
     pub fn width(&self) -> f32 {
-        self.lines.iter().map(|x| x.visible_width(&self.glyphs)).fold(f32::NAN, f32::max)
+        self.lines
+            .iter()
+            .map(|x| x.visible_width(&self.glyphs))
+            .fold(f32::NAN, f32::max)
     }
 
     /// Return the height of the layouted text, from the top of the first line to the bottom of the
@@ -348,14 +351,20 @@ impl TextLayout {
         let width = self.width();
         match self.settings.horizontal_align {
             Alignment::Start => bounds[2] = width,
-            Alignment::Center => { bounds[0] = -width/2.0; bounds[2] = width/2.0; }
+            Alignment::Center => {
+                bounds[0] = -width / 2.0;
+                bounds[2] = width / 2.0;
+            }
             Alignment::End => bounds[0] = -width,
         }
 
         let height = self.height();
         match self.settings.vertical_align {
             Alignment::Start => bounds[3] = height,
-            Alignment::Center => { bounds[1] = -height/2.0; bounds[3] = height/2.0; }
+            Alignment::Center => {
+                bounds[1] = -height / 2.0;
+                bounds[3] = height / 2.0;
+            }
             Alignment::End => bounds[1] = -height,
         }
 
@@ -401,10 +410,10 @@ impl TextLayout {
         Some(pos)
     }
 
-    /// Return the index of the line that contains the given y_position, in pixels, or the closest
-    /// one. If y is above the first line, return 0. If y is below the last line, return the last
-    /// line index.
-    pub fn line_from_y_position(&self, y_position: f32) -> usize {
+    /// Return the index of the line that contains the given y_position, in pixels, wrapped in
+    /// [`Result::Ok`],  or the closest one wrapped in [`Result::Err`]. If y is above the first
+    /// line, return Err(0). If y is below the last line, return the last line index, inside a Err.
+    pub fn line_from_y_position(&self, y_position: f32) -> Result<usize, usize> {
         let l = self.lines.binary_search_by(|l| {
             if l.y - l.ascent > y_position {
                 Ordering::Greater
@@ -415,16 +424,21 @@ impl TextLayout {
             }
         });
         match l {
-            Ok(i) => i,
-            Err(0) => 0,
-            Err(x) if x == self.lines.len() => self.lines.len() - 1,
-            _ => unreachable!(),
+            Ok(i) => Ok(i),
+            Err(0) => Err(0),
+            Err(x) if x == self.lines.len() => Err(self.lines.len() - 1),
+            _ => unreachable!("This is unreachable, as long as there is no gap beetween lines"),
         }
     }
 
-    /// Return the byte index for the caret located at the given line and horizontal position in
-    /// pixels. This is rounded to the closest possible caret position.
-    pub fn byte_index_from_x_position(&self, line_index: usize, x_position: f32) -> usize {
+    /// Return the byte index for the caret in the given line, located closest to the given
+    /// horizontal position, in pixels. Return Ok(byte_index) if the position is contained in the
+    /// text, and Err(byte_index)  otherwise.
+    pub fn byte_index_from_x_position(
+        &self,
+        line_index: usize,
+        x_position: f32,
+    ) -> Result<usize, usize> {
         let line = self.lines.get(line_index).unwrap();
         // if it is the last line, add 1 to the glyph_range to account the extra glyph
         let glyph_range = if line_index == self.lines.len() - 1 {
@@ -454,20 +468,30 @@ impl TextLayout {
                 } else {
                     i
                 };
-                glyphs[i].byte_range.start
+                Ok(glyphs[i].byte_range.start)
             }
-            Err(0) => line.byte_range.start,
-            Err(i) if i == glyphs.len() => glyphs.last().unwrap().byte_range.start,
-            _ => unreachable!(),
+            Err(0) => Err(line.byte_range.start),
+            Err(i) if i == glyphs.len() => Err(glyphs.last().unwrap().byte_range.start),
+            _ => unreachable!("Unreachable, as long as there is no gap beetween glyphs"),
         }
     }
 
-    /// Return the byte index for the caret located closest to the given vertical and horizontal
-    /// position, in pixels.
-    pub fn byte_index_from_position(&self, x: f32, y: f32) -> usize {
+    /// Return the byte index for the closest caret to the given horizontal
+    /// position, in the closest line to the given vertical position. Position is in pixels. Return
+    /// Ok(index) if the position is over the text, and Err(index) if it is outside.
+    pub fn byte_index_from_position(&self, x: f32, y: f32) -> Result<usize, usize> {
         let line = self.line_from_y_position(y);
-        let index = self.byte_index_from_x_position(line, x);
-        index
+        let index = self.byte_index_from_x_position(line.unwrap_or_else(|x| x), x);
+        match index {
+            Ok(x) => {
+                if line.is_ok() {
+                    Ok(x)
+                } else {
+                    Err(x)
+                }
+            }
+            Err(x) => Err(x),
+        }
     }
 
     /// Removes the specified range in the string, and replaces it with the given string. This
@@ -562,9 +586,7 @@ impl TextLayout {
         let mut span_start = 0;
         let mut lines = Vec::new();
         for next_break in mandatory_breaks.into_iter() {
-            let shape_spans = self
-                .text
-                .get_shape_spans();
+            let shape_spans = self.text.get_shape_spans();
             let span_end = shape_spans
                 .iter()
                 .skip(span_start)

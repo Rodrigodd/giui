@@ -1,7 +1,12 @@
 mod common;
 use common::{CruiEventLoop, MyFonts};
 
-use crui::{Color, Gui, RectFill, graphics::{Text, TextStyle, Texture}, layouts::{FitText, MarginLayout}, text::{Span, SpannedString}};
+use crui::{
+    graphics::{Text, TextStyle, Texture},
+    layouts::{FitText, MarginLayout},
+    text::{Span, SpannedString},
+    Color, Gui, RectFill,
+};
 use sprite_render::GLSpriteRender;
 use winit::event_loop::EventLoop;
 
@@ -22,7 +27,6 @@ impl CruiEventLoop<()> for App {
         fonts: MyFonts,
         _event_loop: &EventLoop<()>,
     ) -> Self {
-
         let pangram = "\
 In A Large New Kingdom,
 Brawny Gods In Crazy
@@ -45,10 +49,25 @@ Jump Over The Yacht.";
         spanned_text.add_span(find(pangram, "Huge"), Span::FontSize(38.0));
         spanned_text.add_span(find(pangram, "Quick"), Span::FontSize(10.0));
 
-        spanned_text.add_span(find(pangram, "A Unique\nZebra"), Span::Selection { fg: None, bg: [0, 255, 0, 255].into()});
-        spanned_text.add_span(find(pangram, "When Quick Red"), Span::Selection { fg: Some([0,0,255,255].into()), bg: [255, 0, 0, 255].into()});
+        spanned_text.add_span(
+            find(pangram, "A Unique\nZebra"),
+            Span::Selection {
+                fg: None,
+                bg: [0, 255, 0, 255].into(),
+            },
+        );
+        spanned_text.add_span(
+            find(pangram, "When Quick Red"),
+            Span::Selection {
+                fg: Some([0, 0, 255, 255].into()),
+                bg: [255, 0, 0, 255].into(),
+            },
+        );
 
-        spanned_text.add_span(find(pangram, "ique\nZebra Whe"), Span::Color([255, 255, 0, 255].into()));
+        spanned_text.add_span(
+            find(pangram, "ique\nZebra Whe"),
+            Span::Color([255, 255, 0, 255].into()),
+        );
         let text = Text::from_spanned_string(spanned_text, (0, 0));
 
         // populate the gui with controls.

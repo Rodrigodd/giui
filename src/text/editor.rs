@@ -387,8 +387,9 @@ impl TextEditor {
             // if move to a out of bounds line, go to the end of the text.
             ByteIndex(lines.last().unwrap().byte_range.end - 1)
         } else {
-            let index =
-                text_layout.byte_index_from_x_position(target as usize, self.selection.cursor_x);
+            let index = text_layout
+                .byte_index_from_x_position(target as usize, self.selection.cursor_x)
+                .unwrap_or_else(|x| x);
             ByteIndex(index)
         };
 

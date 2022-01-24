@@ -268,7 +268,9 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
             }
             MouseEvent::Down(Left) => {
                 let x = mouse.pos[0] - anchor_x;
-                let byte_index = text_layout.byte_index_from_position(x, 0.0);
+                let byte_index = text_layout
+                    .byte_index_from_position(x, 0.0)
+                    .unwrap_or_else(|x| x);
                 if byte_index == self.drag_start {
                     match mouse.click_count {
                         0 => unreachable!(),
@@ -310,14 +312,18 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 0 => {}
                 1 => {
                     let x = mouse.pos[0] - anchor_x;
-                    let byte_index = text_layout.byte_index_from_position(x, 0.0);
+                    let byte_index = text_layout
+                        .byte_index_from_position(x, 0.0)
+                        .unwrap_or_else(|x| x);
                     self.editor
                         .move_cursor_to_byte_index(byte_index, true, text_layout);
                     self.update_carret(this, ctx, true);
                 }
                 2..=u8::MAX => {
                     let x = mouse.pos[0] - anchor_x;
-                    let byte_index = text_layout.byte_index_from_position(x, 0.0);
+                    let byte_index = text_layout
+                        .byte_index_from_position(x, 0.0)
+                        .unwrap_or_else(|x| x);
                     self.editor
                         .select_words_at_byte_range(self.drag_start..byte_index, text_layout);
                     self.update_carret(this, ctx, true);

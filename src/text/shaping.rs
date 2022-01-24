@@ -1,7 +1,7 @@
 use crate::Color;
 use crate::{font::Fonts, text::layout::GlyphPosition, text::ShapeSpan};
 
-use ab_glyph::{point, Glyph, GlyphId, Font as _, ScaleFont as _};
+use ab_glyph::{point, Font as _, Glyph, GlyphId, ScaleFont as _};
 use harfbuzz_rs::{shape as hb_shape, Face, Font as HbFont, UnicodeBuffer};
 
 #[cfg(not(feature = "simple_shaping"))]
@@ -85,7 +85,6 @@ pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPo
     glyphs
 }
 
-
 #[cfg(feature = "simple_shaping")]
 pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPosition> {
     let font = fonts
@@ -136,7 +135,7 @@ pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPo
             is_whitespace,
         });
 
-	x += advance;
+        x += advance;
     }
     glyphs
 }
