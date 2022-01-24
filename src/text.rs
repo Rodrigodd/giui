@@ -31,7 +31,7 @@ mod test {
         spanned.add_span( 2..5, Span::FontId(c),);
         let default = ShapeSpan { byte_range: 0..0, font_size: 16.0, font_id: FontId::new(0) };
         assert_eq!(
-            spanned.shape_spans,
+            spanned.get_shape_spans(),
             vec![
                 ShapeSpan { byte_range: 0..1, ..default.clone() },
                 ShapeSpan { byte_range: 1..2, font_id: b, ..default.clone() },
@@ -42,7 +42,7 @@ mod test {
         );
         spanned.replace_range(3..7, "");
         assert_eq!(
-            spanned.shape_spans,
+            spanned.get_shape_spans(),
             vec![
                 ShapeSpan { byte_range: 0..1, ..default.clone() },
                 ShapeSpan { byte_range: 1..2, font_id: b, ..default.clone() },
@@ -54,7 +54,7 @@ mod test {
         spanned.replace_range(3..3, "aaa");
         assert_eq!(spanned.string, "012aaa78");
         assert_eq!(
-            spanned.shape_spans,
+            spanned.get_shape_spans(),
             vec![
                 ShapeSpan { byte_range: 0..1, ..default.clone() },
                 ShapeSpan { byte_range: 1..2, font_id: b, ..default.clone() },
@@ -69,7 +69,7 @@ mod test {
         let mut spanned = SpannedString::from_string("Hel".into(), Default::default());
         spanned.replace_range(1..2, "");
         assert_eq!(
-            spanned.shape_spans,
+            spanned.get_shape_spans(),
             vec![ShapeSpan {
                 byte_range: 0..2,
                 font_size: 16.0,
@@ -84,7 +84,7 @@ mod test {
         spanned.add_span(8..11, Span::FontSize(0.1));
         spanned.replace_range(8..11, "_");
         assert_eq!(
-            spanned.shape_spans,
+            spanned.get_shape_spans(),
             vec![ShapeSpan {
                 byte_range: 0..10,
                 font_size: 16.0,
@@ -98,7 +98,7 @@ mod test {
         let mut spanned = SpannedString::from_string("012".into(), Default::default());
         spanned.replace_range(1..1, "_");
         assert_eq!(
-            spanned.shape_spans,
+            spanned.get_shape_spans(),
             vec![ShapeSpan {
                 byte_range: 0..4,
                 font_size: 16.0,
@@ -107,7 +107,7 @@ mod test {
         );
         spanned.replace_range(1..2, "_");
         assert_eq!(
-            spanned.shape_spans,
+            spanned.get_shape_spans(),
             vec![ShapeSpan {
                 byte_range: 0..4,
                 font_size: 16.0,
@@ -131,7 +131,7 @@ mod test {
             font_id: FontId::new(0),
         };
         assert_eq!(
-            spanned.shape_spans,
+            spanned.get_shape_spans(),
             vec![
                 ShapeSpan {
                     byte_range: 0..1,
@@ -179,38 +179,27 @@ impl ShapeSpan {
     }
 }
 
-/// A span of text with certain style. This contains information for text effects.
-#[derive(Debug, Clone)]
-struct StyleSpan {
-    pub byte_range: Range<usize>,
-    pub kind: StyleKind,
+pub type Key = u32;
+
+#[derive(Debug, Clone, PartialEq)]
+struct InnerSpan {
+    key: Key,
+    byte_range: Range<usize>,
+    span_type: Span,
 }
 
-#[derive(Debug, Clone)]
-enum StyleKind {
-    Color(Color),
-    Selection { bg: Color, fg: Option<Color> },
-    // Shadow { color: Color, dir: [f32; 2] }
-    // Mark { color: Color, round?: bool }
-    // Anim?
-    //
-}
-impl StyleKind {
-    fn from_span(span: Span) -> Result<Self, Span> {
-        Ok(match span {
-            Span::FontSize(_) | Span::FontId(_) => return Err(span),
-            Span::Color(x) => Self::Color(x),
-            Span::Selection { bg, fg } => Self::Selection { bg, fg },
-        })
-    }
-}
-
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Span {
     FontSize(f32),
     FontId(FontId),
     Color(Color),
     Selection { bg: Color, fg: Option<Color> },
+}
+impl Span {
+    /// Tells if this span changes the shape of the text (like the font or text direction)
+    fn is_shape_span(&self) -> bool {
+        matches!(self, Self::FontSize(_) | Self::FontId(_))
+    }
 }
 
 /// A description of the style of a text.
@@ -251,13 +240,13 @@ impl TextStyle {
 pub struct SpannedString {
     pub(crate) string: String,
     shape_spans: Vec<ShapeSpan>,
-    style_spans: Vec<StyleSpan>,
-    default: TextStyle,
+    spans: Vec<InnerSpan>,
+    default_style: TextStyle,
 }
 impl SpannedString {
     pub fn new(default_style: TextStyle) -> Self {
         Self {
-            default: default_style,
+            default_style,
             ..Default::default()
         }
     }
@@ -267,10 +256,40 @@ impl SpannedString {
         &self.string
     }
 
+    /// Remove all spans
+    pub fn clear_spans(&mut self) {
+        self.clear_shape_spans();
+        self.spans.clear();
+    }
+
+    /// Clear the text, and all spans
     pub fn clear(&mut self) {
         self.string.clear();
-        self.shape_spans.clear();
-        self.style_spans.clear();
+        self.clear_spans();
+    }
+
+    /// Clear shape_spans. shape_spans is computed lazily.
+    fn clear_shape_spans(&mut self) {
+        self.shape_spans.clear()
+    }
+
+    /// Compute if need, and return the shape_spans
+    fn get_shape_spans(&mut self) -> &[ShapeSpan] {
+        if self.shape_spans.len() == 0 {
+            self.shape_spans.push(ShapeSpan {
+                byte_range: 0..self.string.len(),
+                font_size: self.default_style.font_size,
+                font_id: self.default_style.font_id,
+            });
+            let spans = std::mem::take(&mut self.spans);
+            for span in &spans {
+                if span.span_type.is_shape_span() {
+                    self.add_shape_span(span.byte_range.clone(), span.span_type);
+                }
+            }
+            self.spans = spans;
+        }
+        &self.shape_spans
     }
 
     pub fn from_string(string: String, style: TextStyle) -> Self {
@@ -280,8 +299,8 @@ impl SpannedString {
                 font_size: style.font_size,
                 font_id: style.font_id,
             }],
-            style_spans: Vec::new(),
-            default: style,
+            spans: Vec::new(),
+            default_style: style,
             string,
         }
     }
@@ -292,123 +311,84 @@ impl SpannedString {
     //     self.spans.push((start..self.string.len(), span));
     // }
 
-    pub fn replace_range(&mut self, mut range: Range<usize>, string: &str) {
-        if !range.is_empty() {
-            assert!(range.end <= self.string.len());
+    /// Replace a range of text with another. Any span that contains the start of that range will
+    /// be exapaded to cover the replaced text. Spans that are entirely contained in the replace
+    /// range will be removed. This may modify the range of any span after the replaced range.
+    pub fn replace_range(&mut self, range: Range<usize>, string: &str) {
+        // rename for readibilty
+        let mut replace_range = range;
+
+        if !replace_range.is_empty() {
+            assert!(replace_range.end <= self.string.len());
         } else {
-            range.end = range.start;
+            replace_range.end = replace_range.start;
         }
-        assert!(range.start <= self.string.len());
+        assert!(replace_range.start <= self.string.len());
 
-        let offset = string.len() as isize - range.len() as isize;
-        let overlap = |this_range: Range<usize>| {
-            // range overlap a range
-            if this_range.start >= range.start && this_range.end <= range.end {
-                false
-            } else {
+        let overlap = |span_range: Range<usize>| {
+            // replace_range overlap span_range
+            if replace_range.start <= span_range.start && span_range.end <= replace_range.end {
                 true
-            }
-        };
-
-        // remove spans
-        self.shape_spans.retain(|x| overlap(x.byte_range.clone()));
-        self.style_spans.retain(|x| overlap(x.byte_range.clone()));
-
-        let shift_range = |range: &mut Range<usize>| {
-            // range.start -= range.len();
-            // range.start += string.len();
-            // range.end -= range.len();
-            // range.end += string.len();
-            if offset < 0 {
-                range.start -= (-offset) as usize;
-                range.end -= (-offset) as usize;
             } else {
-                range.start += offset as usize;
-                range.end += offset as usize;
+                false
             }
         };
 
-        let mut insert_index = 0;
-        let mut split = None;
-        // cut and shift spans
-        for (i, x) in self.shape_spans.iter_mut().enumerate() {
-            if x.byte_range.start < range.start && x.byte_range.end > range.end {
-                // range cut a range in three, if there is a string to insert
-                if string.is_empty() {
-                    x.byte_range.end -= range.len();
+        // remove spans contained enturely in the replaced range
+        self.shape_spans.retain(|x| !overlap(x.byte_range.clone()));
+        self.spans.retain(|x| !overlap(x.byte_range.clone()));
+
+        // shift spans
+        for span_range in self
+            .shape_spans
+            .iter_mut()
+            .map(|x| &mut x.byte_range)
+            .chain(self.spans.iter_mut().map(|x| &mut x.byte_range))
+        {
+            let shift = |x: &mut usize| {
+                if *x <= replace_range.start {
+                    // noop
+                } else if *x < replace_range.end {
+                    // snap to end
+                    *x = replace_range.start + string.len();
                 } else {
-                    let mut s = x.clone();
-                    s.byte_range.start = range.end;
-                    shift_range(&mut s.byte_range);
-                    split = Some(s);
-                    x.byte_range.end = range.start;
+                    *x -= replace_range.len();
+                    *x += string.len();
                 }
-            } else if x.byte_range.start < range.start && x.byte_range.end > range.start {
-                // range.start cut a range
-                x.byte_range.end = range.start;
-            } else if x.byte_range.start < range.end && x.byte_range.end > range.end {
-                // range.end cut a range
-                x.byte_range.start = range.end;
-                shift_range(&mut x.byte_range);
-            } else if x.byte_range.start >= range.end {
-                // range is to the right, and must be shifted
-                shift_range(&mut x.byte_range);
-            }
-
-            if x.byte_range.end <= range.start {
-                insert_index = i + 1;
-            }
-        }
-
-        self.string.replace_range(range.clone(), string);
-        if string.len() > 0 {
-            let shape = ShapeSpan {
-                byte_range: range,
-                font_size: self.default.font_size,
-                font_id: self.default.font_id,
             };
-            if let Some(split) = split {
-                self.shape_spans
-                    .splice(insert_index..insert_index, [shape, split]);
-            } else {
-                self.shape_spans.insert(insert_index, shape);
-            }
-        } else {
-            assert!(split.is_none());
+            shift(&mut span_range.start);
+            shift(&mut span_range.end);
+            // ensure that len is not 0, because they were removed before
+            debug_assert!(span_range.start < span_range.end);
         }
 
-        self.shape_spans.dedup_by(|a, b| {
-            if a.cmp_shape(b) {
-                b.byte_range.end = a.byte_range.end;
-                true
-            } else {
-                false
-            }
-        });
+        self.string.replace_range(replace_range.clone(), string);
     }
 
-    /// Clear all spans, and replace with only one, with the given style.
+    /// Set the default style. This will not remove any spans that could be overwriting the default
+    /// style.
     pub fn set_style(&mut self, style: TextStyle) {
-        self.shape_spans.clear();
-        self.style_spans.clear();
-        self.shape_spans.push(ShapeSpan {
-            byte_range: 0..self.string.len(),
-            font_size: style.font_size,
-            font_id: style.font_id,
-        });
-        self.default = style;
+        self.default_style = style;
     }
 
-    pub fn add_span(&mut self, range: Range<usize>, span: Span) {
-        match StyleKind::from_span(span) {
-            Ok(kind) => self.style_spans.push(StyleSpan {
-                byte_range: range,
-                kind,
-            }),
-            Err(span) => {
-                self.add_shape_span(range, span);
-            }
-        }
+    pub fn remove_span(&mut self, key: Key) -> Option<(Range<usize>, Span)> {
+        let index = self.spans.iter().position(|x| x.key == key)?;
+        let removed = self.spans.remove(index);
+        Some((removed.byte_range, removed.span_type))
+    }
+
+    pub fn add_span(&mut self, range: Range<usize>, span: Span) -> Key {
+        use std::sync::atomic::AtomicU32;
+        static NEXT_KEY: AtomicU32 = AtomicU32::new(0);
+        let key = NEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+        self.clear_shape_spans();
+        self.spans.push(InnerSpan {
+            key,
+            byte_range: range,
+            span_type: span,
+        });
+        key
     }
 
     fn add_shape_span(&mut self, range: Range<usize>, span: Span) {
@@ -464,9 +444,12 @@ impl SpannedString {
         });
     }
 
-    /// Find the shape span that contains the index, and split it in two. This is used for text
-    /// shaping.
-    pub fn split_shape_span(&mut self, index: usize) {
+    /// Find the shape span that contains the index, and split it in two. This is used in text
+    /// shaping for splitting at hard breaklines.
+    fn split_shape_span(&mut self, index: usize) {
+        // compute shape spans
+        self.get_shape_spans();
+
         let i = match self
             .shape_spans
             .binary_search_by(|x| crate::util::cmp_range(index, x.byte_range.clone()))
@@ -623,41 +606,37 @@ impl Text {
     }
 
     pub fn get_font_size(&mut self) -> f32 {
-        self.text.as_spanned().default.font_size
+        self.text.as_spanned().default_style.font_size
     }
 
     pub fn set_font_size(&mut self, font_size: f32) {
         let spanned = self.text.to_spanned();
-        spanned.default.font_size = font_size;
+        spanned.default_style.font_size = font_size;
         for span in &mut spanned.shape_spans {
             span.font_size = font_size;
         }
         self.dirty();
     }
 
-    pub fn add_span(&mut self, range: Range<usize>, span: Span) {
-        self.text.to_spanned().add_span(range, span);
+    pub fn remove_span(&mut self, key: Key) {
+        self.text.to_spanned().remove_span(key);
         self.dirty();
+    }
+
+    pub fn add_span(&mut self, range: Range<usize>, span: Span) -> Key {
+        self.dirty();
+        self.text.to_spanned().add_span(range, span)
     }
 
     pub fn clear_spans(&mut self) {
         let spanned = self.text.to_spanned();
-        let style = spanned.default.clone();
-        spanned.set_style(style);
-        self.dirty();
-    }
-
-    pub fn clear_selections(&mut self) {
-        let spanned = self.text.to_spanned();
-        spanned
-            .style_spans
-            .retain(|x| !matches!(x.kind, StyleKind::Selection { .. }));
+        spanned.clear_spans();
         self.dirty();
     }
 
     pub fn set_text(&mut self, text: &str) {
         let spanned = self.text.to_spanned();
-        let style = spanned.default.clone();
+        let style = spanned.default_style.clone();
         *spanned = SpannedString::from_string(text.into(), style);
         self.dirty();
     }
@@ -774,14 +753,14 @@ impl Text {
     }
 
     pub fn color(&self) -> Color {
-        self.text.as_spanned().default.color
+        self.text.as_spanned().default_style.color
     }
 
     pub fn color_mut(&mut self) -> &mut Color {
-        &mut self.text.to_spanned().default.color
+        &mut self.text.to_spanned().default_style.color
     }
 
     pub fn set_color(&mut self, color: Color) {
-        self.text.to_spanned().default.color = color;
+        self.text.to_spanned().default_style.color = color;
     }
 }

@@ -57,6 +57,7 @@ pub struct TextField<C: TextFieldCallback> {
     mouse_down: u8,
     drag_start: usize,
     style: Rc<TextFieldStyle>,
+    selection_span: Option<crate::text::Key>,
     blink: bool,
     /// event_id of the last scheduled BlinkCaret event
     blink_event: Option<u64>,
@@ -75,6 +76,7 @@ impl<C: TextFieldCallback> TextField<C> {
             mouse_down: 0,
             drag_start: 0,
             style,
+            selection_span: None,
             blink: false,
             blink_event: None,
         }
@@ -160,14 +162,14 @@ impl<C: TextFieldCallback> TextField<C> {
         if selection_range.len() > 0 {
             ctx.set_margins(self.caret, [0.0; 4]);
             if let Graphic::Text(text) = ctx.get_graphic_mut(self.label) {
-                text.clear_selections();
-                text.add_span(
+                self.selection_span.take().map(|x| text.remove_span(x));
+                self.selection_span = Some(text.add_span(
                     selection_range,
                     Span::Selection {
                         bg: self.style.selection_color.bg,
                         fg: self.style.selection_color.fg,
                     },
-                );
+                ));
             }
         } else {
             if let Graphic::Text(text) = ctx.get_graphic_mut(self.label) {

@@ -9,7 +9,7 @@ use crate::text::SpannedString;
 use crate::util::cmp_range;
 use crate::Color;
 
-use super::{ShapeSpan, StyleKind, StyleSpan};
+use super::{ShapeSpan, InnerSpan, Span};
 
 #[cfg(test)]
 mod test {
@@ -290,11 +290,17 @@ impl TextLayout {
     pub fn new(mut text: SpannedString, settings: LayoutSettings, fonts: &Fonts) -> Self {
         // Add a extra glyph to the text, to be used as the final empty line (if the text has a
         // trailing "\n") and for the position of the last caret.
+
         let len = text.string.len();
-        let last_font_size = text
-            .shape_spans
+
+        // compute shape_spans
+        text.get_shape_spans();
+        // borrow immutable
+        let shape_spans = &text.shape_spans;
+
+        let last_font_size = shape_spans
             .last()
-            .map_or(text.default.font_size, |x| x.font_size);
+            .map_or(text.default_style.font_size, |x| x.font_size);
         text.string.push_str("\n");
         text.shape_spans.push(ShapeSpan {
             byte_range: len..len + 1,
@@ -321,11 +327,39 @@ impl TextLayout {
         &self.text.string[0..len - 1]
     }
 
+    /// Return the with of the layouted text, that is the width of biggest line, ignoring the last
+    /// whitespace glyph of each line
+    pub fn width(&self) -> f32 {
+        self.lines.iter().map(|x| x.visible_width(&self.glyphs)).fold(f32::NAN, f32::max)
+    }
+
     /// Return the height of the layouted text, from the top of the first line to the bottom of the
     /// last.
     pub fn height(&self) -> f32 {
         let sum: f32 = self.lines.iter().map(|x| x.height() + x.line_gap).sum();
         sum - self.lines.last().map_or(0.0, |x| x.line_gap)
+    }
+
+    /// Return the bounds of the layouted text, in the form [left, top, right, bottom], in pixels,
+    /// relative to the anchor.
+    pub fn bounds(&self) -> [f32; 4] {
+        let mut bounds = [0.0; 4];
+
+        let width = self.width();
+        match self.settings.horizontal_align {
+            Alignment::Start => bounds[2] = width,
+            Alignment::Center => { bounds[0] = -width/2.0; bounds[2] = width/2.0; }
+            Alignment::End => bounds[0] = -width,
+        }
+
+        let height = self.height();
+        match self.settings.vertical_align {
+            Alignment::Start => bounds[3] = height,
+            Alignment::Center => { bounds[1] = -height/2.0; bounds[3] = height/2.0; }
+            Alignment::End => bounds[1] = -height,
+        }
+
+        bounds
     }
 
     /// Returns the minimum width and height required so that there is no line wrap or overflow.
@@ -528,13 +562,14 @@ impl TextLayout {
         let mut span_start = 0;
         let mut lines = Vec::new();
         for next_break in mandatory_breaks.into_iter() {
-            let span_end = self
+            let shape_spans = self
                 .text
-                .shape_spans
+                .get_shape_spans();
+            let span_end = shape_spans
                 .iter()
                 .skip(span_start)
                 .position(|x| x.byte_range.start == next_break)
-                .map_or(self.text.shape_spans.len(), |x| x + span_start);
+                .map_or(shape_spans.len(), |x| x + span_start);
             let line = LineLayout::new(&self.text, span_start..span_end, fonts);
             lines.push(line);
             span_start = span_end;
@@ -580,7 +615,7 @@ impl TextLayout {
                 x.glyph_range.end += start_glyph;
                 x
             }));
-            let color = self.text.default.color;
+            let color = self.text.default_style.color;
             self.glyphs.extend(line.glyphs.into_iter().map(|mut x| {
                 x.color = color;
                 x
@@ -621,10 +656,14 @@ impl TextLayout {
     /// Apply the styles describe in SpannedString.style_spans for each respective range of text.
     /// This change glyph color and add selections for example.
     fn apply_styles(&mut self) {
-        for style in &self.text.style_spans {
-            let StyleSpan {
+        for style in &self.text.spans {
+            if style.span_type.is_shape_span() {
+                continue;
+            }
+            let InnerSpan {
                 byte_range: range,
-                kind,
+                span_type: kind,
+                ..
             } = style;
             let glyph_range = {
                 let start_glyph = self
@@ -641,8 +680,8 @@ impl TextLayout {
                 continue;
             }
             match kind {
-                &StyleKind::Color(color)
-                | &StyleKind::Selection {
+                &Span::Color(color)
+                | &Span::Selection {
                     fg: Some(color), ..
                 } => self.glyphs[glyph_range.clone()]
                     .iter_mut()
@@ -650,7 +689,7 @@ impl TextLayout {
                 _ => {}
             }
             match kind {
-                &StyleKind::Selection { bg: color, .. } => {
+                &Span::Selection { bg: color, .. } => {
                     let first_line = self
                         .lines
                         .binary_search_by(|x| cmp_range(range.start, x.byte_range.clone()))
@@ -736,9 +775,12 @@ struct LineLayout {
 impl LineLayout {
     /// Create a new layout for the given range of the given text.
     fn new(text: &SpannedString, span_range: Range<usize>, fonts: &Fonts) -> Self {
+        let shape_spans = &text.shape_spans;
+        // assert that the given SpannedString has its shape_spans already computed
+        assert!(!shape_spans.is_empty());
         let byte_range = {
-            let start = text.shape_spans[span_range.start].byte_range.start;
-            let end = text.shape_spans[span_range.end - 1].byte_range.end;
+            let start = shape_spans[span_range.start].byte_range.start;
+            let end = shape_spans[span_range.end - 1].byte_range.end;
             start..end
         };
         let mut this = Self {
@@ -750,7 +792,7 @@ impl LineLayout {
             line_gap: 0.0,
         };
 
-        for shape_span in &text.shape_spans[span_range] {
+        for shape_span in &shape_spans[span_range] {
             let text = &text.string[shape_span.byte_range.clone()];
             this.append_run(fonts, shape_span, text, shape_span.byte_range.clone());
         }
