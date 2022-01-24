@@ -568,7 +568,7 @@ impl TextLayout {
         last_line.glyph_range.end -= 1;
         last_line.byte_range.end -= 1;
 
-        self.apply_styles();
+        self.apply_styles(fonts);
     }
 
     /// Layout it paragraph in a LineLayout. Each paragraph is section of the text, separated by
@@ -675,9 +675,9 @@ impl TextLayout {
         }
     }
 
-    /// Apply the styles describe in SpannedString.style_spans for each respective range of text.
+    /// Apply the styles describe in SpannedString.spans for each respective range of text.
     /// This change glyph color and add selections for example.
-    fn apply_styles(&mut self) {
+    fn apply_styles(&mut self, fonts: &Fonts) {
         for style in &self.text.spans {
             if style.span_type.is_shape_span() {
                 continue;
@@ -701,6 +701,7 @@ impl TextLayout {
             if glyph_range.is_empty() {
                 continue;
             }
+            // modify glyphs
             match kind {
                 &Span::Color(color)
                 | &Span::Selection {
@@ -708,9 +709,13 @@ impl TextLayout {
                 } => self.glyphs[glyph_range.clone()]
                     .iter_mut()
                     .for_each(move |x| x.color = color),
-                _ => {}
+                Span::Selection { .. } => {}
+                Span::Underline(_) => {}
+                Span::FontSize(_) | Span::FontId(_) => {}
             }
+            // create rects
             match kind {
+                Span::Color(color) => {}
                 &Span::Selection { bg: color, .. } => {
                     let first_line = self
                         .lines
@@ -771,7 +776,72 @@ impl TextLayout {
                         }
                     }
                 }
-                _ => {}
+                Span::Underline(color) => {
+                    // TODO: this should have a different thickness for each different font size,
+                    // and should take in account shape_spans.
+                    // TODO: query font for underline position and thickness (not possible with
+                    // ab_glyph currently)
+                    let color = color.unwrap_or_else(|| self.text.default_style.color);
+                    let first_line = self
+                        .lines
+                        .binary_search_by(|x| cmp_range(range.start, x.byte_range.clone()))
+                        .unwrap();
+                    let glyphs = &self.glyphs;
+                    let glyph_pos = |glyph_index: usize| {
+                        let glyph = &glyphs[glyph_index];
+                        [glyph.glyph.position.x, glyph.glyph.position.y]
+                    };
+                    let glyph_pos_end = |glyph_index: usize| {
+                        let glyph = &glyphs[glyph_index];
+                        [glyph.right(), glyph.glyph.position.y]
+                    };
+                    let start_pos = glyph_pos(glyph_range.start);
+                    let end_pos = glyph_pos_end(glyph_range.end - 1);
+                    let line = &self.lines[first_line];
+                    if line.glyph_range.end > glyph_range.end {
+                        let rect = [
+                            start_pos[0],
+                            start_pos[1] - line.descent - 2.0,
+                            end_pos[0],
+                            end_pos[1] - line.descent,
+                        ];
+                        self.rects.push(ColorRect { rect, color });
+                    } else {
+                        {
+                            let end_pos = glyph_pos_end(line.glyph_range.end - 1);
+                            let rect = [
+                                start_pos[0],
+                                start_pos[1] - line.descent - 2.0,
+                                end_pos[0],
+                                end_pos[1] - line.descent,
+                            ];
+                            self.rects.push(ColorRect { rect, color });
+                        }
+                        for line in self.lines[first_line..].iter().skip(1) {
+                            let start_pos = glyph_pos(line.glyph_range.start);
+                            if line.glyph_range.end > glyph_range.end {
+                                let rect = [
+                                    start_pos[0],
+                                    start_pos[1] - line.descent - 2.0,
+                                    end_pos[0],
+                                    end_pos[1] - line.descent,
+                                ];
+                                self.rects.push(ColorRect { rect, color });
+                                break;
+                            } else {
+                                let end_pos = glyph_pos_end(line.glyph_range.end - 1);
+                                let rect = [
+                                    start_pos[0],
+                                    start_pos[1] - line.descent - 2.0,
+                                    end_pos[0],
+                                    end_pos[1] - line.descent,
+                                ];
+                                self.rects.push(ColorRect { rect, color });
+                            };
+                        }
+                    }
+                }
+                Span::FontSize(_) | Span::FontId(_) => {},
             }
         }
     }

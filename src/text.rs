@@ -194,6 +194,7 @@ pub enum Span {
     FontId(FontId),
     Color(Color),
     Selection { bg: Color, fg: Option<Color> },
+    Underline(Option<Color>),
 }
 impl Span {
     /// Tells if this span changes the shape of the text (like the font or text direction)
