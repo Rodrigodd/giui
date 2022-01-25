@@ -677,7 +677,7 @@ impl TextLayout {
 
     /// Apply the styles describe in SpannedString.spans for each respective range of text.
     /// This change glyph color and add selections for example.
-    fn apply_styles(&mut self, fonts: &Fonts) {
+    fn apply_styles(&mut self, _fonts: &Fonts) {
         for style in &self.text.spans {
             if style.span_type.is_shape_span() {
                 continue;
@@ -715,7 +715,7 @@ impl TextLayout {
             }
             // create rects
             match kind {
-                Span::Color(color) => {}
+                Span::Color(_) => {}
                 &Span::Selection { bg: color, .. } => {
                     let first_line = self
                         .lines

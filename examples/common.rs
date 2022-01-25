@@ -133,7 +133,6 @@ pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -
                     None => ControlFlow::Wait,
                 };
                 if gui.render_is_dirty() {
-                    println!("Is dirty!");
                     window.request_redraw();
                 }
                 if let Some(cursor) = gui.cursor_change() {
@@ -149,7 +148,6 @@ pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -
                 // gui receive events
                 gui.handle_event(&event);
                 if gui.render_is_dirty() {
-                    println!("Is dirty!");
                     window.request_redraw();
                 }
                 if let Some(cursor) = gui.cursor_change() {

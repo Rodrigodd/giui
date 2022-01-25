@@ -36,3 +36,6 @@ pub use list::*;
 
 mod adapters;
 pub use adapters::*;
+
+mod interactive_text;
+pub use interactive_text::*;

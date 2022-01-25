@@ -40,5 +40,7 @@ fn double_start() {
 
     let logs = logger.0.lock().unwrap();
     println!("{:#?}", logs);
-    assert!(logs.iter().any(|x| x.as_str().starts_with("delayed start of 1:2")));
+    assert!(logs
+        .iter()
+        .any(|x| x.as_str().starts_with("delayed start of 1:2")));
 }

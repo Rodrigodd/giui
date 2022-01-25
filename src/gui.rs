@@ -130,11 +130,13 @@ pub struct MouseInfo {
     /// The different beetween this mouse position, and the position in the last event. The last
     /// position may be outside of this control.
     pub delta: Option<[f32; 2]>,
-    /// Number of consecutives MouseDown's
+    /// Number of consecutives mouse click. A mouse click is mouse down followed by a mouse up,
+    /// without a mouse exit between the two. Consecutive means that the click occurred within
+    /// 500 ms after the previous one (without a mouse exit between).
     pub click_count: u8,
 }
 impl MouseInfo {
-    /// Returns `true` if the mouse_action is a click.
+    /// Returns `true` if the event is a MouseEvent::Up(MouseButton::Left) and click_count > 0.
     pub fn click(&self) -> bool {
         self.click_count > 0 && matches!(self.event, MouseEvent::Up(MouseButton::Left))
     }
