@@ -36,3 +36,8 @@ impl From<[u8; 4]> for Color {
         Self::from_array(value)
     }
 }
+impl From<u32> for Color {
+    fn from(value: u32) -> Self {
+        Self::from_u32(value)
+    }
+}
