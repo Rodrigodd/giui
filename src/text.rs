@@ -635,6 +635,10 @@ impl Text {
         self.dirty();
     }
 
+    pub fn text(&self) -> &str {
+        self.text.as_spanned().string()
+    }
+
     pub fn set_text(&mut self, text: &str) {
         let spanned = self.text.to_spanned();
         let style = spanned.default_style.clone();
