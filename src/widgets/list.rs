@@ -107,6 +107,8 @@ pub struct List<C: ListBuilder> {
     h_scroll_bar_handle: Id,
     last_created_items: BTreeMap<usize, CreatedItem>,
     created_items: BTreeMap<usize, CreatedItem>,
+    // TODO: the focused really need to be a CreatedItem, or can it be a usize for which the
+    // CreatedItem is in last_created_items?
     focused: Option<CreatedItem>,
     builder: C,
 }
@@ -148,6 +150,85 @@ impl<C: ListBuilder> List<C> {
         }
     }
 
+    fn create_item_generic(
+        &mut self,
+        i: usize,
+        list_id: Id,
+        y: impl FnOnce(f32) -> f32,
+        ctx: &mut LayoutContext,
+        view_rect: [f32; 4],
+        from_bottom: bool,
+    ) -> f32 {
+        let focused;
+        let mut x = if self.focused.as_ref().map_or(false, |x| x.i == i) {
+            focused = true;
+            let x = self.focused.take().unwrap();
+            self.last_created_items.remove(&i);
+            self.builder.update_item(x.i, x.id, ctx);
+            ctx.recompute_min_size(x.id);
+            if !from_bottom {
+                ctx.move_to_front(x.id);
+            }
+            // log::trace!("move focused {}", id);
+            x
+        } else {
+            focused = false;
+            match self.last_created_items.remove(&i) {
+                Some(x) => {
+                    self.builder.update_item(x.i, x.id, ctx);
+                    ctx.recompute_min_size(x.id);
+                    if !from_bottom {
+                        ctx.move_to_front(x.id);
+                    }
+                    // log::trace!("move {}", id);
+                    x
+                }
+                None => {
+                    let id = self
+                        .builder
+                        .create_item(i, list_id, ctx.create_control(), ctx)
+                        .parent(self.view)
+                        .build(ctx);
+                    // log::trace!("create {}", id);
+                    CreatedItem::new(id, i, 0.0, 0.0)
+                }
+            }
+        };
+        if from_bottom {
+            ctx.move_to_back(x.id);
+        }
+
+        let id = x.id;
+
+        let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
+        let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
+            self.margins[3]
+        } else {
+            self.space
+        };
+        assert!(ctx.get_min_size(id)[1] != 0.0);
+        let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
+        let y = y(height);
+        ctx.set_designed_rect(
+            id,
+            [
+                view_rect[0] + self.margins[0] - self.delta_x,
+                y + top_margin,
+                (view_rect[2]).max(view_rect[0] + self.content_width)
+                    - self.margins[2]
+                    - self.delta_x,
+                y + height - bottom_margin,
+            ],
+        );
+        x.y = y - view_rect[1];
+        x.height = height;
+        if focused {
+            self.focused = Some(x.clone());
+        }
+        self.created_items.insert(i, x);
+        height
+    }
+
     fn create_item(
         &mut self,
         i: usize,
@@ -156,99 +237,7 @@ impl<C: ListBuilder> List<C> {
         ctx: &mut LayoutContext,
         view_rect: [f32; 4],
     ) -> f32 {
-        if self.focused.as_ref().map_or(false, |x| x.i == i) {
-            let x = self.focused.as_mut().unwrap();
-            let id = x.id;
-            self.builder.update_item(x.i, id, ctx);
-            ctx.recompute_min_size(id);
-            // log::trace!("move focused {}", id);
-            let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-            let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
-                self.margins[3]
-            } else {
-                self.space
-            };
-            let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
-            ctx.set_designed_rect(
-                id,
-                [
-                    view_rect[0] + self.margins[0] - self.delta_x,
-                    y + top_margin,
-                    (view_rect[2]).max(view_rect[0] + self.content_width)
-                        - self.margins[2]
-                        - self.delta_x,
-                    y + height - bottom_margin,
-                ],
-            );
-            ctx.move_to_front(id);
-            x.y = y - view_rect[1];
-            x.height = height;
-            self.last_created_items.remove(&i);
-            self.created_items.insert(i, x.clone());
-            return height;
-        }
-
-        match self.last_created_items.remove(&i) {
-            Some(mut x) => {
-                let id = x.id;
-                self.builder.update_item(x.i, id, ctx);
-                ctx.recompute_min_size(id);
-                // log::trace!("move {}", id);
-                let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
-                    self.margins[3]
-                } else {
-                    self.space
-                };
-                let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
-                ctx.set_designed_rect(
-                    id,
-                    [
-                        view_rect[0] + self.margins[0] - self.delta_x,
-                        y + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width)
-                            - self.margins[2]
-                            - self.delta_x,
-                        y + height - bottom_margin,
-                    ],
-                );
-                ctx.move_to_front(id);
-                x.y = y - view_rect[1];
-                x.height = height;
-                self.created_items.insert(i, x);
-                height
-            }
-            None => {
-                let id = self
-                    .builder
-                    .create_item(i, list_id, ctx.create_control(), ctx)
-                    .parent(self.view)
-                    .build(ctx);
-                // log::trace!("create {}", id);
-                let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
-                    self.margins[3]
-                } else {
-                    self.space
-                };
-                assert!(ctx.get_min_size(id)[1] != 0.0);
-                let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
-                ctx.set_designed_rect(
-                    id,
-                    [
-                        view_rect[0] + self.margins[0] - self.delta_x,
-                        y + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width)
-                            - self.margins[2]
-                            - self.delta_x,
-                        y + height - bottom_margin,
-                    ],
-                );
-                self.created_items
-                    .insert(i, CreatedItem::new(id, i, y - view_rect[1], height));
-                height
-            }
-        }
+        self.create_item_generic(i, list_id, |_| y, ctx, view_rect, false)
     }
 
     fn create_item_at(
@@ -259,105 +248,20 @@ impl<C: ListBuilder> List<C> {
         view_rect: [f32; 4],
     ) -> f32 {
         let i = start_y as usize;
-
-        if self.focused.as_ref().map_or(false, |x| x.i == i) {
-            let x = self.focused.as_mut().unwrap();
-            let id = x.id;
-            self.builder.update_item(x.i, id, ctx);
-            ctx.recompute_min_size(id);
-            // log::trace!("move focused {}", id);
-            let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-            let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
-                self.margins[3]
-            } else {
-                self.space
-            };
-            let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
-            let mut y = view_rect[1] - start_y.fract() * height;
-            ctx.set_designed_rect(
-                id,
-                [
-                    view_rect[0] + self.margins[0] - self.delta_x,
-                    y + top_margin,
-                    (view_rect[2]).max(view_rect[0] + self.content_width)
-                        - self.margins[2]
-                        - self.delta_x,
-                    y + height - bottom_margin,
-                ],
-            );
-            ctx.move_to_front(id);
-            x.y = y - view_rect[1];
-            x.height = height;
-            y += height;
-            self.created_items.insert(i, x.clone());
-            self.last_created_items.remove(&i);
-            return y;
-        }
-
-        match self.last_created_items.remove(&i) {
-            Some(mut x) => {
-                let id = x.id;
-                self.builder.update_item(x.i, id, ctx);
-                ctx.recompute_min_size(id);
-                // log::trace!("move {}", id);
-                let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
-                    self.margins[3]
-                } else {
-                    self.space
-                };
-                let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
-                let mut y = view_rect[1] - start_y.fract() * height;
-                ctx.set_designed_rect(
-                    id,
-                    [
-                        view_rect[0] + self.margins[0] - self.delta_x,
-                        y + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width)
-                            - self.margins[2]
-                            - self.delta_x,
-                        y + height - bottom_margin,
-                    ],
-                );
-                ctx.move_to_front(id);
-                x.y = y - view_rect[1];
-                x.height = height;
-                y += height;
-                self.created_items.insert(i, x);
+        let mut y = 0.0;
+        let height = self.create_item_generic(
+            i,
+            list_id,
+            |height| {
+                y = view_rect[1] - start_y.fract() * height;
                 y
-            }
-            None => {
-                let id = self
-                    .builder
-                    .create_item(i, list_id, ctx.create_control(), ctx)
-                    .parent(self.view)
-                    .build(ctx);
-                // log::trace!("create {}", id);
-                let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
-                    self.margins[3]
-                } else {
-                    self.space
-                };
-                let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
-                let mut y = view_rect[1] - start_y.fract() * height;
-                ctx.set_designed_rect(
-                    id,
-                    [
-                        view_rect[0] + self.margins[0] - self.delta_x,
-                        y + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width)
-                            - self.margins[2]
-                            - self.delta_x,
-                        y + height - bottom_margin,
-                    ],
-                );
-                self.created_items
-                    .insert(i, CreatedItem::new(id, i, y - view_rect[1], height));
-                y += height;
-                y
-            }
-        }
+            },
+            ctx,
+            view_rect,
+            false,
+        );
+        y += height;
+        y
     }
 
     fn create_item_from_bottom(
@@ -368,101 +272,7 @@ impl<C: ListBuilder> List<C> {
         ctx: &mut LayoutContext,
         view_rect: [f32; 4],
     ) -> f32 {
-        if self.focused.as_ref().map_or(false, |x| x.i == i) {
-            let x = self.focused.as_mut().unwrap();
-            let id = x.id;
-            self.builder.update_item(x.i, id, ctx);
-            ctx.recompute_min_size(id);
-            // log::trace!("move focused {}", id);
-            let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-            let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
-                self.margins[3]
-            } else {
-                self.space
-            };
-            let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
-            ctx.set_designed_rect(
-                id,
-                [
-                    view_rect[0] + self.margins[0] - self.delta_x,
-                    y - height + top_margin,
-                    (view_rect[2]).max(view_rect[0] + self.content_width)
-                        - self.margins[2]
-                        - self.delta_x,
-                    y - bottom_margin,
-                ],
-            );
-            ctx.move_to_back(id);
-            x.y = y - height - view_rect[1];
-            x.height = height;
-            self.created_items.insert(i, x.clone());
-            self.last_created_items.remove(&i);
-            return height;
-        }
-
-        match self.last_created_items.remove(&i) {
-            Some(mut x) => {
-                let id = x.id;
-                self.builder.update_item(x.i, id, ctx);
-                ctx.recompute_min_size(id);
-                // log::trace!("move {}", id);
-                let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
-                    self.margins[3]
-                } else {
-                    self.space
-                };
-                let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
-                ctx.set_designed_rect(
-                    id,
-                    [
-                        view_rect[0] + self.margins[0] - self.delta_x,
-                        y - height + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width)
-                            - self.margins[2]
-                            - self.delta_x,
-                        y - bottom_margin,
-                    ],
-                );
-                ctx.move_to_back(id);
-                x.y = y - height - view_rect[1];
-                x.height = height;
-                self.created_items.insert(i, x);
-                height
-            }
-            None => {
-                let id = self
-                    .builder
-                    .create_item(i, list_id, ctx.create_control(), ctx)
-                    .parent(self.view)
-                    .build(ctx);
-                // log::trace!("create {}", id);
-                let top_margin = if i == 0 { self.margins[1] } else { 0.0 };
-                let bottom_margin = if i + 1 == self.builder.item_count(ctx) {
-                    self.margins[3]
-                } else {
-                    self.space
-                };
-                let height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
-                ctx.set_designed_rect(
-                    id,
-                    [
-                        view_rect[0] + self.margins[0] - self.delta_x,
-                        y - height + top_margin,
-                        (view_rect[2]).max(view_rect[0] + self.content_width)
-                            - self.margins[2]
-                            - self.delta_x,
-                        y - bottom_margin,
-                    ],
-                );
-                ctx.move_to_back(id);
-                self.created_items.insert(
-                    i,
-                    CreatedItem::new(id, i, y - height - view_rect[1], height),
-                );
-                height
-            }
-        }
+        self.create_item_generic(i, list_id, |heigth| y - heigth, ctx, view_rect, true)
     }
 
     fn create_items_from_top(&mut self, view_rect: [f32; 4], list_id: Id, ctx: &mut LayoutContext) {
