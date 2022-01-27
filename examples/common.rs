@@ -80,6 +80,7 @@ pub trait CruiEventLoop<T> {
 }
 
 pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -> ! {
+    env_logger::init();
     // create winit's window and event_loop
     let event_loop = EventLoop::<U>::with_user_event();
     let window = WindowBuilder::new().with_inner_size(PhysicalSize::new(width, height));
