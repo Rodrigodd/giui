@@ -79,7 +79,15 @@ pub trait ListBuilder {
     ) -> ControlBuilder;
 
     /// Used to update a previouly builded control of a item.
-    fn update_item(&mut self, index: usize, item_id: Id, ctx: &mut dyn BuilderContext) {}
+    ///
+    /// The item_id is the Id of the control create in the last call of create_item for the given
+    /// index. If this function returns true, the control is said to be updated, otherwise, if
+    /// false, the control is removed and a new on is created, by calling create_item immediately
+    /// afterwards.
+    #[must_use]
+    fn update_item(&mut self, index: usize, item_id: Id, ctx: &mut dyn BuilderContext) -> bool {
+        false
+    }
 }
 
 pub struct List<C: ListBuilder> {
@@ -164,24 +172,44 @@ impl<C: ListBuilder> List<C> {
             focused = true;
             let x = self.focused.take().unwrap();
             self.last_created_items.remove(&i);
-            self.builder.update_item(x.i, x.id, ctx);
-            ctx.recompute_min_size(x.id);
-            if !from_bottom {
-                ctx.move_to_front(x.id);
+            if self.builder.update_item(i, x.id, ctx) {
+                ctx.recompute_min_size(x.id);
+                if !from_bottom {
+                    ctx.move_to_front(x.id);
+                }
+                log::trace!("move focused {}", x.id);
+                x
+            } else {
+                ctx.remove(x.id);
+                let id = self
+                    .builder
+                    .create_item(i, list_id, ctx.create_control(), ctx)
+                    .parent(self.view)
+                    .build(ctx);
+                log::trace!("recreate focused {} as {}", x.id, id);
+                CreatedItem::new(id, i, 0.0, 0.0)
             }
-            // log::trace!("move focused {}", id);
-            x
         } else {
             focused = false;
             match self.last_created_items.remove(&i) {
                 Some(x) => {
-                    self.builder.update_item(x.i, x.id, ctx);
-                    ctx.recompute_min_size(x.id);
-                    if !from_bottom {
-                        ctx.move_to_front(x.id);
+                    if self.builder.update_item(i, x.id, ctx) {
+                        ctx.recompute_min_size(x.id);
+                        if !from_bottom {
+                            ctx.move_to_front(x.id);
+                        }
+                        log::trace!("move {}", x.id);
+                        x
+                    } else {
+                        ctx.remove(x.id);
+                        let id = self
+                            .builder
+                            .create_item(i, list_id, ctx.create_control(), ctx)
+                            .parent(self.view)
+                            .build(ctx);
+                        log::trace!("recreate {} as {}", x.id, id);
+                        CreatedItem::new(id, i, 0.0, 0.0)
                     }
-                    // log::trace!("move {}", id);
-                    x
                 }
                 None => {
                     let id = self
@@ -189,7 +217,7 @@ impl<C: ListBuilder> List<C> {
                         .create_item(i, list_id, ctx.create_control(), ctx)
                         .parent(self.view)
                         .build(ctx);
-                    // log::trace!("create {}", id);
+                    log::trace!("create {}", id);
                     CreatedItem::new(id, i, 0.0, 0.0)
                 }
             }
@@ -491,7 +519,8 @@ impl<C: ListBuilder> List<C> {
                 }
                 // give item back to last_created_items
                 let item = self.created_items.remove(&i).unwrap();
-                self.last_created_items.insert(i, item);
+                let removed = self.last_created_items.insert(i, item);
+                debug_assert!(removed.is_none());
             }
 
             // destroy items below, if any
@@ -502,7 +531,8 @@ impl<C: ListBuilder> List<C> {
                 }
                 // give item back to last_created_items
                 let item = self.created_items.remove(&i).unwrap();
-                self.last_created_items.insert(i, item);
+                let removed = self.last_created_items.insert(i, item);
+                debug_assert!(removed.is_none());
             }
 
             {
@@ -752,7 +782,7 @@ impl<C: ListBuilder> Layout for List<C> {
         for (_, x) in self.last_created_items.iter() {
             if self.focused.as_ref().map_or(false, |f| x.id == f.id) {
                 // hide the focused outside of the view
-                // log::trace!("hide focused {}", x.id);
+                log::trace!("hide focused {}", x.id);
                 ctx.set_designed_rect(
                     x.id,
                     [
@@ -765,7 +795,7 @@ impl<C: ListBuilder> Layout for List<C> {
                     ],
                 );
             } else {
-                // log::trace!("remove {}", x.id);
+                log::trace!("remove {}", x.id);
                 ctx.remove(x.id);
             }
         }

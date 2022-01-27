@@ -75,7 +75,8 @@ impl std::fmt::Display for Id {
 #[derive(PartialEq, Eq, Debug)]
 enum LazyEvent {
     OnStart(Id),
-    OnRemove(Id),
+    /// The id to be removed, and if it should dirty the layout of its parent
+    OnRemove(Id, bool),
     OnActive(Id),
     OnDeactive(Id),
 }
@@ -483,13 +484,13 @@ impl Gui {
 
     /// Remove a control and all of its children
     pub fn remove_control(&mut self, id: Id) {
-        self.lazy_events.push_back(LazyEvent::OnRemove(id));
+        self.lazy_events.push_back(LazyEvent::OnRemove(id, true));
     }
 
     /// Remove all control
     pub fn clear_controls(&mut self) {
         self.lazy_update();
-        self.lazy_events.push_back(LazyEvent::OnRemove(Id::ROOT_ID));
+        self.lazy_events.push_back(LazyEvent::OnRemove(Id::ROOT_ID, false));
         self.lazy_update();
     }
 
@@ -594,13 +595,13 @@ impl Gui {
     }
 
     // TODO: there should not be a public function which receive Box<...>
-    // (specially when there is identical funtcion that is generic)
+    // (specially when there are identical functions that are generic)
     pub fn send_event_to(&mut self, id: Id, event: Box<dyn Any>) {
         self.call_event(id, |this, id, ctx| this.on_event(event, id, ctx));
     }
 
     // TODO: there should not be a public function which receive Box<...>
-    // (specially when there is identical funtcion that is generic)
+    // (specially when there is identical function that is generic)
     pub fn send_event_to_scheduled(
         &mut self,
         id: Id,
@@ -963,6 +964,7 @@ impl Gui {
     }
 
     pub fn dirty_layout(&mut self, id: Id) {
+        log::trace!("dirty layout of {}", id);
         self.dirty_layouts.push(id);
         self.redraw = true;
     }
@@ -980,7 +982,7 @@ impl Gui {
                         log::trace!("starting {}", id);
                         self.call_event_no_lazy(id, |this, id, ctx| this.on_start(id, ctx));
                     }
-                    LazyEvent::OnRemove(id) => {
+                    LazyEvent::OnRemove(id, dirty_parent_layout) => {
                         if self.controls.get(id).is_none() {
                             log::info!("removing {}, but already removed", id);
                             continue;
@@ -990,8 +992,10 @@ impl Gui {
                         if self.controls.get(id).unwrap().active {
                             // only deactive if it is not the ROOT_ID
                             self.controls.get_mut(id).unwrap().active = id == Id::ROOT_ID;
-                            if let Some(parent) = self.get_parent(id) {
-                                self.dirty_layout(parent);
+                            if dirty_parent_layout {
+                                if let Some(parent) = self.get_parent(id) {
+                                    self.dirty_layout(parent);
+                                }
                             }
                         }
 
@@ -1249,7 +1253,7 @@ impl Gui {
                     // } else {
                     //     self.update_layout(dirty);
                     // }
-                    // TODO: RETHINK THIS!!!!
+                    // TODO: rethink this!!!!
                     if let Some(dirty_parent) = self.get_parent(dirty) {
                         assert!(dirty_parent != id, "A layout cannot dirty its own child!");
                         parents.push(dirty_parent);
@@ -1335,7 +1339,8 @@ impl Gui {
                     } else if let Some(event::ActiveControl { id }) = event.downcast_ref() {
                         self.active_control(*id)
                     } else if let Some(event::RemoveControl { id }) = event.downcast_ref() {
-                        self.remove_control(*id);
+                        // self.remove_control(*id);
+                        self.lazy_events.push_back(LazyEvent::OnRemove(*id, false));
                     } else if let Some(event::StartControl { id }) = event.downcast_ref() {
                         self.start_control(*id);
                     }

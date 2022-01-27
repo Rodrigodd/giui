@@ -188,11 +188,11 @@ fn build_gui(gui: &mut Gui, style: StyleSheet) {
             }
         }
 
-        fn update_item(&mut self, index: usize, item_id: Id, ctx: &mut dyn BuilderContext) {
+        fn update_item(&mut self, index: usize, item_id: Id, ctx: &mut dyn BuilderContext) -> bool {
             let index = if index % 2 == 0 {
                 index / 2
             } else {
-                return;
+                return true;
             };
             let text_id = ctx.get_active_children(item_id)[0];
             let x = ctx.get::<App>().list[index].clone();
@@ -200,6 +200,7 @@ fn build_gui(gui: &mut Gui, style: StyleSheet) {
             if let Graphic::Text(text) = ctx.get_graphic_mut(text_id) {
                 text.set_text(&x);
             }
+            true
         }
     }
 
