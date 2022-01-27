@@ -41,9 +41,7 @@ impl Behaviour for InteractiveText {
         // action.on_mouse_event.
         match mouse.event {
             MouseEvent::Enter => {}
-            MouseEvent::Exit => {
-                println!("Exit!!");
-            }
+            MouseEvent::Exit => {}
             MouseEvent::Down(_) | MouseEvent::Up(_) => {
                 for (_, action, is_on) in self.actions.iter_mut() {
                     if *is_on {
