@@ -153,7 +153,7 @@ impl Graphic {
 
     pub fn set_text(&mut self, new_text: &str) {
         if let Graphic::Text(text) = self {
-            text.set_text(new_text);
+            text.set_string(new_text);
         }
     }
 

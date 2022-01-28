@@ -198,7 +198,7 @@ fn build_gui(gui: &mut Gui, style: StyleSheet) {
             let x = ctx.get::<App>().list[index].clone();
             println!("updated item {}!!", x);
             if let Graphic::Text(text) = ctx.get_graphic_mut(text_id) {
-                text.set_text(&x);
+                text.set_string(&x);
             }
             true
         }

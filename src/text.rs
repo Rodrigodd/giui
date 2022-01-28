@@ -16,6 +16,7 @@ mod shaping;
 #[cfg(test)]
 mod test {
     use crate::font::FontId;
+    use crate::Color;
 
     use super::{ShapeSpan, Span, SpannedString};
 
@@ -85,11 +86,23 @@ mod test {
         spanned.replace_range(8..11, "_");
         assert_eq!(
             spanned.get_shape_spans(),
-            vec![ShapeSpan {
-                byte_range: 0..10,
-                font_size: 16.0,
-                font_id: FontId::new(0),
-            }]
+            vec![
+                ShapeSpan {
+                    byte_range: 0..8,
+                    font_size: 16.0,
+                    font_id: FontId::new(0),
+                },
+                ShapeSpan {
+                    byte_range: 8..9,
+                    font_size: 0.1,
+                    font_id: FontId::new(0),
+                },
+                ShapeSpan {
+                    byte_range: 9..10,
+                    font_size: 16.0,
+                    font_id: FontId::new(0),
+                },
+            ]
         );
     }
 
@@ -110,6 +123,35 @@ mod test {
             spanned.get_shape_spans(),
             vec![ShapeSpan {
                 byte_range: 0..4,
+                font_size: 16.0,
+                font_id: FontId::new(0),
+            }]
+        );
+    }
+
+    #[test]
+    fn replace_all() {
+        let mut spanned = SpannedString::from_string("test".into(), Default::default());
+        assert_eq!(
+            spanned.get_shape_spans(),
+            vec![ShapeSpan {
+                byte_range: 0..4,
+                font_size: 16.0,
+                font_id: FontId::new(0),
+            }]
+        );
+        spanned.add_span(
+            0..4,
+            Span::Selection {
+                bg: Color::WHITE,
+                fg: None,
+            },
+        );
+        spanned.replace_range(0..4, "r");
+        assert_eq!(
+            spanned.get_shape_spans(),
+            vec![ShapeSpan {
+                byte_range: 0..1,
                 font_size: 16.0,
                 font_id: FontId::new(0),
             }]
@@ -290,6 +332,7 @@ impl SpannedString {
             }
             self.spans = spans;
         }
+        debug_assert_eq!(self.shape_spans[0].byte_range.start, 0);
         &self.shape_spans
     }
 
@@ -328,10 +371,13 @@ impl SpannedString {
 
         let overlap = |span_range: Range<usize>| {
             // replace_range overlap span_range
-            if replace_range.start <= span_range.start && span_range.end <= replace_range.end {
-                true
+
+            // if the string is not empty, a non-empty span starting at replace_range.start will
+            // be non-empty. Otherwise it will be empty.
+            if string.is_empty() {
+                replace_range.start <= span_range.start && span_range.end <= replace_range.end
             } else {
-                false
+                replace_range.start < span_range.start && span_range.end <= replace_range.end
             }
         };
 
@@ -353,6 +399,7 @@ impl SpannedString {
                     // snap to end
                     *x = replace_range.start + string.len();
                 } else {
+                    // shift
                     *x -= replace_range.len();
                     *x += string.len();
                 }
@@ -360,7 +407,6 @@ impl SpannedString {
             shift(&mut span_range.start);
             shift(&mut span_range.end);
             // ensure that len is not 0, because they were removed before
-            debug_assert!(span_range.start < span_range.end);
         }
 
         self.string.replace_range(replace_range.clone(), string);
@@ -635,11 +681,18 @@ impl Text {
         self.dirty();
     }
 
-    pub fn text(&self) -> &str {
+    /// Return the length of the underlining string
+    pub fn len(&self) -> usize {
+        self.text.as_spanned().string().len()
+    }
+
+    /// Return a reference to the underlining string
+    pub fn string(&self) -> &str {
         self.text.as_spanned().string()
     }
 
-    pub fn set_text(&mut self, text: &str) {
+    /// Set the value of the underlining string, and clear all spans
+    pub fn set_string(&mut self, text: &str) {
         let spanned = self.text.to_spanned();
         let style = spanned.default_style.clone();
         *spanned = SpannedString::from_string(text.into(), style);

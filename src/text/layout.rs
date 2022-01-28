@@ -497,6 +497,7 @@ impl TextLayout {
     /// Removes the specified range in the string, and replaces it with the given string. This
     /// recompute the layout. The given string doesn’t need to be the same length as the range.
     pub fn replace_range(&mut self, range: Range<usize>, text: &str, fonts: &Fonts) {
+        eprintln!("replace_range {:?}", range);
         // the string has a extra char, so check for out of bounds for len() - 1.
         assert!(
             range.end <= self.text.string.len() - 1,
@@ -630,6 +631,7 @@ impl TextLayout {
             }
         }
 
+        assert_eq!(self.glyphs.len(), 0);
         for line in lines {
             let start_glyph = self.glyphs.len();
             self.lines.extend(line.lines.into_iter().map(|mut x| {
@@ -855,7 +857,7 @@ struct LineLayout {
     /// The byte range of the original text that this line layout represents.
     byte_range: Range<usize>,
     /// Each section of text can have a diferent line measure. This vector preserves that. This is
-    /// use when this layout is break in multiple lines.
+    /// used when this layout is break in multiple lines.
     lines: Vec<Line>,
     /// The width of this line, in pixels.
     width: f32,
