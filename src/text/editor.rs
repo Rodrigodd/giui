@@ -360,7 +360,7 @@ impl TextEditor {
     /// of the selection will be preserved. Otherwise, the selection is clear.
     pub fn move_cursor_line_end(&mut self, expand_selection: bool, text_layout: &TextLayout) {
         let line = self.get_line_from_byte_index(self.selection.cursor.0, text_layout);
-        let cursor = ByteIndex(text_layout.lines()[line].byte_range.end - 1);
+        let cursor = ByteIndex(text_layout.lines()[line].byte_range.end);
         if expand_selection {
             self.selection.cursor = cursor;
         } else {
