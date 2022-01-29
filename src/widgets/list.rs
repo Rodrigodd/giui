@@ -86,8 +86,14 @@ pub trait ListBuilder {
     /// afterwards.
     #[must_use]
     fn update_item(&mut self, index: usize, item_id: Id, ctx: &mut dyn BuilderContext) -> bool {
-        false
+        true
     }
+
+    /// Called after all items has been updated.
+    ///
+    /// In the case where the items need to be updated sometimes, this can be used to mark all
+    /// items as updated at once, intead of keeping a update flag for each item.
+    fn finished_layout(&mut self) {}
 }
 
 pub struct List<C: ListBuilder> {
@@ -778,6 +784,7 @@ impl<C: ListBuilder> Layout for List<C> {
 
         // layout the items in the view
         self.create_items(view_rect, this, ctx);
+        self.builder.finished_layout();
 
         for (_, x) in self.last_created_items.iter() {
             if self.focused.as_ref().map_or(false, |f| x.id == f.id) {
