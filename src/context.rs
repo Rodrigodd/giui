@@ -37,9 +37,15 @@ impl BuilderContext for Context<'_> {
         &mut self.gui.controls
     }
 
-    fn build(&mut self, id: Id, control: Control) {
+    fn build(&mut self, id: Id, mut control: Control) {
+        let focus = control.focus;
+        control.focus = false;
+
         self.gui.controls.add_builded_control(id, control);
         self.send_event(event::StartControl { id });
+        if focus {
+            self.send_event(event::RequestFocus { id });
+        }
     }
 }
 impl<'a> Drop for Context<'a> {
@@ -437,9 +443,15 @@ impl BuilderContext for LayoutContext<'_> {
         self.controls
     }
 
-    fn build(&mut self, id: Id, control: Control) {
-        self.events.push(Box::new(event::StartControl { id }));
+    fn build(&mut self, id: Id, mut control: Control) {
+        let focus = control.focus;
+        control.focus = false;
+
         self.controls.add_builded_control(id, control);
+        self.events.push(Box::new(event::StartControl { id }));
+        if focus {
+            self.events.push(Box::new(event::RequestFocus { id }));
+        }
 
         // when a control is created during layout, the min_size need to be immediately
         // computed

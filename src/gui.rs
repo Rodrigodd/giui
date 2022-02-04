@@ -301,9 +301,18 @@ impl Gui {
                 &mut self.controls
             }
 
-            fn build(&mut self, id: Id, control: Control) {
+            fn build(&mut self, id: Id, mut control: Control) {
+                // I don't know if this is necessary, but I setting focus to false before doing any
+                // operation with it, because it is breaking the invariant by being true when not
+                // yet focused
+                let focus = control.focus;
+                control.focus = false;
+
                 self.controls.add_builded_control(id, control);
                 self.start_control(id);
+                if focus {
+                    self.set_focus(Some(id));
+                }
             }
         }
 

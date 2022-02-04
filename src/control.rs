@@ -40,6 +40,8 @@ pub trait BuilderContext {
     #[doc(hidden)]
     fn controls_mut(&mut self) -> &mut Controls;
     #[doc(hidden)]
+    /// This need to add to control to Controls, send a Start event, and a FocusRequest event when
+    /// necessary
     fn build(&mut self, id: Id, control: Control);
 }
 impl<'a> dyn BuilderContext + 'a {
@@ -143,6 +145,12 @@ impl ControlBuilder {
         self
     }
 
+    /// If it is true, the focus will change to this control when builded.
+    pub fn focus(mut self, focus: bool) -> Self {
+        self.control.focus = focus;
+        self
+    }
+
     pub fn child<F>(self, ctx: &mut dyn BuilderContext, create_child: F) -> Self
     where
         F: FnOnce(ControlBuilder, &mut dyn BuilderContext) -> ControlBuilder,
@@ -158,16 +166,16 @@ impl ControlBuilder {
         let parent = self.id;
 
         {
-            struct ChildBuilderContext<'a>(&'a mut Controls);
+            struct ChildBuilderContext<'a>(&'a mut dyn BuilderContext);
             impl BuilderContext for ChildBuilderContext<'_> {
                 fn controls(&self) -> &Controls {
-                    self.0
+                    self.0.controls()
                 }
                 fn controls_mut(&mut self) -> &mut Controls {
-                    self.0
+                    self.0.controls_mut()
                 }
                 fn build(&mut self, id: Id, control: Control) {
-                    self.0.add_builded_control(id, control);
+                    self.0.build(id, control)
                 }
 
                 fn get_graphic_mut(&mut self, _: Id) -> &mut Graphic {
@@ -181,7 +189,7 @@ impl ControlBuilder {
             let child_builder = ControlBuilder::new(ctx, id);
             (create_child)(child_builder, ctx)
                 .parent(parent)
-                .build(&mut ChildBuilderContext(ctx.controls_mut()));
+                .build(&mut ChildBuilderContext(ctx));
         }
 
         self
