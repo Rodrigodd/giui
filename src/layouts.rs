@@ -120,11 +120,20 @@ impl Layout for RatioLayout {
     }
 }
 
-#[derive(Default)]
 pub struct HBoxLayout {
     spacing: f32,
     margins: [f32; 4],
     align: i8,
+}
+
+impl Default for HBoxLayout {
+    fn default() -> Self {
+        Self {
+            spacing: 0.0,
+            margins: [0.0; 4],
+            align: -1,
+        }
+    }
 }
 impl HBoxLayout {
     pub fn new(spacing: f32, margins: [f32; 4], align: i8) -> Self {
@@ -211,6 +220,16 @@ pub struct VBoxLayout {
     spacing: f32,
     margins: [f32; 4],
     align: i8,
+}
+
+impl Default for VBoxLayout {
+    fn default() -> Self {
+        Self {
+            spacing: 0.0,
+            margins: [0.0; 4],
+            align: -1,
+        }
+    }
 }
 impl VBoxLayout {
     pub fn new(spacing: f32, margins: [f32; 4], align: i8) -> Self {
