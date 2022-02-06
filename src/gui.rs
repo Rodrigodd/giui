@@ -499,7 +499,8 @@ impl Gui {
     /// Remove all control
     pub fn clear_controls(&mut self) {
         self.lazy_update();
-        self.lazy_events.push_back(LazyEvent::OnRemove(Id::ROOT_ID, false));
+        self.lazy_events
+            .push_back(LazyEvent::OnRemove(Id::ROOT_ID, false));
         self.lazy_update();
     }
 

@@ -842,7 +842,7 @@ impl TextLayout {
                         }
                     }
                 }
-                Span::FontSize(_) | Span::FontId(_) => {},
+                Span::FontSize(_) | Span::FontId(_) => {}
             }
         }
     }
