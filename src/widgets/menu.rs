@@ -104,7 +104,7 @@ impl Behaviour for MenuBehaviour {
                     let _text = ctx
                         .create_control()
                         .parent(item)
-                        .graphic(Text::new(text.clone(), (-1, 0), self.style.text.clone()).into())
+                        .graphic(Text::new(text.clone(), (-1, 0), self.style.text.clone()))
                         .layout(FitText)
                         .build(ctx);
                 }
@@ -117,9 +117,11 @@ impl Behaviour for MenuBehaviour {
                     let _text = ctx
                         .create_control()
                         .parent(item)
-                        .graphic(
-                            Text::new(menu.name.clone(), (-1, 0), self.style.text.clone()).into(),
-                        )
+                        .graphic(Text::new(
+                            menu.name.clone(),
+                            (-1, 0),
+                            self.style.text.clone(),
+                        ))
                         .layout(FitText)
                         .expand_x(true)
                         .build(ctx);
@@ -278,7 +280,11 @@ impl Behaviour for MenuBar {
                 .build(ctx);
             ctx.create_control()
                 .parent(item)
-                .graphic(Text::new(menu.name.clone(), (0, 0), self.style.text.clone()).into())
+                .graphic(Text::new(
+                    menu.name.clone(),
+                    (0, 0),
+                    self.style.text.clone(),
+                ))
                 .layout(FitText)
                 .build(ctx);
         }

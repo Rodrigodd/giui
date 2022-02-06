@@ -132,8 +132,8 @@ impl ControlBuilder {
         let x = Rc::new(RefCell::new(behaviour_layout));
         self.behaviour(x.clone()).layout(x)
     }
-    pub fn graphic(mut self, graphic: Graphic) -> Self {
-        self.control.graphic = graphic;
+    pub fn graphic(mut self, graphic: impl Into<Graphic>) -> Self {
+        self.control.graphic = graphic.into();
         self
     }
     pub fn parent(mut self, parent: Id) -> Self {

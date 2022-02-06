@@ -24,19 +24,16 @@ fn main() {
             use crui::graphics::{Text, TextStyle};
             let _text = gui
                 .create_control()
-                .graphic(
-                    Text::new(
-                        "Hello Word!!".to_string(),
-                        (0, 0),
-                        TextStyle {
-                            color: [0, 255, 0, 255].into(),
-                            font_size: 70.0,
-                            font_id: fonts.notosans,
-                            ..Default::default()
-                        },
-                    )
-                    .into(),
-                )
+                .graphic(Text::new(
+                    "Hello Word!!".to_string(),
+                    (0, 0),
+                    TextStyle {
+                        color: [0, 255, 0, 255].into(),
+                        font_size: 70.0,
+                        font_id: fonts.notosans,
+                        ..Default::default()
+                    },
+                ))
                 .build(gui);
             HelloWord
         }

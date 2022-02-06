@@ -149,7 +149,7 @@ struct Style {
 
 fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
     let (hover, hover_label) = {
-        let graphic = style.white.clone().with_color([50, 50, 50, 255].into());
+        let graphic = style.white.clone().with_color([50, 50, 50, 255]);
         let hover = gui
             .create_control()
             .anchors([0.0, 0.0, 0.0, 0.0])
@@ -166,8 +166,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 font_id: style.fonts.notosans,
                 ..Default::default()
             },
-        )
-        .into();
+        );
         let label = gui
             .create_control()
             .graphic(graphic)
@@ -345,8 +344,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     font_id: style.fonts.consolas,
                     ..Default::default()
                 },
-            )
-            .into();
+            );
             gui.create_control()
                 .anchors([0.0, 0.0, 1.0, 1.0])
                 .graphic(graphic)
@@ -499,8 +497,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     font_id: style.fonts.notosans,
                     ..Default::default()
                 },
-            )
-            .into();
+            );
             gui.create_control()
                 .anchors([0.0, 0.0, 1.0, 1.0])
                 .margins([30.0, 0.0, 0.0, 0.0])
@@ -538,19 +535,16 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                             let _text = ctx
                                 .create_control()
                                 .margins([10.0, 0.0, -10.0, 0.0])
-                                .graphic(
-                                    Text::new(
-                                        data.to_string(),
-                                        (-1, 0),
-                                        TextStyle {
-                                            color: [40, 40, 100, 255].into(),
-                                            font_size: 16.0,
-                                            font_id: notosans,
-                                            ..Default::default()
-                                        },
-                                    )
-                                    .into(),
-                                )
+                                .graphic(Text::new(
+                                    data.to_string(),
+                                    (-1, 0),
+                                    TextStyle {
+                                        color: [40, 40, 100, 255].into(),
+                                        font_size: 16.0,
+                                        font_id: notosans,
+                                        ..Default::default()
+                                    },
+                                ))
                                 .layout(FitText)
                                 .parent(id)
                                 .build(ctx);
@@ -587,19 +581,16 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             let _text = gui
                 .create_control_reserved(text)
                 .margins([10.0, 0.0, -10.0, 0.0])
-                .graphic(
-                    Text::new(
-                        "Select one, please".to_owned(),
-                        (-1, 0),
-                        TextStyle {
-                            color: [40, 40, 100, 255].into(),
-                            font_size: 16.0,
-                            font_id: style.fonts.notosans,
-                            ..Default::default()
-                        },
-                    )
-                    .into(),
-                )
+                .graphic(Text::new(
+                    "Select one, please".to_owned(),
+                    (-1, 0),
+                    TextStyle {
+                        color: [40, 40, 100, 255].into(),
+                        font_size: 16.0,
+                        font_id: style.fonts.notosans,
+                        ..Default::default()
+                    },
+                ))
                 .parent(my_dropdown)
                 .build(gui);
 
@@ -665,8 +656,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     font_id: style.fonts.notosans,
                     ..Default::default()
                 },
-            )
-            .into();
+            );
             gui.create_control()
                 .graphic(graphic)
                 .parent(rect)
@@ -838,19 +828,16 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .build(gui);
             let _label = gui
                 .create_control()
-                .graphic(
-                    Text::new(
-                        "Add new: ".to_owned(),
-                        (-1, 0),
-                        TextStyle {
-                            color: [0, 0, 0, 255].into(),
-                            font_size: 16.0,
-                            font_id: style.fonts.notosans,
-                            ..Default::default()
-                        },
-                    )
-                    .into(),
-                )
+                .graphic(Text::new(
+                    "Add new: ".to_owned(),
+                    (-1, 0),
+                    TextStyle {
+                        color: [0, 0, 0, 255].into(),
+                        font_size: 16.0,
+                        font_id: style.fonts.notosans,
+                        ..Default::default()
+                    },
+                ))
                 .layout(FitText)
                 .parent(hbox)
                 .build(gui);
@@ -908,19 +895,16 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .build(gui);
             let _input_text = gui
                 .create_control_reserved(input_text)
-                .graphic(
-                    Text::new(
-                        String::new(),
-                        (-1, 0),
-                        TextStyle {
-                            color: [0, 0, 0, 255].into(),
-                            font_size: 16.0,
-                            font_id: style.fonts.notosans,
-                            ..Default::default()
-                        },
-                    )
-                    .into(),
-                )
+                .graphic(Text::new(
+                    String::new(),
+                    (-1, 0),
+                    TextStyle {
+                        color: [0, 0, 0, 255].into(),
+                        font_size: 16.0,
+                        font_id: style.fonts.notosans,
+                        ..Default::default()
+                    },
+                ))
                 .parent(input_box)
                 .build(gui);
             input_box
@@ -1057,7 +1041,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 font_size: 20.0,
                 font_id: style.fonts.notosans,
                 ..Default::default()
-        }).into();
+        });
         gui.create_control()
             .margins([15.0, 15.0, -15.0, -15.0])
             .graphic(graphic)
@@ -1091,8 +1075,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     font_id: style.fonts.notosans,
                     ..Default::default()
                 },
-            )
-            .into();
+            );
             gui.create_control()
                 .graphic(graphic)
                 .parent(button)
@@ -1209,19 +1192,16 @@ fn create_item(
     let _text = ctx
         .create_control()
         .parent(item)
-        .graphic(
-            Text::new(
-                text,
-                (-1, 0),
-                TextStyle {
-                    color: [0, 0, 0, 255].into(),
-                    font_size: 16.0,
-                    font_id,
-                    ..Default::default()
-                },
-            )
-            .into(),
-        )
+        .graphic(Text::new(
+            text,
+            (-1, 0),
+            TextStyle {
+                color: [0, 0, 0, 255].into(),
+                font_size: 16.0,
+                font_id,
+                ..Default::default()
+            },
+        ))
         .layout(FitText)
         .expand_x(true)
         .build(ctx);
@@ -1249,19 +1229,16 @@ fn create_button<F: Fn(Id, &mut Context) + 'static>(
     gui.create_control_reserved(button_id)
         .child(gui, |x, _| {
             // text
-            x.graphic(
-                Text::new(
-                    text,
-                    (0, 0),
-                    TextStyle {
-                        color: [40, 40, 100, 255].into(),
-                        font_size: 16.0,
-                        font_id,
-                        ..Default::default()
-                    },
-                )
-                .into(),
-            )
+            x.graphic(Text::new(
+                text,
+                (0, 0),
+                TextStyle {
+                    color: [40, 40, 100, 255].into(),
+                    font_size: 16.0,
+                    font_id,
+                    ..Default::default()
+                },
+            ))
             .layout(FitText)
         })
         .behaviour(Button::new(button_style, true, on_click))

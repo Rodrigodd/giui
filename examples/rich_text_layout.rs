@@ -72,8 +72,8 @@ Jump Over The Yacht.";
 
         // populate the gui with controls.
         gui.create_control()
-            .graphic(Texture::new(fonts.white_texture, [0.0, 0.0, 1.0, 1.0]).into())
-            .child(gui, move |cb, _| cb.graphic(text.into()).layout(FitText))
+            .graphic(Texture::new(fonts.white_texture, [0.0, 0.0, 1.0, 1.0]))
+            .child(gui, move |cb, _| cb.graphic(text).layout(FitText))
             .layout(MarginLayout::default())
             .fill_x(RectFill::ShrinkCenter)
             .fill_y(RectFill::ShrinkCenter)

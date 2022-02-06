@@ -48,9 +48,9 @@ impl CruiEventLoop<()> for App {
 
         // populate the gui with controls.
         gui.create_control()
-            .graphic(Texture::new(fonts.white_texture, [0.0, 0.0, 1.0, 1.0]).into())
+            .graphic(Texture::new(fonts.white_texture, [0.0, 0.0, 1.0, 1.0]))
             .child(gui, move |cb, _| {
-                cb.graphic(text.into()).behaviour(InteractiveText::new(vec![
+                cb.graphic(text).behaviour(InteractiveText::new(vec![
                     (
                         click_here.clone(),
                         Box::new(move |mouse: MouseInfo, this: Id, ctx: &mut Context| {

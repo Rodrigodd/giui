@@ -679,7 +679,7 @@ impl OptionsGui {
         style: &StyleSheet,
     ) -> ControlBuilder {
         let button = id;
-        let graphic = Text::new(label, (0, 0), style.text_style.clone()).into();
+        let graphic = Text::new(label, (0, 0), style.text_style.clone());
         gui.create_control()
             .graphic(graphic)
             .parent(button)
@@ -712,7 +712,7 @@ impl OptionsGui {
             .build(gui);
         let _text = gui
             .create_control()
-            .graphic(Text::new(name, (-1, 0), style.text_style.clone()).into())
+            .graphic(Text::new(name, (-1, 0), style.text_style.clone()))
             .layout(FitText)
             .expand_x(true)
             .parent(line)
@@ -731,7 +731,11 @@ impl OptionsGui {
         let label = gui
             .create_control()
             .min_size([0.0, 24.0])
-            .graphic(Text::new(initial_value.to_string(), (0, 0), style.text_style.clone()).into())
+            .graphic(Text::new(
+                initial_value.to_string(),
+                (0, 0),
+                style.text_style.clone(),
+            ))
             .parent(parent)
             .build(gui);
         let line = gui
@@ -827,7 +831,7 @@ impl OptionsGui {
             .parent(parent)
             .build(gui);
 
-        let graphic = Text::new(name, (-1, 0), style.text_style.clone()).into();
+        let graphic = Text::new(name, (-1, 0), style.text_style.clone());
         gui.create_control()
             .anchors([0.0, 0.0, 1.0, 1.0])
             .margins([30.0, 0.0, 0.0, 0.0])
@@ -844,7 +848,11 @@ impl OptionsGui {
             .build(gui);
         let _text = gui
             .create_control()
-            .graphic(Text::new("Dropdown".into(), (-1, 0), style.text_style.clone()).into())
+            .graphic(Text::new(
+                "Dropdown".into(),
+                (-1, 0),
+                style.text_style.clone(),
+            ))
             .layout(FitText)
             .expand_x(true)
             .parent(line)
@@ -890,18 +898,19 @@ impl OptionsGui {
             .parent(popup_window)
             .build(gui);
         gui.create_control_reserved(self.popup_title)
-            .graphic(Text::new("PopUp Title".into(), (-1, 0), style.text_style.clone()).into())
+            .graphic(Text::new(
+                "PopUp Title".into(),
+                (-1, 0),
+                style.text_style.clone(),
+            ))
             .parent(popup_header)
             .build(gui);
         gui.create_control_reserved(self.popup_text)
-            .graphic(
-                Text::new(
-                    "Somthing has happend!".into(),
-                    (-1, 0),
-                    style.text_style.clone(),
-                )
-                .into(),
-            )
+            .graphic(Text::new(
+                "Somthing has happend!".into(),
+                (-1, 0),
+                style.text_style.clone(),
+            ))
             .expand_y(true)
             .parent(popup_window)
             .build(gui);
@@ -922,7 +931,7 @@ impl OptionsGui {
             .build(gui);
         let _ok_button_text = gui
             .create_control()
-            .graphic(Text::new("Ok".into(), (0, 0), style.text_style.clone()).into())
+            .graphic(Text::new("Ok".into(), (0, 0), style.text_style.clone()))
             .parent(ok_button)
             .build(gui);
     }
@@ -949,7 +958,7 @@ impl OptionsGui {
             .build(gui);
         let input_text = gui
             .create_control()
-            .graphic(Text::new(initial_value, (-1, 0), style.text_style.clone()).into())
+            .graphic(Text::new(initial_value, (-1, 0), style.text_style.clone()))
             .parent(input_box)
             .build(gui);
         gui.create_control_reserved(input_box)
@@ -1045,9 +1054,7 @@ impl OptionsGui {
                         let _text = ctx
                             .create_control()
                             .margins([10.0, 0.0, -10.0, 0.0])
-                            .graphic(
-                                Text::new(data.to_string(), (-1, 0), text_style.clone()).into(),
-                            )
+                            .graphic(Text::new(data.to_string(), (-1, 0), text_style.clone()))
                             .layout(FitText)
                             .parent(id)
                             .build(ctx);
@@ -1062,14 +1069,11 @@ impl OptionsGui {
         let text = gui
             .create_control()
             .margins([10.0, 0.0, -10.0, 0.0])
-            .graphic(
-                Text::new(
-                    itens[initial_value].clone(),
-                    (-1, 0),
-                    style.text_style.clone(),
-                )
-                .into(),
-            )
+            .graphic(Text::new(
+                itens[initial_value].clone(),
+                (-1, 0),
+                style.text_style.clone(),
+            ))
             .parent(id)
             .build(gui);
         gui.create_control_reserved(id)
@@ -1114,7 +1118,7 @@ fn create_item(
     let _text = ctx
         .create_control()
         .parent(item)
-        .graphic(Text::new(text, (-1, 0), text_style).into())
+        .graphic(Text::new(text, (-1, 0), text_style))
         .layout(FitText)
         .expand_x(true)
         .build(ctx);

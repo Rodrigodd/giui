@@ -152,19 +152,16 @@ fn build_gui(gui: &mut Gui, style: StyleSheet) {
 
                 ctx.create_control()
                     .parent(cb.id())
-                    .graphic(
-                        Text::new(
-                            x.to_string(),
-                            (-1, 0),
-                            crui::graphics::TextStyle {
-                                color: [0, 0, 0, 255].into(),
-                                font_size: 18.0,
-                                font_id: self.0,
-                                ..Default::default()
-                            },
-                        )
-                        .into(),
-                    )
+                    .graphic(Text::new(
+                        x.to_string(),
+                        (-1, 0),
+                        crui::graphics::TextStyle {
+                            color: [0, 0, 0, 255].into(),
+                            font_size: 18.0,
+                            font_id: self.0,
+                            ..Default::default()
+                        },
+                    ))
                     .layout(FitText)
                     .expand_x(true)
                     .build(ctx);
@@ -243,19 +240,16 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
         )
     })
     .child_reserved(input_text, ctx, |cb, _| {
-        cb.graphic(
-            Text::new(
-                initial_value,
-                (-1, 0),
-                crui::graphics::TextStyle {
-                    color: [0, 0, 0, 255].into(),
-                    font_size: 18.0,
-                    font_id,
-                    ..Default::default()
-                },
-            )
-            .into(),
-        )
+        cb.graphic(Text::new(
+            initial_value,
+            (-1, 0),
+            crui::graphics::TextStyle {
+                color: [0, 0, 0, 255].into(),
+                font_size: 18.0,
+                font_id,
+                ..Default::default()
+            },
+        ))
     })
 }
 
