@@ -21,7 +21,7 @@ ab_glyph = "0.2"
 harfbuzz_rs = "2"
 unicode-linebreak = "0.1"
 unicode-segmentation = "1"
-winit = "0.24"
+winit = "0.26"
 bitflags = "1"
 copypasta = "0.7"
 serde = { version = "1", features = ["derive"] }
@@ -29,8 +29,6 @@ crui-derive = { path = "./crui-derive" }
 keyed_priority_queue = "0.3"
 log = "0.4"
 
-[patch.crates-io]
-winit = { path = "../winit" }
 
 [dev-dependencies]
 
