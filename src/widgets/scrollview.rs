@@ -239,6 +239,32 @@ impl ScrollView {
 }
 impl Behaviour for ScrollView {
     fn on_start(&mut self, _this: Id, ctx: &mut Context) {
+        debug_assert!({
+            let children = ctx.get_all_children(_this);
+            debug_assert!(
+                children.contains(&self.view),
+                "self.view should be a child of ScrollView"
+            );
+            debug_assert!(
+                self.h_scroll_bar_and_handle
+                    .as_ref()
+                    .map(|x| children.contains(&x.0))
+                    .unwrap_or(true),
+                "self.h_scroll_bar should be a child of ScrollView"
+            );
+            debug_assert!(
+                self.v_scroll_bar_and_handle
+                    .as_ref()
+                    .map(|x| children.contains(&x.0))
+                    .unwrap_or(true),
+                "self.v_scroll_bar should be a child of ScrollView"
+            );
+            debug_assert!(
+                ctx.get_all_children(self.view).contains(&self.content),
+                "self.content should be a child of self.view"
+            );
+            true
+        });
         if let Some((h_scroll_bar, _)) = self.h_scroll_bar_and_handle {
             ctx.move_to_front(h_scroll_bar);
         }
