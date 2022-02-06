@@ -149,7 +149,7 @@ struct Style {
 
 fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
     let (hover, hover_label) = {
-        let graphic = style.white.clone().with_color([50, 50, 50, 255]);
+        let graphic = style.white.clone().with_color([50, 50, 50, 255].into());
         let hover = gui
             .create_control()
             .anchors([0.0, 0.0, 0.0, 0.0])
@@ -369,8 +369,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     font_id: style.fonts.notosans,
                     ..Default::default()
                 },
-            )
-            .into();
+            );
             gui.create_control()
                 .anchors([0.0, 0.0, 1.0, 1.0])
                 .margins([5.0, 5.0, -5.0, -5.0])
@@ -999,7 +998,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .layout(RatioLayout::new(1.0, (0, 0)))
             .build(gui);
         let font_texture = 1; // TODO
-        let graphic = Texture::new(font_texture, [0.0, 0.0, 1.0, 1.0]).into();
+        let graphic = Texture::new(font_texture, [0.0, 0.0, 1.0, 1.0]);
         gui.create_control()
             .graphic(graphic)
             .behaviour(ContextMenu::new(style.menu_style.clone(), {

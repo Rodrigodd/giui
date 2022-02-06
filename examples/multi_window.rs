@@ -378,7 +378,6 @@ fn create_gui(
                     ..Default::default()
                 },
             )
-            .into(),
         )
         .layout(FitText)
         .parent(button)
@@ -436,7 +435,6 @@ fn create_gui(
                     ..Default::default()
                 },
             )
-            .into(),
         )
         .layout(FitText)
         .parent(button)
