@@ -1152,6 +1152,7 @@ fn scroll_view<'a>(
         .graphic(Graphic::None)
         .parent(scroll_view)
         .layout(ViewLayout::new(false, true))
+        .child_reserved(content, gui, content_builder)
         .build(gui);
     let v_scroll_bar_handle = gui.reserve_id();
     let v_scroll_bar = gui
@@ -1171,8 +1172,6 @@ fn scroll_view<'a>(
         .parent(v_scroll_bar)
         .build(gui);
 
-    // gui.get_context().set_parent(content, view);
-
     let behaviour = ScrollView::new(
         view,
         content,
@@ -1184,5 +1183,4 @@ fn scroll_view<'a>(
     gui.create_control_reserved(scroll_view)
         .behaviour(behaviour_layout.clone())
         .layout(behaviour_layout)
-        .child_reserved(content, gui, content_builder)
 }
