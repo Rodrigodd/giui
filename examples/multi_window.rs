@@ -67,10 +67,13 @@ fn fonts() -> Fonts {
 fn main() {
     // create winit's window and event_loop
     let event_loop = EventLoop::with_user_event();
-    let window = WindowBuilder::new().with_inner_size(PhysicalSize::new(200, 200));
+    let window = WindowBuilder::new()
+        .with_inner_size(PhysicalSize::new(200, 200))
+        .build(&event_loop)
+        .unwrap();
 
     // create the render and camera, and a texture for the glyphs rendering
-    let (window, mut render) = GLSpriteRender::new(window, &event_loop, true);
+    let mut render = GLSpriteRender::new(&window, true).unwrap();
     let mut camera = {
         let size = window.inner_size();
         let width = size.width;
@@ -160,7 +163,8 @@ fn main() {
 
                 let font_texture = render.new_texture(128, 128, &[], false);
                 let white_texture = render.new_texture(1, 1, &[255, 255, 255, 255], false);
-                let window = render.add_window(window_builder, event_loop);
+                let window = window_builder.build(event_loop).unwrap();
+                render.add_window(&window);
                 let size = window.inner_size();
                 let width = size.width;
                 let height = size.height;
@@ -220,13 +224,13 @@ fn main() {
                     WindowEvent::CloseRequested => {
                         if window_id == main_window {
                             for (_, Instance { window, .. }) in windows.drain() {
-                                render.remove_window(&window);
+                                render.remove_window(window.id());
                             }
                             *control = ControlFlow::Exit;
                         } else {
                             let Instance { window, modal, .. } =
                                 windows.remove(&window_id).unwrap();
-                            render.remove_window(&window);
+                            render.remove_window(window.id());
                             if windows.is_empty() {
                                 *control = ControlFlow::Exit;
                             }
@@ -367,18 +371,16 @@ fn create_gui(
         .build(gui);
     let _text = gui
         .create_control()
-        .graphic(
-            Text::new(
-                "Open A Modal Window!".into(),
-                (0, 0),
-                crui::graphics::TextStyle {
-                    color: [0, 0, 0, 255].into(),
-                    font_size: 16.0,
-                    font_id,
-                    ..Default::default()
-                },
-            )
-        )
+        .graphic(Text::new(
+            "Open A Modal Window!".into(),
+            (0, 0),
+            crui::graphics::TextStyle {
+                color: [0, 0, 0, 255].into(),
+                font_size: 16.0,
+                font_id,
+                ..Default::default()
+            },
+        ))
         .layout(FitText)
         .parent(button)
         .build(gui);
@@ -424,18 +426,16 @@ fn create_gui(
         .build(gui);
     let _text = gui
         .create_control()
-        .graphic(
-            Text::new(
-                "Open A Non-Modal Window!".into(),
-                (0, 0),
-                crui::graphics::TextStyle {
-                    color: [0, 0, 0, 255].into(),
-                    font_size: 16.0,
-                    font_id,
-                    ..Default::default()
-                },
-            )
-        )
+        .graphic(Text::new(
+            "Open A Non-Modal Window!".into(),
+            (0, 0),
+            crui::graphics::TextStyle {
+                color: [0, 0, 0, 255].into(),
+                font_size: 16.0,
+                font_id,
+                ..Default::default()
+            },
+        ))
         .layout(FitText)
         .parent(button)
         .build(gui);

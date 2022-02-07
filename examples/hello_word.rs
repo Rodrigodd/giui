@@ -33,10 +33,13 @@ fn resize(
 fn main() {
     // create winit's window and event_loop
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().with_inner_size(PhysicalSize::new(400, 200));
+    let window = WindowBuilder::new()
+        .with_inner_size(PhysicalSize::new(400, 200))
+        .build(&event_loop)
+        .unwrap();
 
     // create the render and camera, and a texture for the glyphs rendering
-    let (window, mut render) = GLSpriteRender::new(window, &event_loop, true);
+    let mut render = GLSpriteRender::new(&window, true).unwrap();
     let mut camera = {
         let size = window.inner_size();
         let width = size.width;
