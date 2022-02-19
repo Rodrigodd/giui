@@ -276,6 +276,8 @@ impl Clone for Texture {
     }
 }
 impl Texture {
+    /// Createt a new Texture Graphic, with the given texture id, and the given uv rect.
+    /// The uv rect is in the format [x, y, w, h], with values in the range 0.0 to 1.0.
     pub fn new(texture: u32, uv_rect: [f32; 4]) -> Self {
         Self {
             texture,
