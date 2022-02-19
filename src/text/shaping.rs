@@ -1,11 +1,11 @@
 use crate::Color;
 use crate::{font::Fonts, text::layout::GlyphPosition, text::ShapeSpan};
 
-use ab_glyph::{point, Font as _, Glyph, GlyphId, ScaleFont as _};
-use harfbuzz_rs::{shape as hb_shape, Face, Font as HbFont, UnicodeBuffer};
-
 #[cfg(not(feature = "simple_shaping"))]
 pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPosition> {
+    use ab_glyph::{point, Glyph, GlyphId};
+    use harfbuzz_rs::{shape as hb_shape, Face, Font as HbFont, UnicodeBuffer};
+
     let bytes = &fonts.get(style.font_id).unwrap().data;
     let face = Face::from_bytes(bytes, 0);
     let font = HbFont::new(face);
@@ -87,6 +87,7 @@ pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPo
 
 #[cfg(feature = "simple_shaping")]
 pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPosition> {
+    use ab_glyph::{point, Font as _, Glyph, ScaleFont as _};
     let font = fonts
         .get(style.font_id)
         .expect("FontId is out of bounds")
@@ -111,7 +112,7 @@ pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPo
             }
         }
 
-        let mut advance = font.h_advance(glyph.id);
+        let advance = font.h_advance(glyph.id);
         if !glyphs.is_empty() {
             let last = glyphs.last_mut().unwrap();
             last.width += font.kern(last.glyph.id, glyph.id);

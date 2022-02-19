@@ -853,8 +853,6 @@ impl TextLayout {
 struct LineLayout {
     /// The glyphs
     glyphs: Vec<GlyphPosition>,
-    /// The byte range of the original text that this line layout represents.
-    byte_range: Range<usize>,
     /// Each section of text can have a diferent line measure. This vector preserves that. This is
     /// used when this layout is break in multiple lines.
     lines: Vec<Line>,
@@ -871,14 +869,8 @@ impl LineLayout {
         let shape_spans = &text.shape_spans;
         // assert that the given SpannedString has its shape_spans already computed
         assert!(!shape_spans.is_empty());
-        let byte_range = {
-            let start = shape_spans[span_range.start].byte_range.start;
-            let end = shape_spans[span_range.end - 1].byte_range.end;
-            start..end
-        };
         let mut this = Self {
             glyphs: Vec::new(),
-            byte_range,
             lines: Vec::new(),
             width: 0.0,
             height: 0.0,
