@@ -264,7 +264,7 @@ impl<'a> Context<'a> {
         self.render_dirty = true;
         let control = self.gui.controls.get_mut(id).unwrap();
         control.rect.dirty_render_dirty_flags();
-        &mut self.gui.controls.get_mut(id).unwrap().graphic
+        &mut control.graphic
     }
 
     pub fn set_graphic(&mut self, id: Id, graphic: Graphic) {
@@ -274,14 +274,11 @@ impl<'a> Context<'a> {
         self.render_dirty = true;
     }
 
-    pub fn get_rect_and_graphic(&mut self, id: Id) -> Option<(&mut Rect, &mut Graphic)> {
+    pub fn get_rect_and_graphic(&mut self, id: Id) -> (&mut Rect, &mut Graphic) {
         let control = self.gui.controls.get_mut(id).unwrap();
-        if let Graphic::None = control.graphic {
-            None
-        } else {
-            self.render_dirty = true;
-            Some((&mut control.rect, &mut control.graphic))
-        }
+        self.render_dirty = true;
+        control.rect.dirty_render_dirty_flags();
+        (&mut control.rect, &mut control.graphic)
     }
 
     pub fn is_active(&self, id: Id) -> bool {

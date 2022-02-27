@@ -98,7 +98,8 @@ impl<C: TextFieldCallback> TextField<C> {
 
     fn update_text(&mut self, this: Id, ctx: &mut Context) {
         let fonts = ctx.get_fonts();
-        if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {
+        if let (rect, Graphic::Text(text)) = ctx.get_rect_and_graphic(self.label) {
+            text.dirty();
             let text_layout = text.get_layout(fonts, rect).clone();
             if !self.multiline {
                 let min_size = text_layout.min_size();
@@ -118,7 +119,7 @@ impl<C: TextFieldCallback> TextField<C> {
 
     fn get_layout<'a>(&mut self, ctx: &'a mut Context) -> &'a mut TextLayout {
         let fonts = ctx.get_fonts();
-        if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {
+        if let (rect, Graphic::Text(text)) = ctx.get_rect_and_graphic(self.label) {
             text.get_layout(fonts, rect)
         } else {
             panic!("TextField label graphic is not Text");
@@ -257,7 +258,8 @@ impl<C: TextFieldCallback> TextField<C> {
 impl<C: TextFieldCallback> Behaviour for TextField<C> {
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         let fonts = ctx.get_fonts();
-        if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {
+        if let (rect, Graphic::Text(text)) = ctx.get_rect_and_graphic(self.label) {
+            text.dirty();
             if !self.multiline {
                 text.set_wrap(false);
                 let min_size = text.compute_min_size(fonts).unwrap_or([0.0, 0.0]);

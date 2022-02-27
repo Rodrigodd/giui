@@ -81,23 +81,22 @@ impl GuiRender {
         self.last_sprites_map.clear();
         let mut parents = vec![crate::Id::ROOT_ID];
         while let Some(parent) = parents.pop() {
-            if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
-                match graphic {
-                    Graphic::Panel(x) => {
-                        x.color_dirty = true;
-                    }
-                    Graphic::Texture(x) => {
-                        x.color_dirty = true;
-                    }
-                    Graphic::Icon(x) => {
-                        x.color_dirty = true;
-                    }
-                    Graphic::AnimatedIcon(x) => {
-                        x.color_dirty = true;
-                    }
-                    Graphic::Text(x) => x.dirty(),
-                    Graphic::None => {}
+            let graphic = ctx.get_graphic_mut(parent);
+            match graphic {
+                Graphic::Panel(x) => {
+                    x.color_dirty = true;
                 }
+                Graphic::Texture(x) => {
+                    x.color_dirty = true;
+                }
+                Graphic::Icon(x) => {
+                    x.color_dirty = true;
+                }
+                Graphic::AnimatedIcon(x) => {
+                    x.color_dirty = true;
+                }
+                Graphic::Text(x) => x.dirty(),
+                Graphic::None => {}
             }
             parents.extend(ctx.get_active_children(parent).iter().rev())
         }
@@ -156,7 +155,7 @@ impl GuiRender {
         let mut parents = vec![Id::ROOT_ID];
         while let Some(parent) = parents.pop() {
             parents.extend(ctx.get_active_children(parent).iter());
-            if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(parent) {
+            if let (rect, Graphic::Text(text)) = ctx.get_rect_and_graphic(parent) {
                 let (glyphs, _) = text.get_glyphs_and_rects(rect, fonts);
                 for glyph in glyphs {
                     add_to_queue(glyph.font_id, glyph.glyph.clone());
@@ -243,7 +242,8 @@ impl GuiRender {
                 masks.push((parents.len(), mask, mask_changed));
                 (mask, mask_changed)
             };
-            if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
+            {
+                let (rect, graphic) = ctx.get_rect_and_graphic(parent);
                 let mut compute_sprite = true;
                 let is_text = matches!(graphic, Graphic::Text(_));
                 let graphic_is_dirty = !rect.get_render_dirty_flags().is_empty()

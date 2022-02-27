@@ -33,7 +33,7 @@ impl Behaviour for InteractiveText {
     fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         let fonts = ctx.get_fonts();
         let (rect, text) = match ctx.get_rect_and_graphic(this) {
-            Some((a, Graphic::Text(b))) => (a, b),
+            (a, Graphic::Text(b)) => (a, b),
             _ => return,
         };
 
