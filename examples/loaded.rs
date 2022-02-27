@@ -965,6 +965,7 @@ impl OptionsGui {
             .behaviour(TextField::new(
                 caret,
                 input_text,
+                false,
                 style.text_field.clone(),
                 callback,
             ))

@@ -850,6 +850,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                 .behaviour(TextField::new(
                     caret,
                     input_text,
+                    false,
                     TextFieldStyle {
                         caret_color: Color::BLACK,
                         selection_color: SelectionColor {

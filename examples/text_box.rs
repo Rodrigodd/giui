@@ -35,7 +35,7 @@ fn main() {
             text_field(
                 gui.create_control(),
                 gui,
-                "Hello Word!".to_string(),
+                "Hello Word! This is my entire world!! And i like how it is... :)".to_string(),
                 TextFieldStyle {
                     background: OnFocusStyle {
                         normal: Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into(),
@@ -73,7 +73,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
     cb.behaviour(TextField::new(
         caret,
         input_text,
-        false,
+        true,
         Rc::new(style.clone()),
         callback,
     ))
@@ -91,12 +91,11 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
     .child_reserved(input_text, ctx, |cb, _| {
         cb.graphic(Text::new(
             initial_value,
-            (-1, 0),
+            (-1, -1),
             crui::graphics::TextStyle {
                 color: [0, 0, 0, 255].into(),
-                font_size: 72.0,
+                font_size: 22.0,
                 font_id,
-                ..Default::default()
             },
         ))
     })

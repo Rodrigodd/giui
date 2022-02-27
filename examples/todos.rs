@@ -225,6 +225,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
     cb.behaviour(TextField::new(
         caret,
         input_text,
+        false,
         Rc::new(style.clone()),
         callback,
     ))

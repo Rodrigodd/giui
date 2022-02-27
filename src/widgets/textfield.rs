@@ -42,16 +42,26 @@ impl TextFieldCallback for () {
 
 struct BlinkCaret;
 
+const SIDE_MARGIN: f32 = 5.0;
+const TOP_MARGIN: f32 = 5.0;
+
 pub struct TextField<C: TextFieldCallback> {
     callback: C,
     caret: Id,
     label: Id,
     editor: TextEditor,
     text_width: f32,
+    text_height: f32,
     this_width: f32,
-    /// The amount in pixels that the text is scrolled to the left.
+    this_height: f32,
+    /// The amount in pixels that the text is scrolled left.
     /// When there is no scroll, its value is -MARGIN.
     x_scroll: f32,
+    /// The amount in pixels that the text is scrolled up.
+    /// When there is no scroll, its value is -MARGIN.
+    y_scroll: f32,
+    /// If this is false, the TextField will always contain a sigle line.
+    multiline: bool,
     on_focus: bool,
     /// If it is non zero, the mouse is being dragged. 1 for single click, 2 for double click, etc...
     mouse_down: u8,
@@ -63,15 +73,19 @@ pub struct TextField<C: TextFieldCallback> {
     blink_event: Option<u64>,
 }
 impl<C: TextFieldCallback> TextField<C> {
-    pub fn new(caret: Id, label: Id, style: Rc<TextFieldStyle>, callback: C) -> Self {
+    pub fn new(caret: Id, label: Id, multiline: bool, style: Rc<TextFieldStyle>, callback: C) -> Self {
         Self {
             callback,
             caret,
             label,
             editor: TextEditor::new(),
             text_width: 0.0,
+            text_height: 0.0,
             this_width: 0.0,
+            this_height: 0.0,
             x_scroll: 0.0,
+            y_scroll: 0.0,
+            multiline,
             on_focus: false,
             mouse_down: 0,
             drag_start: 0,
@@ -86,9 +100,18 @@ impl<C: TextFieldCallback> TextField<C> {
         let fonts = ctx.get_fonts();
         if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {
             let text_layout = text.get_layout(fonts, rect).clone();
-            let min_size = text_layout.min_size();
-            self.text_width = min_size[0];
-            rect.set_min_size(min_size);
+            if !self.multiline {
+                let min_size = text_layout.min_size();
+                self.text_width = min_size[0];
+                self.text_height = min_size[1];
+                rect.set_min_size(min_size);
+            } else {
+                self.text_width = text_layout.width();
+                self.text_height = text_layout.height();
+                rect.set_min_size([0.0, self.text_height]);
+                rect.anchors = [0.0, 0.0, 1.0, 1.0];
+                rect.margins = [SIDE_MARGIN, TOP_MARGIN, -SIDE_MARGIN, -TOP_MARGIN];
+            }
             self.update_carret(this, ctx, true);
         }
     }
@@ -107,6 +130,8 @@ impl<C: TextFieldCallback> TextField<C> {
     }
 
     fn update_carret(&mut self, this: Id, ctx: &mut Context, focus_caret: bool) {
+        // Cancel the scheduled blink event. The event will rescheduled later in the function if
+        // necessary.
         if let Some(event_id) = self.blink_event {
             ctx.cancel_scheduled_event(event_id);
         } else {
@@ -116,48 +141,75 @@ impl<C: TextFieldCallback> TextField<C> {
         let text_layout = self.get_layout(ctx);
         let mut caret_pos = self.editor.get_caret_position_and_height(text_layout);
 
-        const MARGIN: f32 = 5.0;
-
         let this_rect = ctx.get_rect(this);
         self.this_width = this_rect[2] - this_rect[0];
+        self.this_height = this_rect[3] - this_rect[1];
         let label_rect = ctx.get_rect(self.label);
         if let Graphic::Text(x) = ctx.get_graphic_mut(self.label) {
             let anchor = x.get_align_anchor(label_rect);
             caret_pos[0] += anchor[0] - label_rect[0];
             caret_pos[1] += anchor[1] - label_rect[1];
-        } else {
         }
 
-        // caret_pos[0] += label_rect[0];
-        // caret_pos[1] += label_rect[1] - this_rect[1];
-
-        if self.this_width - MARGIN * 2.0 > self.text_width {
-            self.x_scroll = -MARGIN;
-        } else {
-            self.x_scroll = self
-                .x_scroll
-                .min(self.text_width - self.this_width + MARGIN);
-            if focus_caret {
-                if caret_pos[0] - self.x_scroll > self.this_width - MARGIN {
-                    self.x_scroll = caret_pos[0] - (self.this_width - MARGIN);
-                }
-                if caret_pos[0] - self.x_scroll < MARGIN {
-                    self.x_scroll = caret_pos[0] - MARGIN;
-                }
+        if !self.multiline {
+            if self.this_width - SIDE_MARGIN * 2.0 > self.text_width {
+                self.x_scroll = -SIDE_MARGIN;
             } else {
-                if self.text_width - self.x_scroll < self.this_width - MARGIN {
-                    self.x_scroll = self.text_width - (self.this_width - MARGIN);
-                }
-                if self.x_scroll < -MARGIN {
-                    self.x_scroll = -MARGIN;
+                self.x_scroll = self
+                    .x_scroll
+                    .min(self.text_width - self.this_width + SIDE_MARGIN);
+                if focus_caret {
+                    if caret_pos[0] - self.x_scroll > self.this_width - SIDE_MARGIN {
+                        self.x_scroll = caret_pos[0] - (self.this_width - SIDE_MARGIN);
+                    }
+                    if caret_pos[0] - self.x_scroll < SIDE_MARGIN {
+                        self.x_scroll = caret_pos[0] - SIDE_MARGIN;
+                    }
+                } else {
+                    if self.text_width - self.x_scroll < self.this_width - SIDE_MARGIN {
+                        self.x_scroll = self.text_width - (self.this_width - SIDE_MARGIN);
+                    }
+                    if self.x_scroll < -SIDE_MARGIN {
+                        self.x_scroll = -SIDE_MARGIN;
+                    }
                 }
             }
+
+            ctx.set_margin_left(self.label, -self.x_scroll);
+        } else {
+            self.x_scroll = -SIDE_MARGIN;
+
+            if self.this_height - TOP_MARGIN * 2.0 > self.text_height {
+                self.y_scroll = -TOP_MARGIN;
+            } else {
+                self.y_scroll = self
+                    .y_scroll
+                    .min(self.text_height - self.this_height + TOP_MARGIN);
+                if focus_caret {
+                    if caret_pos[1] - self.y_scroll > self.this_height - TOP_MARGIN {
+                        self.y_scroll = caret_pos[1] - (self.this_height - TOP_MARGIN);
+                    }
+                    if caret_pos[1] - caret_pos[2] - self.y_scroll < TOP_MARGIN {
+                        self.y_scroll = caret_pos[1] - caret_pos[2] - TOP_MARGIN;
+                    }
+                } else {
+                    if self.text_height - self.y_scroll < self.this_height - TOP_MARGIN {
+                        self.y_scroll = self.text_height - (self.this_height - TOP_MARGIN);
+                    }
+                    if self.y_scroll < -TOP_MARGIN {
+                        self.y_scroll = -TOP_MARGIN;
+                    }
+                }
+            }
+
+            ctx.set_margin_top(self.label, -self.y_scroll);
         }
-
-        ctx.set_margin_left(self.label, -self.x_scroll);
-
         caret_pos[0] -= self.x_scroll;
+        caret_pos[1] -= self.y_scroll;
 
+        // If there is selected text, hide the cursor and add the Selection span to the text
+        // graphic. Otherwise, clear the spans, update the cursor and schedule the cursor blink
+        // event if necessary.
         let selection_range = self.editor.selection_range();
         if selection_range.len() > 0 {
             ctx.set_margins(self.caret, [0.0; 4]);
@@ -173,17 +225,11 @@ impl<C: TextFieldCallback> TextField<C> {
             }
         } else {
             if let Graphic::Text(text) = ctx.get_graphic_mut(self.label) {
-                text.clear_spans();
+                self.selection_span.take().map(|x| text.remove_span(x));
             }
             ctx.get_graphic_mut(self.caret)
                 .set_color(self.style.caret_color);
-            if self.on_focus {
-                self.blink_event = Some(ctx.send_event_to_scheduled(
-                    this,
-                    BlinkCaret,
-                    Instant::now() + Duration::from_millis(500),
-                ));
-            }
+
             if self.on_focus && !self.blink {
                 ctx.set_margins(
                     self.caret,
@@ -197,6 +243,14 @@ impl<C: TextFieldCallback> TextField<C> {
             } else {
                 ctx.set_margins(self.caret, [0.0, 0.0, 0.0, 0.0]);
             }
+
+            if self.on_focus {
+                self.blink_event = Some(ctx.send_event_to_scheduled(
+                    this,
+                    BlinkCaret,
+                    Instant::now() + Duration::from_millis(500),
+                ));
+            }
         }
     }
 }
@@ -204,10 +258,24 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         let fonts = ctx.get_fonts();
         if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {
-            text.set_wrap(false);
-            let min_size = text.compute_min_size(fonts).unwrap_or([0.0, 0.0]);
-            self.text_width = min_size[0];
-            rect.set_min_size(min_size);
+            // let min_size = text.compute_min_size(fonts).unwrap_or([0.0, 0.0]);
+            // self.text_width = min_size[0];
+            // rect.set_min_size(min_size);
+            if !self.multiline {
+                text.set_wrap(false);
+                let min_size = text.compute_min_size(fonts).unwrap_or([0.0, 0.0]);
+                self.text_width = min_size[0];
+                self.text_height = min_size[1];
+                rect.set_min_size(min_size);
+            } else {
+                text.set_wrap(true);
+                rect.set_min_size([0.0, 0.0]);
+                rect.anchors = [0.0, 0.0, 1.0, 1.0];
+                rect.margins = [SIDE_MARGIN, 0.0, -SIDE_MARGIN, 0.0];
+                let text_layout = text.get_layout(fonts, rect).clone();
+                self.text_width = text_layout.width();
+                self.text_height = text_layout.height();
+            }
             self.update_text(this, ctx);
             ctx.move_to_front(self.label);
             ctx.set_graphic(this, self.style.background.normal.clone());
@@ -233,28 +301,29 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     fn input_flags(&self) -> InputFlags {
         let mut flags = InputFlags::MOUSE | InputFlags::FOCUS;
 
-        if self.text_width > self.this_width {
+        if !self.multiline && self.text_width > self.this_width
+            || self.multiline && self.text_height > self.this_height
+        {
             flags |= InputFlags::SCROLL;
         }
         flags
     }
 
-    fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {
-        let delta = if delta[0].abs() != 0.0 {
-            delta[0]
-        } else {
-            delta[1]
-        };
-        self.x_scroll -= delta;
+    fn on_scroll_event(&mut self, mut delta: [f32; 2], this: Id, ctx: &mut Context) {
+        // allow scrolling in a text field with the mouse weel.
+        if !self.multiline && delta[0].abs() == 0.0 {
+            delta[0] = delta[1];
+        }
+        self.x_scroll -= delta[0];
+        self.y_scroll -= delta[1];
         self.update_carret(this, ctx, false);
     }
 
     fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
         use crate::MouseButton::*;
         let label_rect = ctx.get_rect(self.label);
-        let anchor_x = if let Graphic::Text(x) = ctx.get_graphic_mut(self.label) {
-            let anchor = x.get_align_anchor(label_rect);
-            anchor[0]
+        let anchor = if let Graphic::Text(x) = ctx.get_graphic_mut(self.label) {
+            x.get_align_anchor(label_rect)
         } else {
             panic!("TextField label graphic is not Text");
         };
@@ -267,9 +336,10 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 ctx.set_cursor(CursorIcon::Default);
             }
             MouseEvent::Down(Left) => {
-                let x = mouse.pos[0] - anchor_x;
+                let x = mouse.pos[0] - anchor[0];
+                let y = mouse.pos[1] - anchor[1];
                 let byte_index = text_layout
-                    .byte_index_from_position(x, 0.0)
+                    .byte_index_from_position(x, y)
                     .unwrap_or_else(|x| x);
                 if byte_index == self.drag_start {
                     match mouse.click_count {
@@ -311,18 +381,20 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
             MouseEvent::Moved => match self.mouse_down {
                 0 => {}
                 1 => {
-                    let x = mouse.pos[0] - anchor_x;
+                    let x = mouse.pos[0] - anchor[0];
+                    let y = mouse.pos[1] - anchor[1];
                     let byte_index = text_layout
-                        .byte_index_from_position(x, 0.0)
+                        .byte_index_from_position(x, y)
                         .unwrap_or_else(|x| x);
                     self.editor
                         .move_cursor_to_byte_index(byte_index, true, text_layout);
                     self.update_carret(this, ctx, true);
                 }
                 2..=u8::MAX => {
-                    let x = mouse.pos[0] - anchor_x;
+                    let x = mouse.pos[0] - anchor[0];
+                    let y = mouse.pos[1] - anchor[1];
                     let byte_index = text_layout
-                        .byte_index_from_position(x, 0.0)
+                        .byte_index_from_position(x, y)
                         .unwrap_or_else(|x| x);
                     self.editor
                         .select_words_at_byte_range(self.drag_start..byte_index, text_layout);
@@ -452,7 +524,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     if modifiers.ctrl() {
                         self.editor
                             .move_cursor_hor(Words(-1), modifiers.shift(), text_layout);
-                    } else {
+                    } else if modifiers.is_empty() || modifiers.shift() {
                         self.editor
                             .move_cursor_hor(Cluster(-1), modifiers.shift(), text_layout);
                     }
@@ -462,9 +534,29 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     if modifiers.ctrl() {
                         self.editor
                             .move_cursor_hor(Words(1), modifiers.shift(), text_layout);
-                    } else {
+                    } else if modifiers.is_empty() || modifiers.shift() {
                         self.editor
                             .move_cursor_hor(Cluster(1), modifiers.shift(), text_layout);
+                    }
+                    self.update_carret(this, ctx, true);
+                }
+                VirtualKeyCode::Up => {
+                    if !self.multiline {
+                        return false;
+                    }
+                    if modifiers.is_empty() || modifiers.shift() {
+                        self.editor
+                            .move_cursor_vert(-1, modifiers.shift(), text_layout);
+                    }
+                    self.update_carret(this, ctx, true);
+                }
+                VirtualKeyCode::Down => {
+                    if !self.multiline {
+                        return false;
+                    }
+                    if modifiers.is_empty() || modifiers.shift() {
+                        self.editor
+                            .move_cursor_vert(1, modifiers.shift(), text_layout);
                     }
                     self.update_carret(this, ctx, true);
                 }

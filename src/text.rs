@@ -766,9 +766,7 @@ impl Text {
     }
 
     pub fn get_layout(&mut self, fonts: &Fonts, rect: &mut Rect) -> &mut TextLayout {
-        if self.text.is_spanned() {
-            self.update_glyphs(rect, fonts);
-        }
+        self.get_glyphs_and_rects(rect, fonts);
         self.text.as_layout()
     }
 
