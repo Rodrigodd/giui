@@ -21,6 +21,8 @@ bitflags! {
         const HEIGHT = 0x2;
         /// The rect of the rect has changed
         const RECT = 0x4;
+        /// Some parameter of the graphic has change.
+        const OTHER = 0x8;
     }
 }
 impl Default for RenderDirtyFlags {
@@ -112,7 +114,7 @@ impl Rect {
     }
 
     pub fn dirty_render_dirty_flags(&mut self) {
-        self.render_dirty_flags = RenderDirtyFlags::all();
+        self.render_dirty_flags = RenderDirtyFlags::OTHER;
     }
 
     pub fn get_layout_dirty_flags(&mut self) -> LayoutDirtyFlags {
@@ -277,6 +279,7 @@ impl Rect {
     #[inline]
     pub fn set_width(&mut self, width: f32) {
         if !cmp_float(self.get_width(), width) {
+            println!("add WIDTH dirty flag");
             self.render_dirty_flags.insert(RenderDirtyFlags::WIDTH);
             self.layout_dirty_flags.insert(LayoutDirtyFlags::WIDTH);
         }

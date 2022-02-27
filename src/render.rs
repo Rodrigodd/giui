@@ -98,9 +98,6 @@ impl GuiRender {
                     Graphic::Text(x) => x.dirty(),
                     Graphic::None => {}
                 }
-                rect.dirty_render_dirty_flags();
-            } else {
-                ctx.get_layouting(parent).dirty_render_dirty_flags();
             }
             parents.extend(ctx.get_active_children(parent).iter().rev())
         }
@@ -249,9 +246,7 @@ impl GuiRender {
             if let Some((rect, graphic)) = ctx.get_rect_and_graphic(parent) {
                 let mut compute_sprite = true;
                 let is_text = matches!(graphic, Graphic::Text(_));
-                let graphic_is_dirty = rect
-                    .get_render_dirty_flags()
-                    .contains(RenderDirtyFlags::RECT)
+                let graphic_is_dirty = !rect.get_render_dirty_flags().is_empty()
                     || mask_changed
                     || graphic.need_rebuild()
                     || (is_text && !font_texture_valid);

@@ -258,9 +258,6 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         let fonts = ctx.get_fonts();
         if let Some((rect, Graphic::Text(text))) = ctx.get_rect_and_graphic(self.label) {
-            // let min_size = text.compute_min_size(fonts).unwrap_or([0.0, 0.0]);
-            // self.text_width = min_size[0];
-            // rect.set_min_size(min_size);
             if !self.multiline {
                 text.set_wrap(false);
                 let min_size = text.compute_min_size(fonts).unwrap_or([0.0, 0.0]);
@@ -276,12 +273,15 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                 self.text_width = text_layout.width();
                 self.text_height = text_layout.height();
             }
-            self.update_text(this, ctx);
             ctx.move_to_front(self.label);
             ctx.set_graphic(this, self.style.background.normal.clone());
         } else {
             panic!("TextField label graphic is not Text");
         }
+    }
+
+    fn on_active(&mut self, this: Id, ctx: &mut Context) {
+        self.update_text(this, ctx);
     }
 
     fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {

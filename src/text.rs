@@ -594,6 +594,7 @@ impl InnerText {
 #[derive(Debug)]
 pub struct Text {
     text: InnerText,
+    /// Keep track if there was a change in the text since the last update.
     pub(crate) text_dirty: bool,
     min_size: Option<[f32; 2]>,
     last_pos: [f32; 2],
@@ -779,6 +780,7 @@ impl Text {
         let width_change = dirty_flags.contains(RenderDirtyFlags::WIDTH)
             && self.min_size.map_or(true, |x| rect.get_width() < x[0]);
         if self.text.is_spanned() || self.text_dirty || width_change {
+            self.text_dirty = false;
             self.update_glyphs(rect, fonts);
         } else if dirty_flags.contains(RenderDirtyFlags::RECT) {
             let rect = *rect.get_rect();
