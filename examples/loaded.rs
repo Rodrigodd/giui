@@ -407,15 +407,8 @@ impl OptionsGui {
             this.pages[0],
             page0_cont,
             |cb, _| {
-                cb.graphic(
-                    style
-                        .menu
-                        .button
-                        .normal
-                        .clone()
-                        .with_color([230, 230, 230, 255].into()),
-                )
-                .layout(VBoxLayout::new(2.0, [5.0, 5.0, 5.0, 5.0], -1))
+                cb.graphic(style.page_background.clone())
+                    .layout(VBoxLayout::new(2.0, [5.0, 5.0, 5.0, 5.0], -1))
             },
             style,
         )
@@ -426,14 +419,7 @@ impl OptionsGui {
         this.create_page0(gui, page0_cont, style);
         let page1 = gui
             .create_control_reserved(this.pages[1])
-            .graphic(
-                style
-                    .menu
-                    .button
-                    .normal
-                    .clone()
-                    .with_color([230, 230, 230, 255].into()),
-            )
+            .graphic(style.page_background.clone())
             .expand_y(true)
             .parent(surface)
             .active(false)
