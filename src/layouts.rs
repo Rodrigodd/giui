@@ -16,7 +16,6 @@ impl Layout for FitText {
             .unwrap_or([0.0, 0.0]);
         min_size
     }
-    fn update_layouts(&mut self, _: Id, _: &mut LayoutContext) {}
 }
 
 pub struct MarginLayout {
