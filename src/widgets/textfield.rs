@@ -494,12 +494,17 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     }
                 }
                 VirtualKeyCode::Return => {
-                    let mut text = text_layout.text().to_owned();
-                    self.callback.on_submit(this, ctx, &mut text);
-                    let text_layout = self.get_layout(ctx);
-                    if text != text_layout.text() {
-                        self.editor.select_all(text_layout);
-                        self.editor.insert_text(&text, fonts, text_layout);
+                    if self.multiline && modifiers.ctrl() {
+                        self.editor.insert_text("\n", fonts, text_layout);
+                    } else {
+                        let mut text = text_layout.text().to_owned();
+                        self.callback.on_submit(this, ctx, &mut text);
+                        let text_layout = self.get_layout(ctx);
+                        if text != text_layout.text() {
+                            self.editor.select_all(text_layout);
+                            self.editor.insert_text(&text, fonts, text_layout);
+                            self.update_text(this, ctx);
+                        }
                     }
                 }
                 VirtualKeyCode::Back => {
