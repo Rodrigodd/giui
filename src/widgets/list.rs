@@ -341,13 +341,9 @@ impl<C: ListBuilder> List<C> {
 
             let y = view_rect[1] + last.y;
             let gap = (view_rect[3] - y) / last.height;
-            debug_assert!(
-                (0.0..1.0).contains(&gap),
-                "gap: {}, height: {}, y: {}",
-                gap,
-                last.height,
-                last.y
-            );
+            if !(0.0..1.0).contains(&gap) {
+                log::error!("gap: {}, height: {}, y: {}", gap, last.height, last.y);
+            }
             self.end_y = last.i as f32 + gap;
             // log::trace!("end at {}", self.end_y);
         }
@@ -386,13 +382,9 @@ impl<C: ListBuilder> List<C> {
             let first = self.created_items.iter().next().unwrap().1;
 
             let gap = -first.y / first.height;
-            debug_assert!(
-                (0.0..1.0).contains(&gap),
-                "gap: {}, height: {}, y: {}",
-                gap,
-                first.height,
-                first.y
-            );
+            if !(0.0..1.0).contains(&gap) {
+                log::error!("gap: {}, height: {}, y: {}", gap, first.height, first.y);
+            }
             self.start_y = first.i as f32 + gap;
         }
     }
@@ -441,15 +433,11 @@ impl<C: ListBuilder> List<C> {
 
             let y = view_rect[1] + last.y;
             let gap = (view_rect[3] - y) / last.height;
-            debug_assert!(
-                (0.0..1.0).contains(&gap),
-                "gap: {}, height: {}, y: {}",
-                gap,
-                last.height,
-                last.y
-            );
+            if !(0.0..1.0).contains(&gap) {
+                log::error!("gap: {}, height: {}, y: {}", gap, last.height, last.y);
+            }
             self.end_y = last.i as f32 + gap;
-            // log::trace!("end at {}", self.end_y);
+            log::trace!("end at {}", self.end_y);
         }
     }
 
@@ -545,26 +533,18 @@ impl<C: ListBuilder> List<C> {
                 let first = self.created_items.iter().next().unwrap().1;
 
                 let gap = -first.y / first.height;
-                debug_assert!(
-                    (0.0..1.0).contains(&gap),
-                    "gap: {}, height: {}, y: {}",
-                    gap,
-                    first.height,
-                    first.y
-                );
+                if !(0.0..1.0).contains(&gap) {
+                    log::error!("gap: {}, height: {}, y: {}", gap, first.height, first.y);
+                }
                 self.start_y = first.i as f32 + gap;
             }
             {
                 let last = self.created_items.iter().rev().next().unwrap().1;
 
                 let mut gap = (view_rect[3] - view_rect[1] - last.y) / last.height;
-                debug_assert!(
-                    (0.0..=1.0).contains(&gap),
-                    "gap: {}, height: {}, y: {}",
-                    gap,
-                    last.height,
-                    last.y
-                );
+                if !(0.0..1.0).contains(&gap) {
+                    log::error!("gap: {}, height: {}, y: {}", gap, last.height, last.y);
+                }
                 gap = gap.clamp(0.0, 1.0 - f32::EPSILON);
                 self.end_y = last.i as f32 + gap;
             }
