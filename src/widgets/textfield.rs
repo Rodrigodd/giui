@@ -26,6 +26,12 @@ pub trait TextFieldCallback {
     /// Called when the TextField is unfocused. The text of the TextField can be
     /// change, while handling this event.
     fn on_unfocus(&mut self, this: Id, ctx: &mut Context, text: &mut String);
+
+    /// Receive keyboard events that was not handled by the TextField.
+    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
+        let _ = (event, this, ctx);
+        false
+    }
 }
 impl<F: FnMut(Id, &mut Context, &mut String) + 'static> TextFieldCallback for F {
     fn on_submit(&mut self, this: Id, ctx: &mut Context, text: &mut String) {
@@ -441,155 +447,164 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
             ctx.cancel_scheduled_event(event_id);
         }
         self.update_carret(this, ctx, false);
-        let fonts = ctx.get_fonts();
-        let modifiers = ctx.modifiers();
-        let text_layout = self.get_layout(ctx);
-        match event {
-            KeyboardEvent::Char(ch) => {
-                log::trace!("insert {}", ch);
-                self.editor
-                    .insert_text(ch.encode_utf8(&mut [0; 4]), fonts, text_layout);
-                log::trace!("text: {}", self.text(ctx));
-                self.update_text(this, ctx);
-                let text = self.text(ctx).to_owned();
-                self.callback.on_change(this, ctx, &text);
-            }
-            KeyboardEvent::Pressed(key_code) => match key_code {
-                // TODO: find a better way to escape non text events. (Maybe wait for the new winit
-                // Keyboard input model, issue #753 on winit repo).
-                VirtualKeyCode::Tab
-                | VirtualKeyCode::F1
-                | VirtualKeyCode::F2
-                | VirtualKeyCode::F3
-                | VirtualKeyCode::F4
-                | VirtualKeyCode::F5
-                | VirtualKeyCode::F6
-                | VirtualKeyCode::F7
-                | VirtualKeyCode::F8
-                | VirtualKeyCode::F9
-                | VirtualKeyCode::F10
-                | VirtualKeyCode::F11
-                | VirtualKeyCode::F12 => return false,
-                VirtualKeyCode::C | VirtualKeyCode::X => {
-                    if modifiers.ctrl() {
-                        let range = self.editor.selection_range();
-                        if !range.is_empty() {
-                            let mut cliptobard = ClipboardContext::new().unwrap();
-                            let _ = cliptobard.set_contents(text_layout.text()[range].to_owned());
-                            if key_code == VirtualKeyCode::X {
-                                self.editor.insert_text("", fonts, text_layout);
+        let mut handle_event = || {
+            let fonts = ctx.get_fonts();
+            let modifiers = ctx.modifiers();
+            let text_layout = self.get_layout(ctx);
+            match event {
+                KeyboardEvent::Char(ch) => {
+                    log::trace!("insert {}", ch);
+                    self.editor
+                        .insert_text(ch.encode_utf8(&mut [0; 4]), fonts, text_layout);
+                    log::trace!("text: {}", self.text(ctx));
+                    self.update_text(this, ctx);
+                    let text = self.text(ctx).to_owned();
+                    self.callback.on_change(this, ctx, &text);
+                }
+                KeyboardEvent::Pressed(key_code) => match key_code {
+                    // TODO: find a better way to escape non text events. (Maybe wait for the new winit
+                    // Keyboard input model, issue #753 on winit repo).
+                    VirtualKeyCode::Tab
+                    | VirtualKeyCode::Escape
+                    | VirtualKeyCode::F1
+                    | VirtualKeyCode::F2
+                    | VirtualKeyCode::F3
+                    | VirtualKeyCode::F4
+                    | VirtualKeyCode::F5
+                    | VirtualKeyCode::F6
+                    | VirtualKeyCode::F7
+                    | VirtualKeyCode::F8
+                    | VirtualKeyCode::F9
+                    | VirtualKeyCode::F10
+                    | VirtualKeyCode::F11
+                    | VirtualKeyCode::F12 => return false,
+                    VirtualKeyCode::C | VirtualKeyCode::X => {
+                        if modifiers.ctrl() {
+                            let range = self.editor.selection_range();
+                            if !range.is_empty() {
+                                let mut cliptobard = ClipboardContext::new().unwrap();
+                                let _ =
+                                    cliptobard.set_contents(text_layout.text()[range].to_owned());
+                                if key_code == VirtualKeyCode::X {
+                                    self.editor.insert_text("", fonts, text_layout);
+                                }
                             }
                         }
                     }
-                }
-                VirtualKeyCode::V => {
-                    if modifiers.ctrl() {
-                        let mut clipboard = ClipboardContext::new().unwrap();
-                        if let Ok(text) = clipboard.get_contents() {
-                            let text = text.replace(|x: char| x.is_control(), "");
-                            self.editor.insert_text(&text, fonts, text_layout);
-                            self.update_text(this, ctx);
-                            let text = self.text(ctx).to_owned();
-                            self.callback.on_change(this, ctx, &text);
+                    VirtualKeyCode::V => {
+                        if modifiers.ctrl() {
+                            let mut clipboard = ClipboardContext::new().unwrap();
+                            if let Ok(text) = clipboard.get_contents() {
+                                let text = text.replace(|x: char| x.is_control(), "");
+                                self.editor.insert_text(&text, fonts, text_layout);
+                                self.update_text(this, ctx);
+                                let text = self.text(ctx).to_owned();
+                                self.callback.on_change(this, ctx, &text);
+                            }
                         }
                     }
-                }
-                VirtualKeyCode::A => {
-                    if modifiers.ctrl() {
-                        self.editor.select_all(text_layout);
-                    }
-                }
-                VirtualKeyCode::Return => {
-                    if self.multiline && modifiers.ctrl() {
-                        self.editor.insert_text("\n", fonts, text_layout);
-                    } else {
-                        let mut text = text_layout.text().to_owned();
-                        self.callback.on_submit(this, ctx, &mut text);
-                        let text_layout = self.get_layout(ctx);
-                        if text != text_layout.text() {
+                    VirtualKeyCode::A => {
+                        if modifiers.ctrl() {
                             self.editor.select_all(text_layout);
-                            self.editor.insert_text(&text, fonts, text_layout);
-                            self.update_text(this, ctx);
                         }
                     }
-                }
-                VirtualKeyCode::Back => {
-                    if modifiers.ctrl() {
-                        self.editor.delete_hor(Words(-1), fonts, text_layout);
-                    } else {
-                        self.editor.delete_hor(Cluster(-1), fonts, text_layout);
+                    VirtualKeyCode::Return => {
+                        if self.multiline && modifiers.ctrl() {
+                            self.editor.insert_text("\n", fonts, text_layout);
+                        } else {
+                            let mut text = text_layout.text().to_owned();
+                            self.callback.on_submit(this, ctx, &mut text);
+                            let text_layout = self.get_layout(ctx);
+                            if text != text_layout.text() {
+                                self.editor.select_all(text_layout);
+                                self.editor.insert_text(&text, fonts, text_layout);
+                                self.update_text(this, ctx);
+                            }
+                        }
                     }
-                    self.update_text(this, ctx);
-                    let text = self.text(ctx).to_owned();
-                    self.callback.on_change(this, ctx, &text);
-                }
-                VirtualKeyCode::Delete => {
-                    if modifiers.ctrl() {
-                        self.editor.delete_hor(Words(1), fonts, text_layout);
-                    } else {
-                        self.editor.delete_hor(Cluster(1), fonts, text_layout);
+                    VirtualKeyCode::Back => {
+                        if modifiers.ctrl() {
+                            self.editor.delete_hor(Words(-1), fonts, text_layout);
+                        } else {
+                            self.editor.delete_hor(Cluster(-1), fonts, text_layout);
+                        }
+                        self.update_text(this, ctx);
+                        let text = self.text(ctx).to_owned();
+                        self.callback.on_change(this, ctx, &text);
                     }
-                    self.update_text(this, ctx);
-                    let text = self.text(ctx).to_owned();
-                    self.callback.on_change(this, ctx, &text);
-                }
-                VirtualKeyCode::Left => {
-                    if modifiers.ctrl() {
-                        self.editor
-                            .move_cursor_hor(Words(-1), modifiers.shift(), text_layout);
-                    } else if modifiers.is_empty() || modifiers.shift() {
-                        self.editor
-                            .move_cursor_hor(Cluster(-1), modifiers.shift(), text_layout);
+                    VirtualKeyCode::Delete => {
+                        if modifiers.ctrl() {
+                            self.editor.delete_hor(Words(1), fonts, text_layout);
+                        } else {
+                            self.editor.delete_hor(Cluster(1), fonts, text_layout);
+                        }
+                        self.update_text(this, ctx);
+                        let text = self.text(ctx).to_owned();
+                        self.callback.on_change(this, ctx, &text);
                     }
-                    self.update_carret(this, ctx, true);
-                }
-                VirtualKeyCode::Right => {
-                    if modifiers.ctrl() {
-                        self.editor
-                            .move_cursor_hor(Words(1), modifiers.shift(), text_layout);
-                    } else if modifiers.is_empty() || modifiers.shift() {
-                        self.editor
-                            .move_cursor_hor(Cluster(1), modifiers.shift(), text_layout);
+                    VirtualKeyCode::Left => {
+                        if modifiers.ctrl() {
+                            self.editor
+                                .move_cursor_hor(Words(-1), modifiers.shift(), text_layout);
+                        } else if modifiers.is_empty() || modifiers.shift() {
+                            self.editor.move_cursor_hor(
+                                Cluster(-1),
+                                modifiers.shift(),
+                                text_layout,
+                            );
+                        }
+                        self.update_carret(this, ctx, true);
                     }
-                    self.update_carret(this, ctx, true);
-                }
-                VirtualKeyCode::Up => {
-                    if !self.multiline {
+                    VirtualKeyCode::Right => {
+                        if modifiers.ctrl() {
+                            self.editor
+                                .move_cursor_hor(Words(1), modifiers.shift(), text_layout);
+                        } else if modifiers.is_empty() || modifiers.shift() {
+                            self.editor
+                                .move_cursor_hor(Cluster(1), modifiers.shift(), text_layout);
+                        }
+                        self.update_carret(this, ctx, true);
+                    }
+                    VirtualKeyCode::Up => {
+                        if !self.multiline {
+                            return false;
+                        }
+                        if modifiers.is_empty() || modifiers.shift() {
+                            self.editor
+                                .move_cursor_vert(-1, modifiers.shift(), text_layout);
+                        }
+                        self.update_carret(this, ctx, true);
+                    }
+                    VirtualKeyCode::Down => {
+                        if !self.multiline {
+                            return false;
+                        }
+                        if modifiers.is_empty() || modifiers.shift() {
+                            self.editor
+                                .move_cursor_vert(1, modifiers.shift(), text_layout);
+                        }
+                        self.update_carret(this, ctx, true);
+                    }
+                    VirtualKeyCode::Home => {
+                        self.editor
+                            .move_cursor_line_start(modifiers.shift(), text_layout);
+                        self.update_carret(this, ctx, true);
+                    }
+                    VirtualKeyCode::End => {
+                        self.editor
+                            .move_cursor_line_end(modifiers.shift(), text_layout);
+                        self.update_carret(this, ctx, true);
+                    }
+                    _ if !modifiers.is_empty() => {
                         return false;
                     }
-                    if modifiers.is_empty() || modifiers.shift() {
-                        self.editor
-                            .move_cursor_vert(-1, modifiers.shift(), text_layout);
-                    }
-                    self.update_carret(this, ctx, true);
-                }
-                VirtualKeyCode::Down => {
-                    if !self.multiline {
-                        return false;
-                    }
-                    if modifiers.is_empty() || modifiers.shift() {
-                        self.editor
-                            .move_cursor_vert(1, modifiers.shift(), text_layout);
-                    }
-                    self.update_carret(this, ctx, true);
-                }
-                VirtualKeyCode::Home => {
-                    self.editor
-                        .move_cursor_line_start(modifiers.shift(), text_layout);
-                    self.update_carret(this, ctx, true);
-                }
-                VirtualKeyCode::End => {
-                    self.editor
-                        .move_cursor_line_end(modifiers.shift(), text_layout);
-                    self.update_carret(this, ctx, true);
-                }
-                _ if !modifiers.is_empty() => {
-                    return false;
-                }
-                _ => {}
-            },
-            KeyboardEvent::Release(_) => {}
-        }
-        true
+                    _ => {}
+                },
+                KeyboardEvent::Release(_) => {}
+            }
+            true
+        };
+
+        handle_event() || self.callback.on_keyboard_event(event, this, ctx)
     }
 }
