@@ -821,12 +821,14 @@ impl Gui {
                 .unwrap_or_else(|| "None".to_string())
         );
 
-        let id = if id.map_or(false, |id| self.controls.get(id).map_or(true, |x| !x.really_active)) {
+        let id = if id.map_or(false, |id| {
+            self.controls.get(id).map_or(true, |x| !x.really_active)
+        }) {
             log::trace!(
                 "{} is not active yet, focusing None",
                 id.map(|x| x.to_string())
-                .unwrap_or_else(|| "None".to_string())
-                );
+                    .unwrap_or_else(|| "None".to_string())
+            );
             None
         } else {
             id

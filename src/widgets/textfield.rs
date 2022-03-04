@@ -73,7 +73,13 @@ pub struct TextField<C: TextFieldCallback> {
     blink_event: Option<u64>,
 }
 impl<C: TextFieldCallback> TextField<C> {
-    pub fn new(caret: Id, label: Id, multiline: bool, style: Rc<TextFieldStyle>, callback: C) -> Self {
+    pub fn new(
+        caret: Id,
+        label: Id,
+        multiline: bool,
+        style: Rc<TextFieldStyle>,
+        callback: C,
+    ) -> Self {
         Self {
             callback,
             caret,
