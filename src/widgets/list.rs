@@ -570,6 +570,9 @@ impl<C: ListBuilder> Behaviour for List<C> {
             if let Some(focused) = &self.focused {
                 let view_rect = ctx.get_rect(self.view);
                 let view_height = view_rect[3] - view_rect[1];
+                // TODO: when dirting the layout, the list could recreate the focused item, losing
+                // its focus. Also this make impossible to click on a button, if the button is
+                // recreated every time you click on it.
                 if focused.y + focused.height >= view_height {
                     self.delta_y += focused.y + focused.height - view_height + 10.0;
                     ctx.dirty_layout(this);
