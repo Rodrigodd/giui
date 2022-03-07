@@ -572,10 +572,11 @@ impl<C: ListBuilder> Behaviour for List<C> {
                 let view_height = view_rect[3] - view_rect[1];
                 if focused.y + focused.height >= view_height {
                     self.delta_y += focused.y + focused.height - view_height + 10.0;
+                    ctx.dirty_layout(this);
                 } else if focused.y <= 0.0 {
                     self.delta_y -= -focused.y + 10.0;
+                    ctx.dirty_layout(this);
                 }
-                ctx.dirty_layout(this);
             }
         } else {
             self.focused = None;
