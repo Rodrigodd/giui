@@ -276,6 +276,9 @@ impl TextStyle {
     pub fn with_color(self, color: Color) -> Self {
         Self { color, ..self }
     }
+    pub fn with_font_size(self, font_size: f32) -> Self {
+        Self { font_size, ..self }
+    }
 }
 
 /// A String with sections of it associated with diferents styles.
