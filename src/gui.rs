@@ -1155,7 +1155,7 @@ impl Gui {
             if self.lazy_events.is_empty() {
                 break;
             }
-            log::trace!("lazy update is lopping");
+            log::trace!("lazy update is looping");
         }
     }
 
@@ -1358,7 +1358,6 @@ impl Gui {
                     (events, dirtys)
                 };
                 for event in events {
-                    //TODO: think carefully about this deactives
                     if let Some(event::DeactiveControl { id }) = event.downcast_ref() {
                         self.deactive_control(*id)
                     } else if let Some(event::ActiveControl { id }) = event.downcast_ref() {
@@ -1373,6 +1372,9 @@ impl Gui {
             }
             parents.extend(self.get_active_children(parent).iter().rev());
         }
+        // self.start_control(id) calls dirty the id, but because all layouts are updated, this
+        // dirties layouts can be clear
+        self.dirty_layouts.clear();
     }
 }
 
