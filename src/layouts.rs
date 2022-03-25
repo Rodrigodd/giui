@@ -5,8 +5,12 @@ use crate::{
 
 // TODO: replace every alignment from i8 to a enum.
 
-pub struct FitText;
-impl Layout for FitText {
+/// Use `Graphic::compute_min_size` as the min_size of this layout.
+///
+/// This can be used, for example, to fit text. Layout of children uses the default anchor/margin
+/// layout.
+pub struct FitGraphic;
+impl Layout for FitGraphic {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let fonts = ctx.get_fonts();
         let min_size = ctx

@@ -158,11 +158,14 @@ impl Graphic {
     }
 
     pub fn compute_min_size(&mut self, fonts: &Fonts) -> Option<[f32; 2]> {
-        if let Graphic::Text(text) = self {
-            text.compute_min_size(fonts)
-        } else {
-            None
-        }
+        Some(match self {
+            Graphic::Text(text) => return text.compute_min_size(fonts),
+            Graphic::Icon(icon) => icon.size,
+            Graphic::Panel(panel) => panel.min_size(),
+            Graphic::AnimatedIcon(icon) => icon.size,
+            Graphic::Texture(..) => [0.0; 2],
+            Graphic::None => return None,
+        })
     }
 }
 
@@ -341,6 +344,15 @@ impl Panel {
         }
     }
 
+    /// The min size of a panel is the smallest size where it borders don't suffer scaling.
+    fn min_size(&self) -> [f32; 2] {
+        [
+            self.border[0] + self.border[2],
+            self.border[1] + self.border[3],
+        ]
+    }
+
+    // TODO: I can use a fixed size array here, and also cache the sprites.
     pub fn get_sprites(&self, rect: [f32; 4]) -> Vec<Sprite> {
         let width = (rect[2] - rect[0]).max(0.0);
         let height = (rect[3] - rect[1]).max(0.0);

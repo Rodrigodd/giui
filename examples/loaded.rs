@@ -48,7 +48,7 @@ use std::{
 use crui::{
     event::SetValue,
     graphics::{Graphic, Panel, Text, TextStyle, Texture},
-    layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
+    layouts::{FitGraphic, HBoxLayout, MarginLayout, VBoxLayout},
     style::{ButtonStyle, MenuStyle, OnFocusStyle, SelectionColor, TabStyle, TextFieldStyle},
     widgets::{
         Blocker, Button, ButtonGroup, CloseMenu, DropMenu, Dropdown, Item, Menu, MenuBar, MenuItem,
@@ -669,7 +669,7 @@ impl OptionsGui {
         gui.create_control()
             .graphic(graphic)
             .parent(button)
-            .layout(FitText)
+            .layout(FitGraphic)
             .build(gui);
         gui.create_control_reserved(button)
             .layout(MarginLayout::new([2.0; 4]))
@@ -699,7 +699,7 @@ impl OptionsGui {
         let _text = gui
             .create_control()
             .graphic(Text::new(name, (-1, 0), style.text_style.clone()))
-            .layout(FitText)
+            .layout(FitGraphic)
             .expand_x(true)
             .parent(line)
             .build(gui);
@@ -839,7 +839,7 @@ impl OptionsGui {
                 (-1, 0),
                 style.text_style.clone(),
             ))
-            .layout(FitText)
+            .layout(FitGraphic)
             .expand_x(true)
             .parent(line)
             .build(gui);
@@ -1042,7 +1042,7 @@ impl OptionsGui {
                             .create_control()
                             .margins([10.0, 0.0, -10.0, 0.0])
                             .graphic(Text::new(data.to_string(), (-1, 0), text_style.clone()))
-                            .layout(FitText)
+                            .layout(FitGraphic)
                             .parent(id)
                             .build(ctx);
                         id
@@ -1106,7 +1106,7 @@ fn create_item(
         .create_control()
         .parent(item)
         .graphic(Text::new(text, (-1, 0), text_style))
-        .layout(FitText)
+        .layout(FitGraphic)
         .expand_x(true)
         .build(ctx);
     let _button = ctx

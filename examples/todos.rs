@@ -6,7 +6,7 @@ use common::*;
 use crui::{
     font::FontId,
     graphics::{Graphic, Panel, Text},
-    layouts::{FitText, HBoxLayout, VBoxLayout},
+    layouts::{FitGraphic, HBoxLayout, VBoxLayout},
     style::{ButtonStyle, OnFocusStyle, SelectionColor, TextFieldStyle},
     widgets::{
         Button, List, ListBuilder, ScrollBar, TextField, TextFieldCallback, UpdateItems, ViewLayout,
@@ -162,7 +162,7 @@ fn build_gui(gui: &mut Gui, style: StyleSheet) {
                             ..Default::default()
                         },
                     ))
-                    .layout(FitText)
+                    .layout(FitGraphic)
                     .expand_x(true)
                     .build(ctx);
 

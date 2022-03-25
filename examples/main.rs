@@ -5,7 +5,7 @@ use std::rc::Rc;
 use crui::{
     font::FontId,
     graphics::{Graphic, Icon, Panel, Text, TextStyle, Texture},
-    layouts::{FitText, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
+    layouts::{FitGraphic, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
     style::{ButtonStyle, MenuStyle, OnFocusStyle, SelectionColor, TabStyle, TextFieldStyle},
     widgets::{
         self, Blocker, Button, ButtonGroup, CloseMenu, ContextMenu, DropMenu, Dropdown, Hoverable,
@@ -171,7 +171,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .create_control()
             .graphic(graphic)
             .parent(hover)
-            .layout(FitText)
+            .layout(FitGraphic)
             .build(gui);
 
         (hover, label)
@@ -544,7 +544,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                                         ..Default::default()
                                     },
                                 ))
-                                .layout(FitText)
+                                .layout(FitGraphic)
                                 .parent(id)
                                 .build(ctx);
                             id
@@ -837,7 +837,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                         ..Default::default()
                     },
                 ))
-                .layout(FitText)
+                .layout(FitGraphic)
                 .parent(hbox)
                 .build(gui);
             let caret = gui.reserve_id();
@@ -1079,7 +1079,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             gui.create_control()
                 .graphic(graphic)
                 .parent(button)
-                .layout(FitText)
+                .layout(FitGraphic)
                 .build(gui);
             button
         };
@@ -1117,7 +1117,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     ..Default::default()
                 },
             )))
-            .layout(FitText)
+            .layout(FitGraphic)
             .parent(header)
             .expand_x(true)
             .build(gui);
@@ -1154,7 +1154,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
                     ..Default::default()
                 },
             )))
-            .layout(FitText)
+            .layout(FitGraphic)
             .parent(content)
             .expand_y(true)
             .build(gui);
@@ -1202,7 +1202,7 @@ fn create_item(
                 ..Default::default()
             },
         ))
-        .layout(FitText)
+        .layout(FitGraphic)
         .expand_x(true)
         .build(ctx);
     let _button = ctx
@@ -1239,7 +1239,7 @@ fn create_button<F: Fn(Id, &mut Context) + 'static>(
                     ..Default::default()
                 },
             ))
-            .layout(FitText)
+            .layout(FitGraphic)
         })
         .behaviour(Button::new(button_style, true, on_click))
     // .layout(Box::new(MarginLayout::new([7.0, 7.0, 7.0, 7.0])))

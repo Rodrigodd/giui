@@ -1,6 +1,6 @@
 use crate::{
     graphics::Text,
-    layouts::{FitText, HBoxLayout, MarginLayout, VBoxLayout},
+    layouts::{FitGraphic, HBoxLayout, MarginLayout, VBoxLayout},
     style::MenuStyle,
     widgets::CloseMenu,
     Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo, RectFill,
@@ -105,7 +105,7 @@ impl Behaviour for MenuBehaviour {
                         .create_control()
                         .parent(item)
                         .graphic(Text::new(text.clone(), (-1, 0), self.style.text.clone()))
-                        .layout(FitText)
+                        .layout(FitGraphic)
                         .build(ctx);
                 }
                 Item::SubMenu(menu) => {
@@ -122,7 +122,7 @@ impl Behaviour for MenuBehaviour {
                             (-1, 0),
                             self.style.text.clone(),
                         ))
-                        .layout(FitText)
+                        .layout(FitGraphic)
                         .expand_x(true)
                         .build(ctx);
                     let _arrow = ctx
@@ -285,7 +285,7 @@ impl Behaviour for MenuBar {
                     (0, 0),
                     self.style.text.clone(),
                 ))
-                .layout(FitText)
+                .layout(FitGraphic)
                 .build(ctx);
         }
     }

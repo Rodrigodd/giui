@@ -6,7 +6,7 @@ use std::{
 use crui::{
     font::{Font, FontId, Fonts},
     graphics::{Panel, Text},
-    layouts::{FitText, MarginLayout, VBoxLayout},
+    layouts::{FitGraphic, MarginLayout, VBoxLayout},
     render::{GuiRender, GuiRenderer},
     style::ButtonStyle,
     widgets::Button,
@@ -381,7 +381,7 @@ fn create_gui(
                 ..Default::default()
             },
         ))
-        .layout(FitText)
+        .layout(FitGraphic)
         .parent(button)
         .build(gui);
 
@@ -436,7 +436,7 @@ fn create_gui(
                 ..Default::default()
             },
         ))
-        .layout(FitText)
+        .layout(FitGraphic)
         .parent(button)
         .build(gui);
 }
