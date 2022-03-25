@@ -963,7 +963,11 @@ impl Gui {
     }
 
     pub fn mouse_down(&mut self, button: MouseButton) {
-        log::info!("click on {}", self.current_mouse.map_or("None".to_string(), |x| x.to_string()));
+        log::info!(
+            "click on {}",
+            self.current_mouse
+                .map_or("None".to_string(), |x| x.to_string())
+        );
         self.set_focus(self.current_mouse);
         if let Some(curr) = self.current_mouse {
             if let MouseButton::Left = button {
