@@ -263,6 +263,14 @@ impl Gui {
             .expect("The type for get<T> must be T")
     }
 
+    pub fn fonts(&self) -> &Fonts {
+        &self.fonts
+    }
+
+    pub fn fonts_mut(&mut self) -> &mut Fonts {
+        &mut self.fonts
+    }
+
     fn get_parent(&self, id: Id) -> Option<Id> {
         self.controls.get(id).and_then(|x| x.parent)
     }
