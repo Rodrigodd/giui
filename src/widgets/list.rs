@@ -100,13 +100,15 @@ pub struct List<C: ListBuilder> {
     space: f32,
     margins: [f32; 4],
     content_width: f32,
-    /// The amount of horizontal scroll in pixels.
+    /// The amount of horizontal scroll, in pixels.
     delta_x: f32,
-    /// The amount of horizontal scroll in the last layout.
+    /// The amount of horizontal scroll in the last layout, in pixels.
     last_delta_x: f32,
-    /// The amount of vertical scroll, between 0 and 1, for the next layout
+    /// The position that start_y must be in the next layout, in items.
     set_y: Option<f32>,
-    /// The variation of vertical scroll, in items, for the next layout
+    /// The variation of vertical scroll, in pixels, for the next layout
+    ///
+    /// If it is negative, the view will mode up, and the items down, and vice-versa if positive.
     delta_y: f32,
     /// The position of the top of the view, in items
     start_y: f32,
