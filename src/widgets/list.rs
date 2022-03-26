@@ -464,11 +464,19 @@ impl<C: ListBuilder> List<C> {
         let delta_y = self.delta_y;
         self.delta_y = 0.0;
 
-        if self.last_created_items.is_empty() {
-            self.create_items_from_top(view_rect, list_id, ctx);
-        } else if let Some(y) = self.set_y.take() {
+        let mut updated = true;
+        if let Some(y) = self.set_y.take() {
             self.create_items_from_a_start_y(y, view_rect, list_id, ctx);
+        } else if self.last_created_items.is_empty() {
+            self.create_items_from_top(view_rect, list_id, ctx);
         } else {
+            updated = false;
+        }
+
+        if delta_y != 0.0 || !updated {
+            self.last_created_items.append(&mut self.created_items);
+            debug_assert!(self.created_items.is_empty());
+
             if delta_y < 0.0 {
                 // create items above
                 let mut i = self.start_y as usize;
