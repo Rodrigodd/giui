@@ -12,6 +12,21 @@ use winit::event::VirtualKeyCode;
 use super::ScrollBar;
 
 pub struct UpdateItems;
+/// When send to the behaviour [List], will bring a item to inside the view.
+///
+/// If the item is outside of the view, the item will be centered on the screen, otherwise the view
+/// will only be scrolled enough to satisfy the FocusItem::margin.
+pub struct FocusItem {
+    /// The index of the item to be focused.
+    pub index: usize,
+    //// The space  around the focused item.
+    ///
+    /// When focusing if the item, this is the space that should have after and before the item. If
+    /// this value is greater than the avaliable space (`(view_height - item.heigth) / 2.0`),
+    /// `f32::INFINITY` for example, the item will be centered in the view. If the value is negative,
+    /// part of the item will be allowed to be outside of the view.
+    pub margin: f32,
+}
 
 #[derive(Default)]
 pub struct ListViewLayout {
@@ -648,6 +663,59 @@ impl<C: ListBuilder> Behaviour for List<C> {
             log::trace!("update list items");
             self.set_y = Some(self.start_y);
             ctx.dirty_layout(this);
+        } else if let Some(&FocusItem { index, margin }) = event.downcast_ref::<FocusItem>() {
+            self.set_y = Some(self.start_y);
+            ctx.dirty_layout(this);
+            match self.created_items.get(&index) {
+                Some(item) => {
+                    let view_height = {
+                        let view_rect = ctx.get_rect(self.view);
+                        view_rect[3] - view_rect[1]
+                    };
+                    if margin > (view_height - item.height) / 2.0 {
+                        self.delta_y += item.y - (view_height - item.height) / 2.0;
+                        ctx.dirty_layout(this);
+                    } else if item.y + item.height >= view_height - margin {
+                        self.delta_y += item.y - (view_height - item.height) + margin;
+                        ctx.dirty_layout(this);
+                    } else if item.y <= margin {
+                        self.delta_y += item.y - margin;
+                        ctx.dirty_layout(this);
+                    }
+                }
+                None => {
+                    self.set_y = Some(index as f32);
+                    let view_height = {
+                        let view_rect = ctx.get_rect(self.view);
+                        view_rect[3] - view_rect[1]
+                    };
+
+                    // FIXME: this only centers the top of the item in the view, not the item
+                    // itself, because I don't know the item size here. Can I buy the item here and
+                    // discovery it size?
+
+                    let id = self
+                        .builder
+                        .create_item(index, this, ctx.create_control(), ctx)
+                        .parent(self.view)
+                        .build(ctx);
+                    log::trace!("create {}", id);
+                    let mut item = CreatedItem::new(id, index, 0.0, 0.0);
+                    let top_margin = if index == 0 { self.margins[1] } else { 0.0 };
+                    let bottom_margin = if index + 1 == self.builder.item_count(ctx) {
+                        self.margins[3]
+                    } else {
+                        self.space
+                    };
+                    item.height = ctx.get_min_size(id)[1] + top_margin + bottom_margin;
+
+                    self.delta_y += -(view_height - item.height) / 2.0;
+                    ctx.dirty_layout(this);
+
+                    // This will only be properly layouted  in the next layout.
+                    self.created_items.insert(index, item);
+                }
+            }
         } else {
             self.builder.on_event(event, this, ctx)
         }
