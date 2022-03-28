@@ -67,16 +67,16 @@ pub fn expand_derive_deserialize(
     let impl_block = quote! {
 
         #[automatically_derived]
-        impl #load_style_impl _crui::style_loader::LoadStyle<'r, 'loader> for #ident #ty_generics #where_clause {
+        impl #load_style_impl _giui::style_loader::LoadStyle<'r, 'loader> for #ident #ty_generics #where_clause {
             type Loader = #loader_name <'r, 'loader>;
-            fn new_loader(loader: &'r mut _crui::style_loader::StyleLoader<'loader>) -> Self::Loader {
+            fn new_loader(loader: &'r mut _giui::style_loader::StyleLoader<'loader>) -> Self::Loader {
                 #loader_name { loader }
             }
         }
 
         #[automatically_derived]
         pub struct #loader_name <'r, 'loader> {
-            loader: &'r mut _crui::style_loader::StyleLoader<'loader>,
+            loader: &'r mut _giui::style_loader::StyleLoader<'loader>,
         }
 
         #[automatically_derived]
@@ -93,7 +93,7 @@ pub fn expand_derive_deserialize(
 
     Ok(dummy::wrap_in_const(
         cont.attrs.custom_serde_path(),
-        cont.attrs.custom_crui_path(),
+        cont.attrs.custom_giui_path(),
         "DESERIALIZE",
         ident,
         impl_block,
@@ -963,7 +963,7 @@ fn deserialize_struct(
         #field_visitor
 
         struct __Visitor #de_impl_generics #where_clause {
-            loader: &'r mut _crui::style_loader::StyleLoader<'loader>,
+            loader: &'r mut _giui::style_loader::StyleLoader<'loader>,
             marker: _serde::__private::PhantomData<#this #ty_generics>,
             lifetime: _serde::__private::PhantomData<&#delife ()>,
         }
@@ -1484,7 +1484,7 @@ fn deserialize_adjacently_tagged_enum(
         }
 
         struct __Visitor #de_impl_generics #where_clause {
-            loader: &'load mut _crui::style_loader::StyleLoader<'load>,
+            loader: &'load mut _giui::style_loader::StyleLoader<'load>,
             marker: _serde::__private::PhantomData<#this #ty_generics>,
             lifetime: _serde::__private::PhantomData<&#delife ()>,
         }
@@ -2433,9 +2433,9 @@ fn deserialize_map(
                     let field_ty = field.ty;
                     let span = field.original.span();
                     let func =
-                        quote_spanned!(span=> _serde::de::MapAccess::next_value_seed::<<#field_ty as _crui::style_loader::LoadStyle>::Loader>);
+                        quote_spanned!(span=> _serde::de::MapAccess::next_value_seed::<<#field_ty as _giui::style_loader::LoadStyle>::Loader>);
                     quote! {
-                        r#try!(#func(&mut __map, <#field_ty as _crui::style_loader::LoadStyle>::new_loader(self.loader)))
+                        r#try!(#func(&mut __map, <#field_ty as _giui::style_loader::LoadStyle>::new_loader(self.loader)))
                     }
                 }
                 Some(path) => {

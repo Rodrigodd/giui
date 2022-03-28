@@ -5,7 +5,7 @@ use crate::r#try;
 
 pub fn wrap_in_const(
     serde_path: Option<&syn::Path>,
-    crui_path: Option<&syn::Path>,
+    giui_path: Option<&syn::Path>,
     trait_: &str,
     ty: &Ident,
     code: TokenStream,
@@ -28,13 +28,13 @@ pub fn wrap_in_const(
         },
     };
 
-    let use_crui = match crui_path {
+    let use_giui = match giui_path {
         Some(path) => quote! {
-            use #path as _crui;
+            use #path as _giui;
         },
         None => quote! {
             #[allow(rust_2018_idioms, clippy::useless_attribute)]
-            extern crate crui as _crui;
+            extern crate giui as _giui;
         },
     };
 
@@ -43,7 +43,7 @@ pub fn wrap_in_const(
         #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
         const #dummy_const: () = {
             #use_serde
-            #use_crui
+            #use_giui
             #try_replacement
             #code
         };

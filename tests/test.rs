@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use crui::Gui;
+use giui::Gui;
 
 use log::{Metadata, Record};
 

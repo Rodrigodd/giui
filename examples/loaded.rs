@@ -45,7 +45,7 @@ use std::{
 //     }
 // }
 
-use crui::{
+use giui::{
     event::SetValue,
     graphics::{Graphic, Panel, Text, TextStyle, Texture},
     layouts::{FitGraphic, HBoxLayout, MarginLayout, VBoxLayout},
@@ -64,12 +64,12 @@ use winit::{
 };
 
 mod common;
-use common::{CruiEventLoop, MyFonts};
+use common::{GiuiEventLoop, MyFonts};
 
 struct Loaded {
     options: Rc<RefCell<Options>>,
 }
-impl CruiEventLoop<UserEvent> for Loaded {
+impl GiuiEventLoop<UserEvent> for Loaded {
     fn init(
         gui: &mut Gui,
         render: &mut GLSpriteRender,
@@ -78,17 +78,17 @@ impl CruiEventLoop<UserEvent> for Loaded {
     ) -> Self {
         // load textures
         let texture = {
-            let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
+            let data = image::open("examples/panel.png").unwrap();
             let data = data.to_rgba8();
             render.new_texture(data.width(), data.height(), data.as_ref(), true)
         };
         let icon_texture = {
-            let data = image::open("D:/repos/rust/crui/examples/icons.png").unwrap();
+            let data = image::open("examples/icons.png").unwrap();
             let data = data.to_rgba8();
             render.new_texture(data.width(), data.height(), data.as_ref(), true)
         };
         let tab_texture = {
-            let data = image::open("D:/repos/rust/crui/examples/tab.png").unwrap();
+            let data = image::open("examples/tab.png").unwrap();
             let data = data.to_rgba8();
             render.new_texture(data.width(), data.height(), data.as_ref(), true)
         };
@@ -911,8 +911,8 @@ impl OptionsGui {
                 ctx.deactive(popup)
             }))
             .min_size([75.0, 20.0])
-            .fill_x(crui::RectFill::ShrinkCenter)
-            .fill_y(crui::RectFill::ShrinkCenter)
+            .fill_x(giui::RectFill::ShrinkCenter)
+            .fill_y(giui::RectFill::ShrinkCenter)
             .parent(button_area)
             .build(gui);
         let _ok_button_text = gui

@@ -1,7 +1,7 @@
 mod common;
-use common::{CruiEventLoop, MyFonts};
+use common::{GiuiEventLoop, MyFonts};
 
-use crui::{
+use giui::{
     graphics::{Text, TextStyle, Texture},
     layouts::{FitGraphic, MarginLayout},
     text::{Span, SpannedString},
@@ -20,7 +20,7 @@ fn find(s: &str, subs: &str) -> std::ops::Range<usize> {
 }
 
 struct App;
-impl CruiEventLoop<()> for App {
+impl GiuiEventLoop<()> for App {
     fn init(
         gui: &mut Gui,
         _render: &mut GLSpriteRender,

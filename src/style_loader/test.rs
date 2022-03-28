@@ -273,7 +273,7 @@ fn deserialize_text() {
 #[test]
 fn my_style() {
     #[derive(LoadStyle, Debug)]
-    #[crui(crate = "crate")]
+    #[giui(crate = "crate")]
     #[allow(dead_code)]
     pub struct MyStyle {
         graphic1: Graphic,

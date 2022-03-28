@@ -1,4 +1,4 @@
-use crui::{
+use giui::{
     font::{Font, Fonts},
     graphics::{Text, TextStyle},
     render::{GuiRender, GuiRenderer},

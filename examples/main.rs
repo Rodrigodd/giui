@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use crui::{
+use giui::{
     font::FontId,
     graphics::{Graphic, Icon, Panel, Text, TextStyle, Texture},
     layouts::{FitGraphic, GridLayout, HBoxLayout, MarginLayout, RatioLayout, VBoxLayout},
@@ -28,7 +28,7 @@ fn main() {
 }
 
 struct Main;
-impl common::CruiEventLoop<()> for Main {
+impl common::GiuiEventLoop<()> for Main {
     fn init(
         gui: &mut Gui,
         render: &mut GLSpriteRender,
@@ -36,22 +36,22 @@ impl common::CruiEventLoop<()> for Main {
         event_loop: &EventLoop<()>,
     ) -> Self {
         let texture = {
-            let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
+            let data = image::open("examples/panel.png").unwrap();
             let data = data.to_rgba8();
             render.new_texture(data.width(), data.height(), data.as_ref(), true)
         };
         let tab_texture = {
-            let data = image::open("D:/repos/rust/crui/examples/tab.png").unwrap();
+            let data = image::open("examples/tab.png").unwrap();
             let data = data.to_rgba8();
             render.new_texture(data.width(), data.height(), data.as_ref(), true)
         };
         let icon_texture = {
-            let data = image::open("D:/repos/rust/crui/examples/icons.png").unwrap();
+            let data = image::open("examples/icons.png").unwrap();
             let data = data.to_rgba8();
             render.new_texture(data.width(), data.height(), data.as_ref(), true)
         };
         let marker_texture = {
-            let data = image::open("D:/repos/rust/crui/examples/check.png").unwrap();
+            let data = image::open("examples/check.png").unwrap();
             let data = data.to_rgba8();
             render.new_texture(data.width(), data.height(), data.as_ref(), true)
         };

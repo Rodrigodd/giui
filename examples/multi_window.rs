@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use crui::{
+use giui::{
     font::{Font, FontId, Fonts},
     graphics::{Panel, Text},
     layouts::{FitGraphic, MarginLayout, VBoxLayout},
@@ -83,7 +83,7 @@ fn main() {
     let font_texture = render.new_texture(128, 128, &[], false);
     let white_texture = render.new_texture(1, 1, &[255, 255, 255, 255], false);
     let texture = {
-        let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
+        let data = image::open("examples/panel.png").unwrap();
         let data = data.to_rgba8();
         render.new_texture(data.width(), data.height(), data.as_ref(), true)
     };
@@ -365,8 +365,8 @@ fn create_gui(
         }))
         .parent(surface)
         .layout(MarginLayout::new([5.0; 4]))
-        .fill_x(crui::RectFill::ShrinkCenter)
-        .fill_y(crui::RectFill::ShrinkEnd)
+        .fill_x(giui::RectFill::ShrinkCenter)
+        .fill_y(giui::RectFill::ShrinkEnd)
         .expand_y(true)
         .build(gui);
     let _text = gui
@@ -374,7 +374,7 @@ fn create_gui(
         .graphic(Text::new(
             "Open A Modal Window!".into(),
             (0, 0),
-            crui::graphics::TextStyle {
+            giui::graphics::TextStyle {
                 color: [0, 0, 0, 255].into(),
                 font_size: 16.0,
                 font_id,
@@ -420,8 +420,8 @@ fn create_gui(
         }))
         .parent(surface)
         .layout(MarginLayout::new([5.0; 4]))
-        .fill_x(crui::RectFill::ShrinkCenter)
-        .fill_y(crui::RectFill::ShrinkStart)
+        .fill_x(giui::RectFill::ShrinkCenter)
+        .fill_y(giui::RectFill::ShrinkStart)
         .expand_y(true)
         .build(gui);
     let _text = gui
@@ -429,7 +429,7 @@ fn create_gui(
         .graphic(Text::new(
             "Open A Non-Modal Window!".into(),
             (0, 0),
-            crui::graphics::TextStyle {
+            giui::graphics::TextStyle {
                 color: [0, 0, 0, 255].into(),
                 font_size: 16.0,
                 font_id,

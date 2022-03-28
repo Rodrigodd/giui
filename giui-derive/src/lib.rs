@@ -76,7 +76,7 @@ mod de;
 mod dummy;
 mod r#try;
 
-#[proc_macro_derive(LoadStyle, attributes(serde, crui))]
+#[proc_macro_derive(LoadStyle, attributes(serde, giui))]
 pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(input as DeriveInput);
     de::expand_derive_deserialize(&mut input)

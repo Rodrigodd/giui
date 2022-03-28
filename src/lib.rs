@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate bitflags;
 #[macro_use]
-extern crate crui_derive;
+extern crate giui_derive;
 #[doc(hidden)]
-pub use crui_derive::*;
+pub use giui_derive::*;
 
 pub mod font;
 pub mod text;

@@ -3,7 +3,7 @@ use common::MyFonts;
 use std::rc::Rc;
 
 use common::*;
-use crui::{
+use giui::{
     font::FontId,
     graphics::{Graphic, Panel, Text},
     layouts::{FitGraphic, HBoxLayout, VBoxLayout},
@@ -18,7 +18,7 @@ use winit::event_loop::EventLoop;
 
 fn main() {
     struct Todos;
-    impl CruiEventLoop<()> for Todos {
+    impl GiuiEventLoop<()> for Todos {
         fn init(
             gui: &mut Gui,
             render: &mut GLSpriteRender,
@@ -26,7 +26,7 @@ fn main() {
             _event_loop: &EventLoop<()>,
         ) -> Self {
             let texture = {
-                let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
+                let data = image::open("examples/panel.png").unwrap();
                 let data = data.to_rgba8();
                 render.new_texture(data.width(), data.height(), data.as_ref(), true)
             };
@@ -88,7 +88,7 @@ fn build_gui(gui: &mut Gui, style: StyleSheet) {
         list: Id,
     }
     impl TextFieldCallback for Callback {
-        fn on_submit(&mut self, _this: crui::Id, ctx: &mut crui::Context, text: &mut String) {
+        fn on_submit(&mut self, _this: giui::Id, ctx: &mut giui::Context, text: &mut String) {
             if text.is_empty() {
                 return;
             }
@@ -106,9 +106,9 @@ fn build_gui(gui: &mut Gui, style: StyleSheet) {
             ctx.send_event_to(self.list, UpdateItems);
         }
 
-        fn on_change(&mut self, _this: crui::Id, _ctx: &mut crui::Context, _text: &str) {}
+        fn on_change(&mut self, _this: giui::Id, _ctx: &mut giui::Context, _text: &str) {}
 
-        fn on_unfocus(&mut self, _this: crui::Id, _ctx: &mut crui::Context, _text: &mut String) {}
+        fn on_unfocus(&mut self, _this: giui::Id, _ctx: &mut giui::Context, _text: &mut String) {}
     }
 
     text_field(
@@ -138,7 +138,7 @@ fn build_gui(gui: &mut Gui, style: StyleSheet) {
         fn create_item<'a>(
             &mut self,
             index: usize,
-            this_list: crui::Id,
+            this_list: giui::Id,
             cb: ControlBuilder,
             ctx: &mut dyn BuilderContext,
         ) -> ControlBuilder {
@@ -155,7 +155,7 @@ fn build_gui(gui: &mut Gui, style: StyleSheet) {
                     .graphic(Text::new(
                         x.to_string(),
                         (-1, 0),
-                        crui::graphics::TextStyle {
+                        giui::graphics::TextStyle {
                             color: [0, 0, 0, 255].into(),
                             font_size: 18.0,
                             font_id: self.0,
@@ -168,7 +168,7 @@ fn build_gui(gui: &mut Gui, style: StyleSheet) {
 
                 ctx.create_control()
                     .min_size([20.0, 20.0])
-                    .fill_y(crui::RectFill::ShrinkCenter)
+                    .fill_y(giui::RectFill::ShrinkCenter)
                     .behaviour(Button::new(self.1.clone(), true, move |_, ctx| {
                         // remove this item from the list
                         ctx.get_mut::<App>().list.remove(index);
@@ -244,7 +244,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
         cb.graphic(Text::new(
             initial_value,
             (-1, 0),
-            crui::graphics::TextStyle {
+            giui::graphics::TextStyle {
                 color: [0, 0, 0, 255].into(),
                 font_size: 18.0,
                 font_id,

@@ -3,7 +3,7 @@ use common::MyFonts;
 use std::rc::Rc;
 
 use common::*;
-use crui::{
+use giui::{
     font::FontId,
     graphics::{Panel, Text},
     layouts::MarginLayout,
@@ -16,7 +16,7 @@ use winit::event_loop::EventLoop;
 
 fn main() {
     struct TextField;
-    impl CruiEventLoop<()> for TextField {
+    impl GiuiEventLoop<()> for TextField {
         fn init(
             gui: &mut Gui,
             render: &mut GLSpriteRender,
@@ -24,7 +24,7 @@ fn main() {
             _event_loop: &EventLoop<()>,
         ) -> Self {
             let texture = {
-                let data = image::open("D:/repos/rust/crui/examples/panel.png").unwrap();
+                let data = image::open("examples/panel.png").unwrap();
                 let data = data.to_rgba8();
                 render.new_texture(data.width(), data.height(), data.as_ref(), true)
             };
@@ -92,7 +92,7 @@ fn text_field<'a, C: TextFieldCallback + 'static>(
         cb.graphic(Text::new(
             initial_value,
             (-1, 0),
-            crui::graphics::TextStyle {
+            giui::graphics::TextStyle {
                 color: [0, 0, 0, 255].into(),
                 font_size: 72.0,
                 font_id,

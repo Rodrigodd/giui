@@ -1,4 +1,4 @@
-use crui::{
+use giui::{
     font::{Font, FontId, Fonts},
     render::{GuiRender, GuiRenderer},
     Gui,
@@ -14,14 +14,14 @@ use winit::{
 #[allow(dead_code)]
 fn main() {
     struct HelloWord;
-    impl CruiEventLoop<()> for HelloWord {
+    impl GiuiEventLoop<()> for HelloWord {
         fn init(
             gui: &mut Gui,
             _render: &mut GLSpriteRender,
             fonts: MyFonts,
             _event_loop: &EventLoop<()>,
         ) -> Self {
-            use crui::graphics::{Text, TextStyle};
+            use giui::graphics::{Text, TextStyle};
             let _text = gui
                 .create_control()
                 .graphic(Text::new(
@@ -65,7 +65,7 @@ fn resize(
     camera.set_position(width / 2.0, height / 2.0);
 }
 
-pub trait CruiEventLoop<T> {
+pub trait GiuiEventLoop<T> {
     fn init(
         gui: &mut Gui,
         _render: &mut GLSpriteRender,
@@ -76,7 +76,7 @@ pub trait CruiEventLoop<T> {
     fn on_event(&mut self, event: &Event<T>, control: &mut ControlFlow) {}
 }
 
-pub fn run<U: 'static, T: CruiEventLoop<U> + 'static>(width: u32, height: u32) -> ! {
+pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -> ! {
     env_logger::init();
     // create winit's window and event_loop
     let event_loop = EventLoop::<U>::with_user_event();

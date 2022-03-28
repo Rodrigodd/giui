@@ -220,7 +220,7 @@ pub struct Container {
     identifier: Identifier,
     has_flatten: bool,
     serde_path: Option<syn::Path>,
-    crui_path: Option<syn::Path>,
+    giui_path: Option<syn::Path>,
     /// Error message generated when type can't be deserialized
     expecting: Option<String>,
 }
@@ -307,19 +307,19 @@ impl Container {
         let mut serde_path = Attr::none(cx, CRATE);
         let mut expecting = Attr::none(cx, EXPECTING);
 
-        let mut crui_path = Attr::none(cx, CRATE);
+        let mut giui_path = Attr::none(cx, CRATE);
 
         for meta_item in item
             .attrs
             .iter()
-            .flat_map(|attr| get_crui_meta_items(cx, attr))
+            .flat_map(|attr| get_giui_meta_items(cx, attr))
             .flatten()
         {
             match &meta_item {
-                // Parse `#[crui(crate = "foo")]`
+                // Parse `#[giui(crate = "foo")]`
                 Meta(NameValue(m)) if m.path == CRATE => {
                     if let Ok(path) = parse_lit_into_path(cx, CRATE, &m.lit) {
-                        crui_path.set(&m.path, path)
+                        giui_path.set(&m.path, path)
                     }
                 }
 
@@ -331,12 +331,12 @@ impl Container {
                         .replace(' ', "");
                     cx.error_spanned_by(
                         meta_item.path(),
-                        format!("unknown crui container attribute `{}`", path),
+                        format!("unknown giui container attribute `{}`", path),
                     );
                 }
 
                 Lit(lit) => {
-                    cx.error_spanned_by(lit, "unexpected literal in crui container attribute");
+                    cx.error_spanned_by(lit, "unexpected literal in giui container attribute");
                 }
             }
         }
@@ -649,7 +649,7 @@ impl Container {
             identifier: decide_identifier(cx, item, field_identifier, variant_identifier),
             has_flatten: false,
             serde_path: serde_path.get(),
-            crui_path: crui_path.get(),
+            giui_path: giui_path.get(),
             expecting: expecting.get(),
         }
     }
@@ -713,8 +713,8 @@ impl Container {
     pub fn custom_serde_path(&self) -> Option<&syn::Path> {
         self.serde_path.as_ref()
     }
-    pub fn custom_crui_path(&self) -> Option<&syn::Path> {
-        self.crui_path.as_ref()
+    pub fn custom_giui_path(&self) -> Option<&syn::Path> {
+        self.giui_path.as_ref()
     }
 
     pub fn serde_path(&self) -> Cow<syn::Path> {
@@ -1589,15 +1589,15 @@ pub fn get_serde_meta_items(cx: &Ctxt, attr: &syn::Attribute) -> Result<Vec<syn:
     }
 }
 
-pub fn get_crui_meta_items(cx: &Ctxt, attr: &syn::Attribute) -> Result<Vec<syn::NestedMeta>, ()> {
-    if attr.path != CRUI {
+pub fn get_giui_meta_items(cx: &Ctxt, attr: &syn::Attribute) -> Result<Vec<syn::NestedMeta>, ()> {
+    if attr.path != GIUI {
         return Ok(Vec::new());
     }
 
     match attr.parse_meta() {
         Ok(List(meta)) => Ok(meta.nested.into_iter().collect()),
         Ok(other) => {
-            cx.error_spanned_by(other, "expected #[crui(...)]");
+            cx.error_spanned_by(other, "expected #[giui(...)]");
             Err(())
         }
         Err(err) => {
