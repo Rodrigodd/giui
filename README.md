@@ -18,7 +18,7 @@ A normal GUI crate made by myself.
   - this means that there is no default graphics
 - No advanced GUI architectures
   - widgets use callback closures, but only the widgets that I made, not in the
-    core of crate at last. I expect to be able to make widgets that use others
+    core of crate at least. I expect to be able to make widgets that use others
     event systems.
   - there are no reactive events, or something like that, controls need to be
     updated manually.
