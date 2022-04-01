@@ -494,8 +494,18 @@ impl TextLayout {
         }
     }
 
-    /// Removes the specified range in the string, and replaces it with the given string. This
-    /// recompute the layout. The given string doesn’t need to be the same length as the range.
+    /// Append the given string to the alrleady existing text.
+    ///
+    /// This recompute the layout.
+    pub fn append(&mut self, text: &str, fonts: &Fonts) {
+        let len = self.text.string.len() - 1;
+        self.replace_range(len..len, text, fonts)
+    }
+
+    /// Removes the specified range in the string, and replaces it with the given string.
+    ///
+    /// This recompute the layout. The given string doesn’t need to be the same length as the
+    /// range.
     pub fn replace_range(&mut self, range: Range<usize>, text: &str, fonts: &Fonts) {
         // the string has a extra char, so check for out of bounds for len() - 1.
         assert!(
