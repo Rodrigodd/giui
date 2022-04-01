@@ -182,12 +182,19 @@ impl Behaviour for ScrollBar {
 
 #[derive(Default)]
 pub struct ViewLayout {
-    h: bool,
-    v: bool,
+    scroll_horz: bool,
+    scroll_vert: bool,
 }
 impl ViewLayout {
-    pub fn new(h: bool, v: bool) -> Self {
-        Self { h, v }
+    /// Create new ViewLayout.
+    ///
+    /// Paramenters tell if the view should scroll content that execed the view size, or view
+    /// min_size must respect the min width and min height of content.
+    pub fn new(scroll_horz: bool, scroll_vert: bool) -> Self {
+        Self {
+            scroll_horz,
+            scroll_vert,
+        }
     }
 }
 impl Layout for ViewLayout {
@@ -198,10 +205,10 @@ impl Layout for ViewLayout {
         };
         let mut min_size = [0.0, 0.0];
         let content_min_size = ctx.get_min_size(content);
-        if !self.h {
+        if !self.scroll_horz {
             min_size[0] = content_min_size[0];
         }
-        if !self.v {
+        if !self.scroll_vert {
             min_size[1] = content_min_size[1];
         }
 
