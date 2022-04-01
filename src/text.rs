@@ -771,6 +771,8 @@ impl Text {
 
     pub fn get_layout(&mut self, fonts: &Fonts, rect: &mut Rect) -> &mut TextLayout {
         self.get_glyphs_and_rects(rect, fonts);
+        // the returned mutable reference could dirty the text
+        self.dirty();
         self.text.as_layout()
     }
 
