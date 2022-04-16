@@ -708,6 +708,11 @@ impl Text {
         self.dirty();
     }
 
+    pub fn with_wrap(mut self, wrap: bool) -> Self {
+        self.set_wrap(wrap);
+        self
+    }
+
     pub fn set_text_layout(&mut self, text: TextLayout) {
         self.text.set_layout(text);
         self.dirty();
