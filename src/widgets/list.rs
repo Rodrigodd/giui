@@ -846,7 +846,6 @@ impl<C: ListBuilder> Layout for List<C> {
 
         // layout the items in the view
         self.create_items(view_rect, this, ctx);
-        self.builder.finished_layout();
 
         for (_, x) in self.last_created_items.iter() {
             if self.focused.as_ref().map_or(false, |f| x.id == f.id) {
@@ -959,5 +958,7 @@ impl<C: ListBuilder> Layout for List<C> {
 
             ScrollBar::set_anchors(ctx, self.v_scroll_bar_handle, true, start, end, view_height);
         }
+
+        self.builder.finished_layout();
     }
 }
