@@ -459,20 +459,6 @@ impl<C: ListBuilder> List<C> {
     }
 
     fn create_items(&mut self, view_rect: [f32; 4], list_id: Id, ctx: &mut LayoutContext) {
-        let same_rect = cmp_float(view_rect[0], self.last_rect[0])
-            && cmp_float(view_rect[1], self.last_rect[1])
-            && cmp_float(view_rect[2], self.last_rect[2])
-            && cmp_float(view_rect[3], self.last_rect[3]);
-        // log::trace!("delta_y: {}", self.delta_y);
-        if same_rect
-            && cmp_float(0.0, self.delta_y)
-            && self.set_y.is_none()
-            && cmp_float(self.last_delta_x, self.delta_x)
-            && self.builder.item_count(ctx) > 0
-        {
-            return;
-        }
-
         std::mem::swap(&mut self.created_items, &mut self.last_created_items);
         debug_assert!(self.created_items.is_empty());
 
