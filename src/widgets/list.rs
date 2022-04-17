@@ -878,7 +878,7 @@ impl<C: ListBuilder> Layout for List<C> {
             v_scroll_bar_size = 0.0;
             view_rect[2] = this_rect[2];
             // the first layout has assumed that the vertical bar exist. redo if it not exist.
-            self.create_items_from_top(view_rect, self.view, ctx);
+            self.create_items_from_top(view_rect, this, ctx);
 
             // clamp delta_x
             let view_width = view_rect[2] - view_rect[0];
