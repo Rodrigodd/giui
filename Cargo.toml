@@ -13,13 +13,13 @@ members = ["./giui-derive"]
 [features]
 
 # serde = ["serde", "ron"]
-simple_shaping = []
+complex_shaping = [ "harfbuzz_rs" ]
 
 [dependencies]
 
 texture-cache = "0.1"
 ab_glyph = "0.2"
-harfbuzz_rs = "2"
+harfbuzz_rs = { version = "2", optional = true }
 unicode-linebreak = "0.1"
 unicode-segmentation = "1"
 winit = "0.26"
