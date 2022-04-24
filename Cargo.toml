@@ -29,6 +29,7 @@ serde = { version = "1", features = ["derive"] }
 giui-derive = { path = "./giui-derive" }
 keyed_priority_queue = "0.3"
 log = "0.4"
+instant = { version = "0.1.12", features = ["wasm-bindgen"] }
 
 
 [dev-dependencies]

@@ -12,8 +12,9 @@ use std::{
     collections::{HashMap, VecDeque},
     num::NonZeroU32,
     sync::atomic::AtomicU64,
-    time::{Duration, Instant},
+    time::Duration,
 };
+use instant::Instant;
 use winit::{
     event::{ElementState, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
     window::CursorIcon,

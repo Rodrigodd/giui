@@ -1,7 +1,7 @@
+use instant::Instant;
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
-    time::Instant,
 };
 
 use winit::{event::ModifiersState, window::CursorIcon};

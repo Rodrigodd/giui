@@ -1,8 +1,5 @@
-use std::{
-    any::Any,
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use instant::Instant;
+use std::{any::Any, rc::Rc, time::Duration};
 
 use copypasta::{ClipboardContext, ClipboardProvider};
 use winit::{event::VirtualKeyCode, window::CursorIcon};
