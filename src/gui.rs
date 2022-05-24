@@ -82,11 +82,6 @@ enum LazyEvent {
     OnDeactive(Id),
 }
 
-// pub struct Mouse {
-//     pos: [f32; 2],
-//     event: MouseEvent,
-// }
-
 #[derive(Clone, Copy, Debug)]
 pub enum MouseButton {
     Left,
@@ -114,14 +109,6 @@ pub enum MouseEvent {
     Moved,
     None,
 }
-
-// #[derive(Clone, Copy, Debug)]
-// pub enum MouseAction {
-//     Click,
-//     DoubleClick,
-//     Drag,
-//     None,
-// }
 
 #[derive(Clone, Debug)]
 pub struct MouseInfo {
