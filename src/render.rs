@@ -19,7 +19,7 @@ pub struct FontGlyph {
 }
 
 pub trait GuiRenderer {
-    fn update_font_texure(&mut self, font_texture: u32, rect: [u32; 4], data: &[u8]);
+    fn update_font_texture(&mut self, font_texture: u32, rect: [u32; 4], data: &[u8]);
     fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]);
 }
 
@@ -194,7 +194,7 @@ impl GuiRender {
                     let i = y as usize * g_width + x as usize;
                     pixels[i] = (c * 256.0) as u8;
                 });
-                renderer.update_font_texure(
+                renderer.update_font_texture(
                     self.font_texture,
                     [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height],
                     &pixels,
