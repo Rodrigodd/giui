@@ -77,6 +77,14 @@ impl GuiRender {
         }
     }
 
+    /// Replace the current font texture by the given one.
+    ///
+    /// This invalidates the current glyph cache.
+    pub fn set_font_texture(&mut self, font_texture: u32, font_texture_size: [u32; 2]) {
+        self.font_texture = font_texture;
+        self.draw_cache = LruTextureCache::new(font_texture_size[0], font_texture_size[1]);
+    }
+
     pub fn clear_cache(&mut self, ctx: &mut Context) {
         self.last_sprites.clear();
         self.last_sprites_map.clear();
@@ -126,8 +134,6 @@ impl GuiRender {
 
         let fonts = ctx.get_fonts();
 
-        let mut font_texture_valid = true;
-
         // queue all glyphs for cache
 
         let mut queue = Vec::new();
@@ -163,6 +169,10 @@ impl GuiRender {
                 }
             }
         }
+
+        // If `self.set_font_texture` was called, the draw_cache was cleared, and the texture
+        // became invalid.
+        let mut font_texture_valid = self.draw_cache.len() > 0;
 
         loop {
             // add the glyphs to the cache
