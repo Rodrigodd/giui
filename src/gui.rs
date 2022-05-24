@@ -180,18 +180,21 @@ pub struct Gui {
     pub(crate) fonts: Fonts,
     pub(crate) modifiers: ModifiersState,
     pub(crate) resources: HashMap<TypeId, Box<dyn Any>>,
+
     redraw: bool,
     // controls that need to update the layout
     dirty_layouts: Vec<Id>,
     // controls that 'on_start' need be called
     scheduled_events: KeyedPriorityQueue<u64, ScheduledEventTo>,
     lazy_events: VecDeque<LazyEvent>,
-    change_cursor: Option<CursorIcon>,
+
     pub(crate) input: Input,
     current_mouse: Option<Id>,
     current_scroll: Option<Id>,
     pub(crate) current_focus: Option<Id>,
     over_is_locked: bool,
+
+    change_cursor: Option<CursorIcon>,
 }
 impl Gui {
     pub fn new(width: f32, height: f32, fonts: Fonts) -> Self {
