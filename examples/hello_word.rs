@@ -24,7 +24,7 @@ fn resize(
     camera.resize(size.width, size.height);
     let width = size.width as f32;
     let height = size.height as f32;
-    gui.resize(width, height);
+    gui.set_root_rect(width, height);
     camera.set_width(width);
     camera.set_height(height);
     camera.set_position(width / 2.0, height / 2.0);

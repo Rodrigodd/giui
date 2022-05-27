@@ -23,7 +23,24 @@ use winit::{
 mod common;
 use common::MyFonts;
 
+#[cfg_attr(
+    target_os = "android",
+    ndk_glue::main(
+        backtrace = "on",
+        ndk_glue = "ndk_glue",
+        logger(level = "trace", tag = "my-tag", filter = "main,giui=debug")
+    )
+)]
 fn main() {
+    #[cfg(target_os = "android")]
+    unsafe {
+        let activity = ndk_glue::native_activity().ptr();
+        ndk_sys::ANativeActivity_setWindowFlags(
+            activity.as_ptr(),
+            ndk_sys::AWINDOW_FLAG_FULLSCREEN,
+            0,
+        );
+    }
     common::run::<(), Main>(800, 600);
 }
 
@@ -31,27 +48,27 @@ struct Main;
 impl common::GiuiEventLoop<()> for Main {
     fn init(
         gui: &mut Gui,
-        render: &mut GLSpriteRender,
+        render: &mut dyn SpriteRender,
         fonts: MyFonts,
-        event_loop: &EventLoop<()>,
+        proxy: EventLoopProxy<()>,
     ) -> Self {
         let texture = {
-            let data = image::open("examples/panel.png").unwrap();
+            let data = image::load_from_memory(include_bytes!("panel.png")).unwrap();
             let data = data.to_rgba8();
             render.new_texture(data.width(), data.height(), data.as_ref(), true)
         };
         let tab_texture = {
-            let data = image::open("examples/tab.png").unwrap();
+            let data = image::load_from_memory(include_bytes!("tab.png")).unwrap();
             let data = data.to_rgba8();
             render.new_texture(data.width(), data.height(), data.as_ref(), true)
         };
         let icon_texture = {
-            let data = image::open("examples/icons.png").unwrap();
+            let data = image::load_from_memory(include_bytes!("icons.png")).unwrap();
             let data = data.to_rgba8();
             render.new_texture(data.width(), data.height(), data.as_ref(), true)
         };
         let marker_texture = {
-            let data = image::open("examples/check.png").unwrap();
+            let data = image::load_from_memory(include_bytes!("check.png")).unwrap();
             let data = data.to_rgba8();
             render.new_texture(data.width(), data.height(), data.as_ref(), true)
         };
@@ -118,8 +135,6 @@ impl common::GiuiEventLoop<()> for Main {
             close_button,
             fonts,
         };
-
-        let proxy = event_loop.create_proxy();
 
         build_gui(gui, proxy, style);
 

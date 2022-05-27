@@ -6,6 +6,7 @@ use crate::{
     util::WithPriority,
     Control, ControlBuilder, ControlEntry, Controls, LayoutDirtyFlags, Rect,
 };
+use instant::Instant;
 use keyed_priority_queue::KeyedPriorityQueue;
 use std::{
     any::{Any, TypeId},
@@ -14,8 +15,8 @@ use std::{
     sync::atomic::AtomicU64,
     time::Duration,
 };
-use instant::Instant;
 use winit::{
+    dpi::LogicalPosition,
     event::{ElementState, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
     window::CursorIcon,
 };
@@ -195,9 +196,10 @@ pub struct Gui {
     over_is_locked: bool,
 
     change_cursor: Option<CursorIcon>,
+    scale_factor: f64,
 }
 impl Gui {
-    pub fn new(width: f32, height: f32, fonts: Fonts) -> Self {
+    pub fn new(width: f32, height: f32, scale_factor: f64, fonts: Fonts) -> Self {
         Self {
             modifiers: ModifiersState::empty(),
             controls: Controls::new(width, height),
@@ -213,6 +215,7 @@ impl Gui {
             current_focus: None,
             over_is_locked: false,
             fonts,
+            scale_factor,
         }
     }
 
@@ -569,12 +572,27 @@ impl Gui {
         Some(&self.controls.get(id)?.rect)
     }
 
-    pub fn resize(&mut self, width: f32, height: f32) {
+    /// Set the scale factor of the gui.
+    ///
+    /// This is used to scale the gui when rendering, for allowing dpi awareness.
+    fn set_scale_factor(&mut self, scale_factor: f64) {
+        self.scale_factor = scale_factor;
+    }
+
+    /// Get the current scale factor of the gui.
+    fn scale_factor(&self) -> f64 {
+        self.scale_factor
+    }
+
+    /// Set the rect of the root control. Must be called when the window resize for example.
+    ///
+    /// The given rect must be in the format [x1, y1, x2, y2].
+    pub fn set_root_rect(&mut self, rect: [f32; 4]) {
         self.controls
             .get_mut(Id::ROOT_ID)
             .unwrap()
             .rect
-            .set_rect([0.0, 0.0, width, height]);
+            .set_rect(rect);
         self.dirty_layout(Id::ROOT_ID);
     }
 
@@ -690,8 +708,12 @@ impl Gui {
     pub fn handle_event(&mut self, event: &WindowEvent) {
         self.lazy_update();
         match event {
-            WindowEvent::CursorMoved { position, .. } => {
-                self.mouse_moved(position.x as f32, position.y as f32);
+            &WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                self.set_scale_factor(scale_factor);
+            }
+            &WindowEvent::CursorMoved { position, .. } => {
+                let position = LogicalPosition::<f32>::from_physical(position, self.scale_factor);
+                self.mouse_moved(position.x, position.y);
             }
             WindowEvent::MouseInput { state, button, .. } => match state {
                 ElementState::Pressed => {
@@ -701,12 +723,33 @@ impl Gui {
                     self.mouse_up((*button).into());
                 }
             },
-            WindowEvent::MouseWheel { delta, .. } => {
+            &WindowEvent::Touch(winit::event::Touch {
+                phase, location, ..
+            }) => {
+                let location = LogicalPosition::<f32>::from_physical(location, self.scale_factor);
+                self.mouse_moved(location.x, location.y);
+                match phase {
+                    winit::event::TouchPhase::Started => {
+                        self.mouse_down(MouseButton::Left);
+                    }
+                    winit::event::TouchPhase::Ended => {
+                        self.mouse_up(MouseButton::Left);
+                    }
+                    _ => {}
+                }
+            }
+            &WindowEvent::MouseWheel { delta, .. } => {
                 if let Some(curr) = self.current_scroll {
                     //TODO: I should handle Line and Pixel Delta differences more wisely?
                     let delta = match delta {
-                        winit::event::MouseScrollDelta::LineDelta(x, y) => [*x * 100.0, *y * 100.0],
-                        winit::event::MouseScrollDelta::PixelDelta(p) => [p.x as f32, p.y as f32],
+                        winit::event::MouseScrollDelta::LineDelta(x, y) => {
+                            let line_scale = 100.0 / self.scale_factor as f32;
+                            [x * line_scale, y * line_scale]
+                        }
+                        winit::event::MouseScrollDelta::PixelDelta(p) => {
+                            let p = LogicalPosition::<f32>::from_physical(p, self.scale_factor);
+                            [p.x, p.y]
+                        }
                     };
                     self.call_event(curr, |this, id, ctx| this.on_scroll_event(delta, id, ctx));
                 }
