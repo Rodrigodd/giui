@@ -65,6 +65,7 @@ pub struct Rect {
     pub margins: [f32; 4],
     pub(crate) user_min_size: [f32; 2],
     pub(crate) min_size: [f32; 2],
+    /// A [x1, y1, x2, y2] rect.
     pub(crate) rect: [f32; 4],
     pub(crate) expand_x: bool,
     pub(crate) expand_y: bool,
@@ -129,6 +130,7 @@ impl Rect {
         self.layout_dirty_flags = LayoutDirtyFlags::all();
     }
 
+    /// Set the [x1, y1, x2, y2] rect.
     pub fn set_rect(&mut self, rect: [f32; 4]) {
         #[allow(clippy::float_cmp)]
         if rect == self.rect {
