@@ -2,7 +2,7 @@ use crate::{
     context::Context,
     font::FontId,
     graphics::{Graphic, Sprite},
-    Color, Id, RenderDirtyFlags,
+    Color, Id, RenderContext, RenderDirtyFlags,
 };
 // use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
 use ab_glyph::{Font, GlyphId};
@@ -113,7 +113,7 @@ impl GuiRender {
 
     pub fn render<'a, T: GuiRenderer>(
         &'a mut self,
-        ctx: &mut Context,
+        ctx: &mut RenderContext,
         mut renderer: T,
     ) -> (&'a [Sprite], bool) {
         self.sprites.clear();
@@ -389,8 +389,6 @@ impl GuiRender {
 
         if is_animating {
             self.last_anim_draw = Some(Instant::now());
-        } else {
-            ctx.clear_dirty();
         }
 
         (&self.last_sprites, is_animating)

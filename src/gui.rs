@@ -1,5 +1,5 @@
 use crate::{
-    context::{Context, LayoutContext, MinSizeContext},
+    context::{Context, LayoutContext, MinSizeContext, RenderContext},
     control::BuilderContext,
     font::Fonts,
     graphics::Graphic,
@@ -536,11 +536,10 @@ impl Gui {
     }
 
     #[inline]
-    pub fn get_render_context(&mut self) -> Context {
+    pub fn get_render_context(&mut self) -> RenderContext {
         self.lazy_update();
-        //TODO: Context -> RenderContext
         self.redraw = false;
-        Context::new(self)
+        RenderContext::new(self)
     }
 
     pub(crate) fn context_drop(

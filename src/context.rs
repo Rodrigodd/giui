@@ -173,13 +173,6 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// Clear all internal dirty flags from this context. This is called after rendering the gui.
-    //TODO: a RenderContext must be created, and this function only need to exist there
-    pub fn clear_dirty(&mut self) {
-        self.render_dirty = false;
-        self.dirtys.clear();
-    }
-
     pub fn get_rect(&self, id: Id) -> [f32; 4] {
         self.gui.controls.get(id).unwrap().rect.rect
     }
@@ -694,5 +687,68 @@ impl<'a> LayoutContext<'a> {
 
     pub fn get_active_children(&self, id: Id) -> Vec<Id> {
         self.controls.get_active_children(id).unwrap()
+    }
+}
+
+pub struct RenderContext<'a> {
+    gui: &'a mut Gui,
+    fonts: &'a Fonts,
+    render_dirty: bool,
+}
+impl<'a> RenderContext<'a> {
+    pub(crate) fn new(gui: &'a mut Gui) -> Self {
+        let fonts = unsafe { std::mem::transmute(&gui.fonts) };
+        Self {
+            gui,
+            fonts,
+            render_dirty: false,
+        }
+    }
+
+    pub fn get_fonts(&self) -> &'a Fonts {
+        self.fonts
+    }
+
+    pub fn get_layouting(&mut self, id: Id) -> &mut Rect {
+        &mut self.gui.controls.get_mut(id).unwrap().rect
+    }
+
+    pub fn get_rect(&self, id: Id) -> [f32; 4] {
+        self.gui.controls.get(id).unwrap().rect.rect
+    }
+
+    pub fn get_size(&mut self, id: Id) -> [f32; 2] {
+        self.gui.controls.get(id).unwrap().rect.get_size()
+    }
+
+    pub fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
+        self.render_dirty = true;
+        let control = self.gui.controls.get_mut(id).unwrap();
+        control.rect.dirty_render_dirty_flags();
+        &mut control.graphic
+    }
+
+    pub fn get_rect_and_graphic(&mut self, id: Id) -> (&mut Rect, &mut Graphic) {
+        let control = self.gui.controls.get_mut(id).unwrap();
+        self.render_dirty = true;
+        control.rect.dirty_render_dirty_flags();
+        (&mut control.rect, &mut control.graphic)
+    }
+
+    pub fn is_active(&self, id: Id) -> bool {
+        self.gui.controls.get(id).map_or(false, |x| x.active)
+    }
+
+    pub fn get_parent(&self, id: Id) -> Option<Id> {
+        self.gui.controls.get(id).unwrap().parent
+    }
+
+    /// Get both active and deactive children.
+    pub fn get_all_children(&self, id: Id) -> &[Id] {
+        self.gui.controls.get_all_children(id).unwrap()
+    }
+
+    pub fn get_active_children(&self, id: Id) -> Vec<Id> {
+        self.gui.controls.get_active_children(id).unwrap()
     }
 }
