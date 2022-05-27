@@ -62,8 +62,14 @@ impl MenuBehaviour {
             Item::SubMenu(menu) => {
                 let child = ctx.get_active_children(this)[i];
                 let rect = ctx.get_rect(child);
-                let x = rect[2];
-                let y = rect[1];
+
+                let (root_x, root_y) = {
+                    let rect = ctx.get_rect(Id::ROOT_ID);
+                    (rect[0], rect[1])
+                };
+
+                let x = rect[2] - root_x;
+                let y = rect[1] - root_y;
 
                 let menu = ctx
                     .create_control()
@@ -251,8 +257,14 @@ impl MenuBar {
         ctx.active(self.blocker);
         let child = ctx.get_active_children(this)[i];
         let rect = ctx.get_rect(child);
-        let x = rect[0];
-        let y = rect[3];
+
+        let (root_x, root_y) = {
+            let rect = ctx.get_rect(Id::ROOT_ID);
+            (rect[0], rect[1])
+        };
+
+        let x = rect[0] - root_x;
+        let y = rect[3] - root_y;
 
         let menu = ctx
             .create_control()

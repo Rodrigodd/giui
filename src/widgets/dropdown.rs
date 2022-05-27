@@ -274,7 +274,16 @@ where
                     if !self.opened {
                         self.opened = true;
                         // ctx.active(self.menu);
-                        let size = ctx.get_rect(this);
+                        let size = {
+                            let root = ctx.get_rect(Id::ROOT_ID);
+                            let rect = ctx.get_rect(this);
+                            [
+                                rect[0] - root[0],
+                                rect[1] - root[1],
+                                rect[2] - root[0],
+                                rect[3] - root[1],
+                            ]
+                        };
                         ctx.set_anchors(self.menu, [0.0, 0.0, 0.0, 0.0]);
                         ctx.set_margins(self.menu, [size[0], size[3], size[2], size[3]]);
                         ctx.send_event_to(

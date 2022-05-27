@@ -41,7 +41,10 @@ impl Behaviour for Hoverable {
             MouseEvent::Down(_) => {}
             MouseEvent::Up(_) => {}
             MouseEvent::Moved => {
-                let [x, y] = mouse.pos;
+                let [x, y] = {
+                    let root = ctx.get_rect(Id::ROOT_ID);
+                    [mouse.pos[0] - root[0], mouse.pos[1] - root[1]]
+                };
                 if self.is_over {
                     let [width, heigth] = ctx.get_size(crate::Id::ROOT_ID);
                     let x = x / width;
