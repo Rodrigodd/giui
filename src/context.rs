@@ -705,6 +705,10 @@ impl<'a> RenderContext<'a> {
         }
     }
 
+    pub fn scale_factor(&self) -> f64 {
+        self.gui.scale_factor()
+    }
+
     pub fn get_fonts(&self) -> &'a Fonts {
         self.fonts
     }

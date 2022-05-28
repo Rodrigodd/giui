@@ -133,11 +133,17 @@ impl GuiRender {
         }
 
         let fonts = ctx.get_fonts();
+        let scale_factor = ctx.scale_factor() as f32;
 
         // queue all glyphs for cache
 
         let mut queue = Vec::new();
-        let mut add_to_queue = |f: FontId, g: ab_glyph::Glyph| {
+        let mut add_to_queue = |f: FontId, mut g: ab_glyph::Glyph| {
+            g.scale.x *= scale_factor;
+            g.scale.y *= scale_factor;
+            g.position.x *= scale_factor;
+            g.position.y *= scale_factor;
+
             let outline = match fonts.get(f).unwrap().outline_glyph(g.clone()) {
                 Some(x) => x,
                 None => return,
@@ -221,17 +227,19 @@ impl GuiRender {
             0.0
         };
 
+        let scale_rect = |rect: [f32; 4]| rect.map(|x| x * scale_factor);
+
         let mut parents = vec![Id::ROOT_ID];
         'tree: while let Some(parent) = parents.pop() {
             let (mask, mask_changed) = {
                 let rect = ctx.get_layouting(parent);
                 let mask = *rect.get_rect();
-                let mut mask = [
+                let mut mask = scale_rect([
                     mask[0].round(),
                     mask[1].round(),
                     mask[2].round(),
                     mask[3].round(),
-                ];
+                ]);
                 let mut mask_changed = rect
                     .get_render_dirty_flags()
                     .contains(RenderDirtyFlags::RECT);
@@ -291,7 +299,8 @@ impl GuiRender {
                 if compute_sprite {
                     match graphic {
                         Graphic::Panel(panel) => {
-                            for mut sprite in panel.get_sprites(rect.rect).iter().cloned() {
+                            let rect = scale_rect(*rect.get_rect());
+                            for mut sprite in panel.get_sprites(rect).iter().cloned() {
                                 if cut_sprite(&mut sprite, &mask) {
                                     self.sprites.push(sprite);
                                 }
@@ -299,14 +308,16 @@ impl GuiRender {
                         }
                         Graphic::Texture(x) => {
                             let rect = rect;
-                            let mut sprite = x.get_sprite(*rect.get_rect());
+                            let rect = scale_rect(*rect.get_rect());
+                            let mut sprite = x.get_sprite(rect);
                             if cut_sprite(&mut sprite, &mask) {
                                 self.sprites.push(sprite);
                             }
                         }
                         Graphic::Icon(x) => {
                             let rect = rect;
-                            let mut sprite = x.get_sprite(*rect.get_rect());
+                            let rect = scale_rect(*rect.get_rect());
+                            let mut sprite = x.get_sprite(rect);
                             if cut_sprite(&mut sprite, &mask) {
                                 self.sprites.push(sprite);
                             }
@@ -315,7 +326,8 @@ impl GuiRender {
                             is_animating = true;
 
                             let rect = rect;
-                            let mut sprite = x.get_sprite(*rect.get_rect(), dt);
+                            let rect = scale_rect(*rect.get_rect());
+                            let mut sprite = x.get_sprite(rect, dt);
                             if cut_sprite(&mut sprite, &mask) {
                                 self.sprites.push(sprite);
                             }
@@ -334,9 +346,16 @@ impl GuiRender {
                                 }
                             }
                             for glyph in glyphs {
-                                if let Some(rect) = self
-                                    .draw_cache
-                                    .get_rect(&GlyphKey::new(glyph.font_id, &glyph.glyph))
+                                let g = {
+                                    let mut g = glyph.glyph.clone();
+                                    g.scale.x *= scale_factor;
+                                    g.scale.y *= scale_factor;
+                                    g.position.x *= scale_factor;
+                                    g.position.y *= scale_factor;
+                                    g
+                                };
+                                if let Some(rect) =
+                                    self.draw_cache.get_rect(&GlyphKey::new(glyph.font_id, &g))
                                 {
                                     // (tex_coords, pixel_coords)
                                     let tex_width = self.draw_cache.width() as f32;
@@ -349,10 +368,10 @@ impl GuiRender {
                                     ];
                                     let px_bounds = rect.value;
                                     let pixel_coords = [
-                                        px_bounds[0] + glyph.glyph.position.x,
-                                        px_bounds[1] + glyph.glyph.position.y,
-                                        px_bounds[2] + glyph.glyph.position.x,
-                                        px_bounds[3] + glyph.glyph.position.y,
+                                        px_bounds[0] + g.position.x,
+                                        px_bounds[1] + g.position.y,
+                                        px_bounds[2] + g.position.x,
+                                        px_bounds[3] + g.position.y,
                                     ];
                                     if pixel_coords[0] as f32 > mask[2]
                                         || pixel_coords[1] as f32 > mask[3]

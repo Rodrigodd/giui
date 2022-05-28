@@ -573,13 +573,13 @@ impl Gui {
 
     /// Set the scale factor of the gui.
     ///
-    /// This is used to scale the gui when rendering, for allowing dpi awareness.
-    fn set_scale_factor(&mut self, scale_factor: f64) {
+    /// This is used to scale the gui when rendering, allowing dpi awareness.
+    pub fn set_scale_factor(&mut self, scale_factor: f64) {
         self.scale_factor = scale_factor;
     }
 
     /// Get the current scale factor of the gui.
-    fn scale_factor(&self) -> f64 {
+    pub fn scale_factor(&self) -> f64 {
         self.scale_factor
     }
 

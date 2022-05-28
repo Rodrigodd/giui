@@ -61,12 +61,16 @@ fn resize(
     camera.resize(size.width, size.height);
     let width = size.width as f32;
     let height = size.height as f32;
-    let width = width / scale_factor as f32;
-    let height = height / scale_factor as f32;
-    gui.set_root_rect([10.0, 0.0, width - 20.0, height - 50.0]);
     camera.set_width(width);
     camera.set_height(height);
     camera.set_position(width / 2.0, height / 2.0);
+    let width = width / scale_factor as f32;
+    let height = height / scale_factor as f32;
+    if cfg!(target_os = "android") {
+        gui.set_root_rect([10.0, 0.0, width - 20.0, height - 50.0]);
+    } else {
+        gui.set_root_rect([0.0, 0.0, width, height]);
+    }
 }
 
 pub trait GiuiEventLoop<T> {
@@ -79,8 +83,6 @@ pub trait GiuiEventLoop<T> {
     #[allow(unused_variables)]
     fn on_event(&mut self, event: &Event<T>, control: &mut ControlFlow) {}
 }
-
-fn create_render() {}
 
 pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -> ! {
     #[cfg(not(target_os = "android"))]
