@@ -111,12 +111,43 @@ pub enum MouseEvent {
     None,
 }
 
+/// The state of a button, if is Pressed or Released.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ButtonState {
+    Released = 0,
+    Pressed = 1,
+}
+impl ButtonState {
+    /// Return `true` if the button state is Pressed.
+    pub fn pressed(self) -> bool {
+        self == Self::Pressed
+    }
+}
+impl Default for ButtonState {
+    fn default() -> Self {
+        Self::Released
+    }
+}
+
+/// The state of each button of the mouse.
+#[derive(Default, Debug, Clone)]
+pub struct MouseButtons {
+    /// The button state of the left mouse button.
+    pub left: ButtonState,
+    /// The button state of the right mouse button.
+    pub right: ButtonState,
+    /// The button state of the middle mouse button (the scroll wheel button).
+    pub middle: ButtonState,
+}
+
 #[derive(Clone, Debug)]
 pub struct MouseInfo {
     pub event: MouseEvent,
     // pub action: MouseAction,
     /// The position of the mouse, in pixels, relative to the top-right corner of the window
     pub pos: [f32; 2],
+    /// The state of each button of the mouse.
+    pub buttons: MouseButtons,
     /// The different beetween this mouse position, and the position in the last event. The last
     /// position may be outside of this control.
     pub delta: Option<[f32; 2]>,
@@ -137,6 +168,7 @@ impl Default for MouseInfo {
             event: MouseEvent::None,
             // action: MouseAction::None,
             pos: [f32::NAN; 2],
+            buttons: MouseButtons::default(),
             delta: None,
             click_count: 0,
         }
@@ -153,6 +185,7 @@ pub enum KeyboardEvent {
 pub(crate) struct Input {
     pub mouse_pos: Option<[f32; 2]>,
     pub last_mouse_pos: Option<[f32; 2]>,
+    pub buttons: MouseButtons,
     /// number of consecutives MouseDown's
     pub click_count: u8,
     /// used to check for double clicks
@@ -168,6 +201,7 @@ impl Input {
             event,
             // action,
             pos: self.mouse_pos.unwrap(),
+            buttons: self.buttons.clone(),
             delta,
             click_count: self.click_count,
         }
@@ -503,6 +537,9 @@ impl Gui {
     }
 
     pub fn render_is_dirty(&self) -> bool {
+        if self.redraw {
+            log::debug!("render is dirty");
+        }
         self.redraw
     }
 
@@ -761,6 +798,7 @@ impl Gui {
                 }
             }
             WindowEvent::ReceivedCharacter(ch) => {
+                log::debug!("received character {:?}", ch);
                 if let Some(curr) = self.current_focus {
                     if ch.is_control() {
                         return;
@@ -780,6 +818,7 @@ impl Gui {
                     },
                 ..
             } => {
+                log::debug!("received key {:?}", keycode);
                 if let Some(curr) = self.current_focus {
                     let event = if *state == ElementState::Pressed {
                         KeyboardEvent::Pressed(*keycode)
@@ -996,12 +1035,20 @@ impl Gui {
     }
 
     pub fn mouse_down(&mut self, button: MouseButton) {
+        match button {
+            MouseButton::Left => self.input.buttons.left = ButtonState::Pressed,
+            MouseButton::Right => self.input.buttons.right = ButtonState::Pressed,
+            MouseButton::Middle => self.input.buttons.middle = ButtonState::Pressed,
+            MouseButton::Other(_) => {}
+        }
+
         log::info!(
             "click on {}",
             self.current_mouse
                 .map_or("None".to_string(), |x| x.to_string())
         );
         self.set_focus(self.current_mouse);
+
         if let Some(curr) = self.current_mouse {
             if let MouseButton::Left = button {
                 const DOUBLE_CLICK_TIME: Duration = Duration::from_millis(500);
@@ -1023,6 +1070,12 @@ impl Gui {
     }
 
     pub fn mouse_up(&mut self, button: MouseButton) {
+        match button {
+            MouseButton::Left => self.input.buttons.left = ButtonState::Released,
+            MouseButton::Right => self.input.buttons.right = ButtonState::Released,
+            MouseButton::Middle => self.input.buttons.middle = ButtonState::Released,
+            MouseButton::Other(_) => {}
+        }
         if let Some(curr) = self.current_mouse {
             self.send_mouse_event_to(curr, MouseEvent::Up(button));
         }
