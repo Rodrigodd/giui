@@ -181,26 +181,35 @@ pub enum KeyboardEvent {
     Release(VirtualKeyCode),
 }
 
+/// Store data related to mouse input
 #[derive(Default)]
-pub(crate) struct Input {
-    pub mouse_pos: Option<[f32; 2]>,
-    pub last_mouse_pos: Option<[f32; 2]>,
+pub(crate) struct MouseInput {
+    pub position: Option<[f32; 2]>,
+    pub last_position: Option<[f32; 2]>,
     pub buttons: MouseButtons,
     /// number of consecutives MouseDown's
     pub click_count: u8,
     /// used to check for double clicks
-    pub last_mouse_down: Option<Instant>,
+    pub last_down: Option<Instant>,
+    /// Tells if current_mouse control is locked, and will not change when the mouse stop hovering
+    /// it. Useful for drag widgets like a slider.
+    over_is_locked: bool,
+    /// The control currently hovered by the mouse. Has receive a MouseEvent::Enter, and
+    /// will receive a MouseEvent::Exit when this value chances.
+    current_mouse: Option<Id>,
+    /// The control currently receiving on_scroll_event's.
+    current_scroll: Option<Id>,
 }
-impl Input {
+impl MouseInput {
     fn get_mouse_info(&self, event: MouseEvent) -> MouseInfo {
         let delta = self
-            .mouse_pos
-            .zip(self.last_mouse_pos)
+            .position
+            .zip(self.last_position)
             .map(|(a, b)| [a[0] - b[0], a[1] - b[1]]);
         MouseInfo {
             event,
             // action,
-            pos: self.mouse_pos.unwrap(),
+            pos: self.position.unwrap(),
             buttons: self.buttons.clone(),
             delta,
             click_count: self.click_count,
@@ -223,11 +232,9 @@ pub struct Gui {
     scheduled_events: KeyedPriorityQueue<u64, ScheduledEventTo>,
     lazy_events: VecDeque<LazyEvent>,
 
-    pub(crate) input: Input,
-    current_mouse: Option<Id>,
-    current_scroll: Option<Id>,
+    pub(crate) input: MouseInput,
+    /// The control currently receiving on_keyboard_event's.
     pub(crate) current_focus: Option<Id>,
-    over_is_locked: bool,
 
     change_cursor: Option<CursorIcon>,
     scale_factor: f64,
@@ -243,11 +250,8 @@ impl Gui {
             dirty_layouts: Vec::new(),
             lazy_events: VecDeque::new(),
             change_cursor: None,
-            input: Input::default(),
-            current_mouse: None,
-            current_scroll: None,
+            input: MouseInput::default(),
             current_focus: None,
-            over_is_locked: false,
             fonts,
             scale_factor,
         }
@@ -494,14 +498,14 @@ impl Gui {
             let mut parents = vec![id];
             while let Some(id) = parents.pop() {
                 parents.extend(self.get_active_children(id).iter().rev());
-                if Some(id) == self.current_mouse {
+                if Some(id) == self.input.current_mouse {
                     self.update_layout();
                     let mouse = self.input.get_mouse_info(MouseEvent::Exit);
                     self.call_event_no_lazy(id, |x, id, ctx| x.on_mouse_event(mouse, id, ctx));
-                    self.current_mouse = None;
+                    self.input.current_mouse = None;
                 }
-                if Some(id) == self.current_scroll {
-                    self.current_scroll = None;
+                if Some(id) == self.input.current_scroll {
+                    self.input.current_scroll = None;
                 }
                 if Some(id) == self.current_focus {
                     self.set_focus(None);
@@ -641,9 +645,9 @@ impl Gui {
         } else if let Some(event::RemoveControl { id }) = event.downcast_ref() {
             self.remove_control(*id);
         } else if event.is::<event::LockOver>() {
-            self.over_is_locked = true;
+            self.input.over_is_locked = true;
         } else if event.is::<event::UnlockOver>() {
-            self.over_is_locked = false;
+            self.input.over_is_locked = false;
         } else if let Some(event::RequestFocus { id }) = event.downcast_ref() {
             self.set_focus(Some(*id));
         } else if let Some(event::StartControl { id }) = event.downcast_ref() {
@@ -775,7 +779,7 @@ impl Gui {
                 }
             }
             &WindowEvent::MouseWheel { delta, .. } => {
-                if let Some(curr) = self.current_scroll {
+                if let Some(curr) = self.input.current_scroll {
                     //TODO: I should handle Line and Pixel Delta differences more wisely?
                     let delta = match delta {
                         winit::event::MouseScrollDelta::LineDelta(x, y) => {
@@ -791,8 +795,8 @@ impl Gui {
                 }
             }
             WindowEvent::CursorLeft { .. } => {
-                if !self.over_is_locked {
-                    if let Some(curr) = self.current_mouse.take() {
+                if !self.input.over_is_locked {
+                    if let Some(curr) = self.input.current_mouse.take() {
                         self.send_mouse_event_to(curr, MouseEvent::Exit);
                     }
                 }
@@ -976,10 +980,10 @@ impl Gui {
     }
 
     pub fn mouse_moved(&mut self, mouse_x: f32, mouse_y: f32) {
-        self.input.last_mouse_pos = self.input.mouse_pos;
-        self.input.mouse_pos = Some([mouse_x, mouse_y]);
-        if self.current_mouse.is_some() && self.over_is_locked {
-            self.send_mouse_event_to(self.current_mouse.unwrap(), MouseEvent::Moved);
+        self.input.last_position = self.input.position;
+        self.input.position = Some([mouse_x, mouse_y]);
+        if self.input.current_mouse.is_some() && self.input.over_is_locked {
+            self.send_mouse_event_to(self.input.current_mouse.unwrap(), MouseEvent::Moved);
             return;
         }
 
@@ -998,7 +1002,7 @@ impl Gui {
                     curr_mouse = Some(curr);
                 }
                 if flags.contains(InputFlags::SCROLL) {
-                    self.current_scroll = Some(curr);
+                    self.input.current_scroll = Some(curr);
                 }
             }
             // the interator is reversed because the last child block the previous ones
@@ -1017,16 +1021,16 @@ impl Gui {
             break;
         }
 
-        if curr_mouse == self.current_mouse {
-            if let Some(current_mouse) = self.current_mouse {
+        if curr_mouse == self.input.current_mouse {
+            if let Some(current_mouse) = self.input.current_mouse {
                 self.send_mouse_event_to(current_mouse, MouseEvent::Moved);
             }
         } else {
-            if let Some(current_mouse) = self.current_mouse {
+            if let Some(current_mouse) = self.input.current_mouse {
                 self.send_mouse_event_to(current_mouse, MouseEvent::Exit);
             }
-            self.current_mouse = curr_mouse;
-            if let Some(current_mouse) = self.current_mouse {
+            self.input.current_mouse = curr_mouse;
+            if let Some(current_mouse) = self.input.current_mouse {
                 self.input.click_count = 0;
                 self.send_mouse_event_to(current_mouse, MouseEvent::Enter);
                 self.send_mouse_event_to(current_mouse, MouseEvent::Moved);
@@ -1044,20 +1048,21 @@ impl Gui {
 
         log::info!(
             "click on {}",
-            self.current_mouse
+            self.input
+                .current_mouse
                 .map_or("None".to_string(), |x| x.to_string())
         );
-        self.set_focus(self.current_mouse);
+        self.set_focus(self.input.current_mouse);
 
-        if let Some(curr) = self.current_mouse {
+        if let Some(curr) = self.input.current_mouse {
             if let MouseButton::Left = button {
                 const DOUBLE_CLICK_TIME: Duration = Duration::from_millis(500);
-                let time = if let Some(last_click) = self.input.last_mouse_down {
+                let time = if let Some(last_click) = self.input.last_down {
                     last_click.elapsed()
                 } else {
                     Duration::from_millis(0)
                 };
-                self.input.last_mouse_down = Some(Instant::now());
+                self.input.last_down = Some(Instant::now());
                 self.input.click_count = if time < DOUBLE_CLICK_TIME {
                     // with saturating the program don't will crash after 256 consective clicks
                     self.input.click_count.saturating_add(1)
@@ -1076,7 +1081,7 @@ impl Gui {
             MouseButton::Middle => self.input.buttons.middle = ButtonState::Released,
             MouseButton::Other(_) => {}
         }
-        if let Some(curr) = self.current_mouse {
+        if let Some(curr) = self.input.current_mouse {
             self.send_mouse_event_to(curr, MouseEvent::Up(button));
         }
     }
@@ -1142,17 +1147,17 @@ impl Gui {
                         while let Some(id) = parents.pop() {
                             parents.extend(self.controls.get(id).unwrap().children.iter().rev());
 
-                            if self.current_mouse == Some(id) {
+                            if self.input.current_mouse == Some(id) {
                                 // self.update_layout();
                                 // if let Some((this, mut ctx)) =
                                 //     Context::new_with_mut_behaviour(id, self)
                                 // {
                                 //     this.on_mouse_event(MouseEvent::Exit, id, &mut ctx);
                                 // }
-                                self.current_mouse = None;
+                                self.input.current_mouse = None;
                             }
-                            if self.current_scroll == Some(id) {
-                                self.current_scroll = None;
+                            if self.input.current_scroll == Some(id) {
+                                self.input.current_scroll = None;
                             }
                             if self.current_focus == Some(id) {
                                 let mut curr = Some(id);
@@ -1348,12 +1353,12 @@ impl Gui {
                             parents.extend(self.get_active_children(id).iter().rev());
 
                             // TODO: this comment-out's are probaly buggy
-                            if Some(id) == self.current_mouse {
+                            if Some(id) == self.input.current_mouse {
                                 // self.send_mouse_event_to(id, MouseEvent::Exit);
-                                self.current_mouse = None;
+                                self.input.current_mouse = None;
                             }
-                            if Some(id) == self.current_scroll {
-                                self.current_scroll = None;
+                            if Some(id) == self.input.current_scroll {
+                                self.input.current_scroll = None;
                             }
                             if Some(id) == self.current_focus {
                                 // self.set_focus(None);
