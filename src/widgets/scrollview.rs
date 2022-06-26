@@ -82,7 +82,7 @@ impl Behaviour for ScrollBar {
             MouseEvent::Down(Left) => {
                 self.dragging = true;
                 ctx.set_graphic(self.handle, self.style.pressed.clone());
-                ctx.send_event(event::LockOver);
+                ctx.lock_cursor(true, mouse.id);
                 let handle_rect = ctx.get_rect(self.handle);
                 let area = ctx
                     .get_parent(self.handle)
@@ -126,7 +126,7 @@ impl Behaviour for ScrollBar {
             MouseEvent::Up(Left) => {
                 if self.dragging {
                     self.dragging = false;
-                    ctx.send_event(event::UnlockOver);
+                    ctx.lock_cursor(false, mouse.id);
                     ctx.set_graphic(self.handle, self.style.hover.clone());
                 }
             }

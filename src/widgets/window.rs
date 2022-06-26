@@ -38,7 +38,7 @@ impl Behaviour for Window {
             }
             MouseEvent::Down(Left) => {
                 self.dragging = true;
-                ctx.send_event(event::LockOver);
+                ctx.lock_cursor(true, mouse.id);
                 let mut margins = ctx.get_margins(this);
                 let min_size = ctx.get_min_size(this);
                 if margins[2] - margins[0] < min_size[0] {
@@ -52,7 +52,7 @@ impl Behaviour for Window {
             }
             MouseEvent::Up(Left) => {
                 self.dragging = false;
-                ctx.send_event(event::UnlockOver);
+                ctx.lock_cursor(false, mouse.id);
             }
             MouseEvent::Moved => {
                 let [mut x, mut y] = mouse.pos;

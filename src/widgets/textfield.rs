@@ -375,7 +375,7 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                         .move_cursor_to_byte_index(byte_index, false, text_layout);
                     self.mouse_down = 1;
                     if mouse.click_count > 1 {
-                        ctx.reset_click_count_to_one();
+                        ctx.reset_click_count_to_one(mouse.id);
                     }
                 }
                 self.drag_start = byte_index;
@@ -383,11 +383,11 @@ impl<C: TextFieldCallback> Behaviour for TextField<C> {
                     ctx.cancel_scheduled_event(event_id);
                 }
                 self.update_carret(this, ctx, true);
-                ctx.lock_cursor(true);
+                ctx.lock_cursor(true, mouse.id);
             }
             MouseEvent::Up(Left) => {
                 self.mouse_down = 0;
-                ctx.lock_cursor(false);
+                ctx.lock_cursor(false, mouse.id);
             }
             MouseEvent::Moved => match self.mouse_down {
                 0 => {}

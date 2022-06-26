@@ -120,7 +120,7 @@ impl<C: SliderCallback> Behaviour for Slider<C> {
             MouseEvent::Exit => {}
             MouseEvent::Down(Left) => {
                 self.dragging = true;
-                ctx.send_event(event::LockOver);
+                ctx.lock_cursor(true, mouse.id);
                 self.update_value(ctx);
                 self.set_handle_pos(this, ctx);
                 let value = self.value;
@@ -131,7 +131,7 @@ impl<C: SliderCallback> Behaviour for Slider<C> {
                 self.set_handle_pos(this, ctx);
                 let value = self.value;
                 self.callback.on_release(this, ctx, value);
-                ctx.send_event(event::UnlockOver);
+                ctx.lock_cursor(false, mouse.id);
             }
             MouseEvent::Moved => {
                 let [x, _] = mouse.pos;

@@ -154,7 +154,7 @@ where
             self.owner = *owner;
             // set focus
             if selected.is_none() {
-                ctx.send_event(event::RequestFocus { id: this });
+                ctx.set_focus(this);
             }
             // set itens
             for child in ctx.get_active_children(this) {
@@ -166,7 +166,7 @@ where
                 // set focus
                 if let Some(index) = selected {
                     if *index == i {
-                        ctx.send_event(event::RequestFocus { id });
+                        ctx.set_focus(id);
                     }
                 }
             }

@@ -155,11 +155,17 @@ impl<'a> Context<'a> {
     /// This means that even if the mouse position go out of the area of the control, the control
     /// will continue receiving mouse events, and MouseExit will not be emitted. This is useful
     /// for dragging behavior.
-    pub fn lock_cursor(&mut self, lock: bool) {
+    pub fn lock_cursor(&mut self, lock: bool, mouse_id: crate::MouseId) {
         if lock {
-            self.send_event(event::LockOver);
+            self.send_event(event::SetLockOver {
+                lock: true,
+                mouse_id,
+            });
         } else {
-            self.send_event(event::UnlockOver);
+            self.send_event(event::SetLockOver {
+                lock: false,
+                mouse_id,
+            });
         }
     }
 
@@ -293,8 +299,18 @@ impl<'a> Context<'a> {
     /// Set MouseInfo::click_count to 1, wich keep track of consecutives clicks.
     /// This means that, if called, if the next click is consecutive,
     /// it will have a click count of 2.
-    pub fn reset_click_count_to_one(&mut self) {
-        self.gui.input.click_count = 1;
+    pub fn reset_click_count_to_one(&mut self, mouse_id: crate::MouseId) {
+        let input = match Gui::get_mouse(&mut self.gui.inputs, mouse_id) {
+            Some(x) => x,
+            None => {
+                log::error!(
+                    "reset clock count to one mouse with unkown id {}.",
+                    mouse_id
+                );
+                return;
+            }
+        };
+        input.click_count = 1;
     }
 
     /// This only took effect when Controls is dropped
