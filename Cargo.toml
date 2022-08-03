@@ -32,7 +32,7 @@ unicode-linebreak = "0.1"
 unicode-segmentation = "1"
 winit = "0.26"
 bitflags = "1"
-copypasta = "0.7"
+copypasta = "0.8"
 serde = { version = "1", features = ["derive"] }
 giui-derive = { path = "./giui-derive" }
 keyed_priority_queue = "0.3"
