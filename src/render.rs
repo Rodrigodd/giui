@@ -185,14 +185,16 @@ impl GuiRender {
             let added = match self.draw_cache.cache_rects(&mut queue) {
                 Ok(Cached::Added(x) | Cached::Changed(x)) => x,
                 Ok(Cached::Cleared(x)) => {
+                    log::debug!("draw cache: cleared");
                     font_texture_valid = false;
                     x
                 }
                 Err(_) => {
-                    let width = self.draw_cache.width();
-                    let height = self.draw_cache.height();
-                    self.draw_cache = LruTextureCache::new(width * 2, height * 2);
-                    renderer.resize_font_texture(self.font_texture, [width * 2, height * 2]);
+                    let width = 2 * self.draw_cache.width();
+                    let height = 2 * self.draw_cache.height();
+                    self.draw_cache = LruTextureCache::new(width, height);
+                    renderer.resize_font_texture(self.font_texture, [width, height]);
+                    log::debug!("draw cache: rebuilded to {} x {}", width, height);
                     font_texture_valid = false;
                     // retry
                     continue;
