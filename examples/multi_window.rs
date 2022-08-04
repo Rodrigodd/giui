@@ -49,7 +49,7 @@ fn resize(
     camera.resize(size.width, size.height);
     let width = size.width as f32;
     let height = size.height as f32;
-    gui.set_root_rect(width, height);
+    gui.set_root_rect([0.0, 0.0, width, height]);
     camera.set_width(width);
     camera.set_height(height);
     camera.set_position(width / 2.0, height / 2.0);
@@ -68,7 +68,7 @@ fn main() {
     // create winit's window and event_loop
     let event_loop = EventLoop::with_user_event();
     let window = WindowBuilder::new()
-        .with_inner_size(PhysicalSize::new(200, 200))
+        .with_inner_size(PhysicalSize::<u32>::new(200, 200))
         .build(&event_loop)
         .unwrap();
 
@@ -91,7 +91,7 @@ fn main() {
     // create the gui, and the gui_render
     // TODO: I should not be cloning the fonts for each gui instance.
     let my_font = FontId::new(0); // this is not cool.
-    let mut gui = Gui::new(0.0, 0.0, fonts());
+    let mut gui = Gui::new(0.0, 0.0, window.scale_factor(), fonts());
     let gui_render = GuiRender::new(font_texture, white_texture, [128, 128]);
 
     // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
@@ -168,7 +168,7 @@ fn main() {
                 let size = window.inner_size();
                 let width = size.width;
                 let height = size.height;
-                let mut gui = Gui::new(width as f32, height as f32, fonts());
+                let mut gui = Gui::new(width as f32, height as f32, window.scale_factor(), fonts());
                 let gui_render = GuiRender::new(font_texture, white_texture, [128, 128]);
                 let mut camera = Camera::new(width, height, height as f32);
 
@@ -256,7 +256,7 @@ fn main() {
                 // render the gui
                 struct Render<'a>(&'a mut GLSpriteRender);
                 impl<'a> GuiRenderer for Render<'a> {
-                    fn update_font_texure(
+                    fn update_font_texture(
                         &mut self,
                         font_texture: u32,
                         rect: [u32; 4],

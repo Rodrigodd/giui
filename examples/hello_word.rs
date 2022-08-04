@@ -24,7 +24,7 @@ fn resize(
     camera.resize(size.width, size.height);
     let width = size.width as f32;
     let height = size.height as f32;
-    gui.set_root_rect(width, height);
+    gui.set_root_rect([0.0, 0.0, width, height]);
     camera.set_width(width);
     camera.set_height(height);
     camera.set_position(width / 2.0, height / 2.0);
@@ -58,7 +58,7 @@ fn main() {
     };
 
     // create the gui, and the gui_render
-    let mut gui = Gui::new(0.0, 0.0, fonts);
+    let mut gui = Gui::new(0.0, 0.0, 1.0, fonts);
     let mut gui_render = GuiRender::new(font_texture, white_texture, [128, 128]);
 
     // populate the gui with controls. In this case a green 'Hello Word' text covering the entire of the screen.
@@ -138,7 +138,7 @@ fn main() {
                 // render the gui
                 struct Render<'a>(&'a mut GLSpriteRender);
                 impl<'a> GuiRenderer for Render<'a> {
-                    fn update_font_texure(
+                    fn update_font_texture(
                         &mut self,
                         font_texture: u32,
                         rect: [u32; 4],

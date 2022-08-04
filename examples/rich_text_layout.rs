@@ -7,8 +7,8 @@ use giui::{
     text::{Span, SpannedString},
     Color, Gui, RectFill,
 };
-use sprite_render::GLSpriteRender;
-use winit::event_loop::EventLoop;
+use sprite_render::SpriteRender;
+use winit::event_loop::EventLoopProxy;
 
 fn main() {
     common::run::<(), App>(400, 200);
@@ -23,9 +23,9 @@ struct App;
 impl GiuiEventLoop<()> for App {
     fn init(
         gui: &mut Gui,
-        _render: &mut GLSpriteRender,
+        _render: &mut dyn SpriteRender,
         fonts: MyFonts,
-        _event_loop: &EventLoop<()>,
+        _event_loop: EventLoopProxy<()>,
     ) -> Self {
         let pangram = "\
 In A Large New Kingdom,

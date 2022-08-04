@@ -12,16 +12,16 @@ use giui::{
     BuilderContext, Color, ControlBuilder, Gui,
 };
 use sprite_render::{GLSpriteRender, SpriteRender};
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopProxy;
 
 fn main() {
     struct TextField;
     impl GiuiEventLoop<()> for TextField {
         fn init(
             gui: &mut Gui,
-            render: &mut GLSpriteRender,
+            render: &mut dyn SpriteRender,
             fonts: MyFonts,
-            _event_loop: &EventLoop<()>,
+            _event_loop: EventLoopProxy<()>,
         ) -> Self {
             let texture = {
                 let data = image::open("examples/panel.png").unwrap();

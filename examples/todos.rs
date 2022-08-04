@@ -13,17 +13,17 @@ use giui::{
     },
     BuilderContext, Color, ControlBuilder, Gui, Id,
 };
-use sprite_render::{GLSpriteRender, SpriteRender};
-use winit::event_loop::EventLoop;
+use sprite_render::SpriteRender;
+use winit::event_loop::EventLoopProxy;
 
 fn main() {
     struct Todos;
     impl GiuiEventLoop<()> for Todos {
         fn init(
             gui: &mut Gui,
-            render: &mut GLSpriteRender,
+            render: &mut dyn SpriteRender,
             fonts: MyFonts,
-            _event_loop: &EventLoop<()>,
+            _event_loop: EventLoopProxy<()>,
         ) -> Self {
             let texture = {
                 let data = image::open("examples/panel.png").unwrap();
@@ -55,6 +55,13 @@ fn main() {
                 },
             );
             Todos
+        }
+
+        fn on_event(
+            &mut self,
+            event: &winit::event::Event<()>,
+            control: &mut winit::event_loop::ControlFlow,
+        ) {
         }
     }
 

@@ -72,9 +72,9 @@ struct Loaded {
 impl GiuiEventLoop<UserEvent> for Loaded {
     fn init(
         gui: &mut Gui,
-        render: &mut GLSpriteRender,
+        render: &mut dyn SpriteRender,
         fonts: MyFonts,
-        event_loop: &EventLoop<UserEvent>,
+        event_loop: EventLoopProxy<UserEvent>,
     ) -> Self {
         // load textures
         let texture = {
@@ -107,12 +107,7 @@ impl GiuiEventLoop<UserEvent> for Loaded {
         };
         let options = Rc::new(RefCell::new(options));
         let style_sheet = StyleSheet::new(texture, icon_texture, tab_texture, fonts);
-        let options_gui = OptionsGui::new(
-            gui,
-            options.clone(),
-            event_loop.create_proxy(),
-            &style_sheet,
-        );
+        let options_gui = OptionsGui::new(gui, options.clone(), event_loop, &style_sheet);
 
         if let Some(e) = err {
             let mut ctx = gui.get_context();
