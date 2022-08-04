@@ -1,4 +1,4 @@
-use instant::Instant;
+use crate::time::Instant;
 use std::{any::Any, rc::Rc, time::Duration};
 
 use copypasta::{ClipboardContext, ClipboardProvider};

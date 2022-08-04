@@ -1,3 +1,4 @@
+use crate::time::Instant;
 use crate::{
     context::{Context, LayoutContext, MinSizeContext, RenderContext},
     control::BuilderContext,
@@ -6,7 +7,6 @@ use crate::{
     util::WithPriority,
     Control, ControlBuilder, ControlEntry, Controls, LayoutDirtyFlags, Rect,
 };
-use instant::Instant;
 use keyed_priority_queue::KeyedPriorityQueue;
 use std::{
     any::{Any, TypeId},

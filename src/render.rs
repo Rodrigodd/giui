@@ -5,8 +5,8 @@ use crate::{
     Color, Id, RenderContext, RenderDirtyFlags,
 };
 // use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
+use crate::time::Instant;
 use ab_glyph::{Font, GlyphId};
-use instant::Instant;
 use std::ops::Range;
 use texture_cache::{Cached, LruTextureCache, RectEntry};
 

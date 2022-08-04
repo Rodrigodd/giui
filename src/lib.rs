@@ -7,6 +7,7 @@ pub use giui_derive::*;
 
 pub mod font;
 pub mod text;
+mod time;
 mod util;
 
 mod color;
