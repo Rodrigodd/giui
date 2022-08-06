@@ -44,7 +44,6 @@ fn mouse_click() {
         .behaviour(TestClickCount { list: list.clone() })
         .build(&mut gui);
 
-    gui.mouse_enter(0);
     gui.mouse_moved(0, 50.0, 50.0);
     gui.mouse_down(0, MouseButton::Left);
     gui.mouse_up(0, MouseButton::Left);
@@ -107,7 +106,6 @@ fn mouse_click_touch() {
         .behaviour(TestClickCount { list: list.clone() })
         .build(&mut gui);
 
-    gui.mouse_enter(0);
     gui.mouse_moved(0, 50.0, 50.0);
     gui.mouse_down(0, MouseButton::Left);
     gui.mouse_up(0, MouseButton::Left);
@@ -115,7 +113,6 @@ fn mouse_click_touch() {
 
     mock_instant::MockClock::advance(Duration::from_millis(100));
 
-    gui.mouse_enter(0);
     gui.mouse_moved(0, 50.0, 50.0);
     gui.mouse_down(0, MouseButton::Left);
     gui.mouse_up(0, MouseButton::Left);
@@ -123,7 +120,6 @@ fn mouse_click_touch() {
 
     mock_instant::MockClock::advance(Duration::from_millis(100));
 
-    gui.mouse_enter(0);
     gui.mouse_moved(0, 50.0, 50.0);
     gui.mouse_down(0, MouseButton::Left);
     gui.mouse_up(0, MouseButton::Left);
@@ -131,7 +127,6 @@ fn mouse_click_touch() {
 
     mock_instant::MockClock::advance(Duration::from_millis(1000));
 
-    gui.mouse_enter(0);
     gui.mouse_moved(0, 50.0, 50.0);
     gui.mouse_down(0, MouseButton::Left);
     gui.mouse_up(0, MouseButton::Left);
@@ -194,13 +189,11 @@ fn multi_touch() {
         })
         .build(&mut gui);
 
-    gui.mouse_enter(1);
     gui.mouse_moved(1, 25.0, 50.0);
     gui.mouse_down(1, MouseButton::Left);
 
     mock_instant::MockClock::advance(Duration::from_millis(1000));
 
-    gui.mouse_enter(2);
     gui.mouse_moved(2, 75.0, 50.0);
     gui.mouse_down(2, MouseButton::Left);
 
@@ -269,13 +262,11 @@ fn multi_touch_one_control() {
         .behaviour(TestMouseEvent { list: list.clone() })
         .build(&mut gui);
 
-    gui.mouse_enter(0);
     gui.mouse_moved(0, 25.0, 50.0);
     gui.mouse_down(0, MouseButton::Left);
 
     mock_instant::MockClock::advance(Duration::from_millis(1000));
 
-    gui.mouse_enter(2);
     gui.mouse_moved(2, 75.0, 50.0);
     gui.mouse_down(2, MouseButton::Left);
 
@@ -310,11 +301,9 @@ fn multi_touch_one_control() {
         ]
     );
 
-    gui.mouse_enter(1);
     gui.mouse_moved(1, 25.0, 50.0);
     gui.mouse_down(1, MouseButton::Left);
 
-    gui.mouse_enter(2);
     gui.mouse_moved(2, 75.0, 50.0);
     gui.mouse_down(2, MouseButton::Left);
 

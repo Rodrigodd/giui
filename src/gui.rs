@@ -911,7 +911,6 @@ impl Gui {
                 let location = LogicalPosition::<f32>::from_physical(location, self.scale_factor);
                 match phase {
                     winit::event::TouchPhase::Started => {
-                        self.mouse_enter(id);
                         self.mouse_moved(id, location.x, location.y);
                         self.mouse_down(id, MouseButton::Left);
                     }
@@ -930,9 +929,7 @@ impl Gui {
             &WindowEvent::MouseWheel { delta, .. } => {
                 self.mouse_scroll(MOUSE_ID, delta);
             }
-            WindowEvent::CursorEntered { .. } => {
-                self.mouse_enter(MOUSE_ID);
-            }
+            WindowEvent::CursorEntered { .. } => {}
             WindowEvent::CursorLeft { .. } => {
                 self.mouse_exit(MOUSE_ID);
             }
@@ -1303,11 +1300,6 @@ impl Gui {
             };
             self.call_event(curr, |this, id, ctx| this.on_scroll_event(delta, id, ctx));
         }
-    }
-
-    /// Called when the mouse enters the Gui. Could have being outside of the window, for example.
-    pub fn mouse_enter(&mut self, id: MouseId) {
-        log::trace!("mouse {} enters", id);
     }
 
     /// Called when the mouse exit the Gui. Could have exit the window, for example.
