@@ -1,10 +1,10 @@
+use std::{any::Any, rc::Rc};
+
 use crate::{
     event::SetValue,
     style::{ButtonStyle, OnFocusStyle},
     Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
 };
-
-use std::{any::Any, rc::Rc};
 
 pub struct Toggle<F: Fn(Id, &mut Context, bool)> {
     click: bool,

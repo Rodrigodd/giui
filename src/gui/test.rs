@@ -2,8 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use instant::Duration;
 
-use crate::{font::Fonts, Behaviour, Context, Gui, Id, InputFlags, MouseInfo};
-use crate::{MouseButton, MouseEvent};
+use crate::{
+    font::Fonts, Behaviour, Context, Gui, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
+};
 
 struct TestClickCount {
     list: Arc<Mutex<Vec<u8>>>,

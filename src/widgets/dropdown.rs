@@ -1,8 +1,8 @@
+use std::{any::Any, rc::Rc};
+
 use crate::{
     style::ButtonStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
 };
-
-use std::{any::Any, rc::Rc};
 
 pub struct SetSelected(pub usize);
 struct SetIndex(usize);

@@ -1,8 +1,7 @@
 mod common;
-use common::MyFonts;
 use std::rc::Rc;
 
-use common::*;
+use common::{MyFonts, *};
 use giui::{
     font::FontId,
     graphics::{Graphic, Panel, Text},

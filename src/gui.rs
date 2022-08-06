@@ -1,25 +1,27 @@
-use crate::time::Instant;
+use std::{
+    any::{Any, TypeId},
+    collections::{HashMap, VecDeque},
+    num::NonZeroU32,
+    ops::{Deref, DerefMut},
+    sync::atomic::AtomicU64,
+    time::Duration,
+};
+
+use keyed_priority_queue::KeyedPriorityQueue;
+use winit::{
+    dpi::LogicalPosition,
+    event::{ElementState, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
+    window::CursorIcon,
+};
+
 use crate::{
     context::{Context, LayoutContext, MinSizeContext, RenderContext},
     control::BuilderContext,
     font::Fonts,
     graphics::Graphic,
+    time::Instant,
     util::WithPriority,
     Control, ControlBuilder, ControlEntry, Controls, LayoutDirtyFlags, Rect,
-};
-use keyed_priority_queue::KeyedPriorityQueue;
-use std::ops::{Deref, DerefMut};
-use std::{
-    any::{Any, TypeId},
-    collections::{HashMap, VecDeque},
-    num::NonZeroU32,
-    sync::atomic::AtomicU64,
-    time::Duration,
-};
-use winit::{
-    dpi::LogicalPosition,
-    event::{ElementState, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
-    window::CursorIcon,
 };
 
 pub type MouseId = u64;

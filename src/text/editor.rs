@@ -1,6 +1,8 @@
-use crate::{font::Fonts, text::layout::TextLayout, util::cmp_range};
 use std::ops::Range;
+
 use unicode_segmentation::UnicodeSegmentation;
+
+use crate::{font::Fonts, text::layout::TextLayout, util::cmp_range};
 
 /// Represents a position in a text.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

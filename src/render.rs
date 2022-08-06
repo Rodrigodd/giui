@@ -1,14 +1,16 @@
+use std::ops::Range;
+
+use ab_glyph::{Font, GlyphId};
+use texture_cache::{Cached, LruTextureCache, RectEntry};
+
+// use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
+use crate::time::Instant;
 use crate::{
     context::Context,
     font::FontId,
     graphics::{Graphic, Sprite},
     Color, Id, RenderContext, RenderDirtyFlags,
 };
-// use glyph_brush_draw_cache::{CachedBy, DrawCache, DrawCacheBuilder};
-use crate::time::Instant;
-use ab_glyph::{Font, GlyphId};
-use std::ops::Range;
-use texture_cache::{Cached, LruTextureCache, RectEntry};
 
 #[derive(Debug)]
 /// A glyph and a font_id

@@ -1,5 +1,8 @@
-use crate::Color;
-use crate::{font::Fonts, text::layout::GlyphPosition, text::ShapeSpan};
+use crate::{
+    font::Fonts,
+    text::{layout::GlyphPosition, ShapeSpan},
+    Color,
+};
 
 #[cfg(feature = "complex_shaping")]
 pub(crate) fn shape(fonts: &Fonts, text: &str, style: &ShapeSpan) -> Vec<GlyphPosition> {

@@ -1,11 +1,11 @@
+use std::{any::Any, rc::Rc};
+
 use event::SetValue;
 
 use crate::{
     event, style::OnFocusStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent,
     MouseInfo,
 };
-
-use std::{any::Any, rc::Rc};
 
 pub struct SetMinValue(pub i32);
 pub struct SetMaxValue(pub i32);

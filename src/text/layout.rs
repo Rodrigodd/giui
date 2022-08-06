@@ -1,22 +1,25 @@
-use std::cmp::Ordering;
-use std::collections::VecDeque;
-use std::ops::Range;
+use std::{cmp::Ordering, collections::VecDeque, ops::Range};
 
 use ab_glyph::{Font, Glyph, ScaleFont};
 
-use crate::font::{FontId, Fonts};
-use crate::text::SpannedString;
-use crate::util::cmp_range;
-use crate::Color;
-
 use super::{InnerSpan, ShapeSpan, Span};
+use crate::{
+    font::{FontId, Fonts},
+    text::SpannedString,
+    util::cmp_range,
+    Color,
+};
 
 #[cfg(test)]
 mod test {
-    use crate::font::{Font, FontId, Fonts};
-    use crate::text::layout::{LayoutSettings, TextLayout};
-    use crate::text::{Span, SpannedString, TextStyle};
-    use crate::Color;
+    use crate::{
+        font::{Font, FontId, Fonts},
+        text::{
+            layout::{LayoutSettings, TextLayout},
+            Span, SpannedString, TextStyle,
+        },
+        Color,
+    };
 
     fn fonts() -> (Fonts, Vec<FontId>) {
         let mut fonts = Fonts::new();

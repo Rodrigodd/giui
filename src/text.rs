@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use self::layout::ColorRect;
 use crate::{
     font::{FontId, Fonts},
     render::FontGlyph,
@@ -7,18 +8,14 @@ use crate::{
     Color, Rect, RenderDirtyFlags,
 };
 
-use self::layout::ColorRect;
-
 pub mod editor;
 pub mod layout;
 mod shaping;
 
 #[cfg(test)]
 mod test {
-    use crate::font::FontId;
-    use crate::Color;
-
     use super::{ShapeSpan, Span, SpannedString};
+    use crate::{font::FontId, Color};
 
     #[rustfmt::skip]
     #[test]

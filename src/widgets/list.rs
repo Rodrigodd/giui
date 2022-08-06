@@ -1,15 +1,14 @@
 // TODO: call just once builder.item_count() per layout
 
-use crate::BuilderContext;
-use crate::{
-    util::cmp_float, widgets::SetScrollPosition, Behaviour, Context, ControlBuilder, Id,
-    InputFlags, KeyboardEvent, Layout, LayoutContext, MinSizeContext,
-};
-
 use std::{any::Any, collections::BTreeMap};
+
 use winit::event::VirtualKeyCode;
 
 use super::ScrollBar;
+use crate::{
+    util::cmp_float, widgets::SetScrollPosition, Behaviour, BuilderContext, Context,
+    ControlBuilder, Id, InputFlags, KeyboardEvent, Layout, LayoutContext, MinSizeContext,
+};
 
 pub struct UpdateItems;
 /// When send to the behaviour [List], will bring a item to inside the view.

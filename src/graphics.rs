@@ -1,6 +1,5 @@
-use crate::{font::Fonts, Color};
-
 pub use crate::text::{Text, TextStyle};
+use crate::{font::Fonts, Color};
 
 #[derive(Clone)]
 pub struct Sprite {

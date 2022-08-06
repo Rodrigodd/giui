@@ -1,4 +1,3 @@
-use crate::time::Instant;
 use std::{any::Any, rc::Rc, time::Duration};
 
 use copypasta::{ClipboardContext, ClipboardProvider};
@@ -8,8 +7,8 @@ use crate::{
     event::SetValue,
     graphics::Graphic,
     style::TextFieldStyle,
-    text::layout::TextLayout,
-    text::{editor::TextEditor, Span},
+    text::{editor::TextEditor, layout::TextLayout, Span},
+    time::Instant,
     Behaviour, Context, Id, InputFlags, KeyboardEvent, MouseEvent, MouseInfo,
 };
 

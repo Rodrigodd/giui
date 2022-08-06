@@ -1,11 +1,11 @@
+use std::{any::Any, rc::Rc};
+
 use crate::{
     layouts::VBoxLayout,
     style::MenuStyle,
     widgets::{Blocker, CloseMenu, ItemClicked, Menu, MenuBehaviour},
     Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
 };
-
-use std::{any::Any, rc::Rc};
 
 struct Repos;
 

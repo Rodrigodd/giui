@@ -1,3 +1,5 @@
+use std::{any::Any, rc::Rc};
+
 use crate::{
     graphics::Text,
     layouts::{FitGraphic, HBoxLayout, MarginLayout, VBoxLayout},
@@ -5,8 +7,6 @@ use crate::{
     widgets::CloseMenu,
     Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo, RectFill,
 };
-
-use std::{any::Any, rc::Rc};
 
 pub enum Item {
     Separator,

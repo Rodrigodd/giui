@@ -1,4 +1,3 @@
-use crate::time::Instant;
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
@@ -7,8 +6,8 @@ use std::{
 use winit::{event::ModifiersState, window::CursorIcon};
 
 use crate::{
-    control::BuilderContext, event, font::Fonts, graphics::Graphic, Control, ControlBuilder,
-    Controls, Gui, Id, Rect,
+    control::BuilderContext, event, font::Fonts, graphics::Graphic, time::Instant, Control,
+    ControlBuilder, Controls, Gui, Id, Rect,
 };
 
 // contains a reference to all the controls, except the behaviour of one control

@@ -1,8 +1,8 @@
+use std::{any::Any, cell::RefCell, rc::Rc};
+
 use crate::{
     style::TabStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
 };
-
-use std::{any::Any, cell::RefCell, rc::Rc};
 
 struct Unselected;
 pub struct Select;

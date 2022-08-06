@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
     fs::File,
@@ -18,6 +17,7 @@ use giui::{
     },
     BuilderContext, Color, Context, ControlBuilder, Gui, Id, RectFill,
 };
+use serde::{Deserialize, Serialize};
 use sprite_render::SpriteRender;
 use winit::{
     event::{Event, WindowEvent},

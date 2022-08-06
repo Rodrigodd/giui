@@ -13,10 +13,10 @@ members = ["./giui-derive"]
 [features]
 
 # serde = ["serde", "ron"]
-complex_shaping = [ "harfbuzz_rs" ]
+complex_shaping = ["harfbuzz_rs"]
 
 [[package.metadata.android.uses_feature]]
-opengles_version = [2,0]
+opengles_version = [2, 0]
 
 [package.metadata.android.sdk]
 min_sdk_version = 23
@@ -43,17 +43,19 @@ mock_instant = "0.2"
 
 [dev-dependencies]
 
-image = { version = "0.23", default-features = false, features=["png"] }
+image = { version = "0.23", default-features = false, features = ["png"] }
 rand = { version = "0.8", features = ["small_rng"] }
 # sprite-render = { path = "../sprite-render-rs", features=["opengl", "opengles"] }
-sprite-render = { features=["opengl"], git = "https://github.com/Rodrigodd/sprite-render-rs.git", rev = "b5bdf38cf0f259725800be84aeefc176f4e93482" }
+sprite-render = { features = [
+    "opengl",
+], git = "https://github.com/Rodrigodd/sprite-render-rs.git", rev = "b5bdf38cf0f259725800be84aeefc176f4e93482" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
 ron = "0.6"
 env_logger = "0.9.0"
 
 [target.'cfg(target_os = "android")'.dev-dependencies]
-ndk-glue = { version = "0.6", features=["logger"] }
+ndk-glue = { version = "0.6", features = ["logger"] }
 ndk-sys = { version = "0.3" }
 
 [patch.crates-io]

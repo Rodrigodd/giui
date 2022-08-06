@@ -1,6 +1,9 @@
-use std::any::{Any, TypeId};
-use std::cell::RefCell;
-use std::{num::NonZeroU32, rc::Rc};
+use std::{
+    any::{Any, TypeId},
+    cell::RefCell,
+    num::NonZeroU32,
+    rc::Rc,
+};
 
 use crate::{graphics::Graphic, Behaviour, Id, Layout, Rect, RectFill};
 

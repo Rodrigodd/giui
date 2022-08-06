@@ -1,9 +1,10 @@
+use std::{collections::HashMap, rc::Rc};
+
 use super::*;
 use crate::{
     graphics::{Graphic, Icon, Panel, Text, Texture},
     style::{ButtonStyle, OnFocusStyle},
 };
-use std::{collections::HashMap, rc::Rc};
 
 struct MyLoader {
     avaliable_textures: HashMap<String, (u32, u32)>,

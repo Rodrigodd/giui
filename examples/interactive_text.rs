@@ -1,6 +1,5 @@
 mod common;
 use common::{GiuiEventLoop, MyFonts};
-
 use giui::{
     graphics::{Graphic, Text, TextStyle, Texture},
     layouts::MarginLayout,

@@ -1,8 +1,8 @@
+use std::rc::Rc;
+
 use crate::{
     style::ButtonStyle, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
 };
-
-use std::rc::Rc;
 
 pub struct Button<F: FnMut(Id, &mut Context)> {
     normal: bool,
