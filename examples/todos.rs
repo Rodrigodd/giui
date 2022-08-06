@@ -14,7 +14,10 @@ use giui::{
     BuilderContext, Color, ControlBuilder, Gui, Id,
 };
 use sprite_render::SpriteRender;
-use winit::event_loop::EventLoopProxy;
+use winit::{
+    event::Event,
+    event_loop::{ControlFlow, EventLoopProxy},
+};
 
 fn main() {
     struct Todos;
@@ -57,12 +60,7 @@ fn main() {
             Todos
         }
 
-        fn on_event(
-            &mut self,
-            event: &winit::event::Event<()>,
-            control: &mut winit::event_loop::ControlFlow,
-        ) {
-        }
+        fn on_event(&mut self, _event: &Event<()>, _control: &mut ControlFlow) {}
     }
 
     run::<(), Todos>(400, 200);

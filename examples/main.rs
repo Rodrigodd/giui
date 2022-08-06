@@ -14,10 +14,10 @@ use giui::{
     },
     Color, Context, ControlBuilder, Gui, Id, RectFill,
 };
-use sprite_render::{GLSpriteRender, SpriteRender};
+use sprite_render::SpriteRender;
 use winit::{
     event::Event,
-    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
+    event_loop::{ControlFlow, EventLoopProxy},
 };
 
 mod common;

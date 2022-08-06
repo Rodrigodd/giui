@@ -1,6 +1,6 @@
 use crate::{
-    event, style::ButtonStyle, Behaviour, Context, Id, InputFlags, KeyboardEvent, Layout,
-    LayoutContext, MinSizeContext, MouseButton, MouseEvent, MouseInfo,
+    style::ButtonStyle, Behaviour, Context, Id, InputFlags, KeyboardEvent, Layout, LayoutContext,
+    MinSizeContext, MouseButton, MouseEvent, MouseInfo,
 };
 
 use std::{any::Any, rc::Rc};

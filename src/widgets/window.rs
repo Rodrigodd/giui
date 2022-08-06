@@ -1,6 +1,6 @@
 use winit::window::CursorIcon;
 
-use crate::{event, Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo};
+use crate::{Behaviour, Context, Id, InputFlags, MouseButton, MouseEvent, MouseInfo};
 
 const LEFT: u8 = 0x1;
 const RIGHT: u8 = 0x2;

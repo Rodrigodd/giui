@@ -11,7 +11,7 @@ use giui::{
     widgets::{TextField, TextFieldCallback},
     BuilderContext, Color, ControlBuilder, Gui,
 };
-use sprite_render::{GLSpriteRender, SpriteRender};
+use sprite_render::SpriteRender;
 use winit::event_loop::EventLoopProxy;
 
 fn main() {

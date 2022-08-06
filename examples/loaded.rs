@@ -6,6 +6,24 @@ use std::{
     rc::Rc,
 };
 
+use giui::{
+    event::SetValue,
+    graphics::{Graphic, Panel, Text, TextStyle, Texture},
+    layouts::{FitGraphic, HBoxLayout, MarginLayout, VBoxLayout},
+    style::{ButtonStyle, MenuStyle, OnFocusStyle, SelectionColor, TabStyle, TextFieldStyle},
+    widgets::{
+        Blocker, Button, ButtonGroup, CloseMenu, DropMenu, Dropdown, Item, Menu, MenuBar, MenuItem,
+        ScrollBar, ScrollView, Select, SetMaxValue, SetMinValue, SetSelected, Slider,
+        SliderCallback, TabButton, TextField, TextFieldCallback, Toggle, ViewLayout,
+    },
+    BuilderContext, Color, Context, ControlBuilder, Gui, Id, RectFill,
+};
+use sprite_render::SpriteRender;
+use winit::{
+    event::{Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoopProxy},
+};
+
 // struct HasDrop<T>(T);
 // impl<T> std::ops::Deref for HasDrop<T> {
 //     type Target = T;
@@ -44,24 +62,6 @@ use std::{
 //         self.0.borrow_mut()
 //     }
 // }
-
-use giui::{
-    event::SetValue,
-    graphics::{Graphic, Panel, Text, TextStyle, Texture},
-    layouts::{FitGraphic, HBoxLayout, MarginLayout, VBoxLayout},
-    style::{ButtonStyle, MenuStyle, OnFocusStyle, SelectionColor, TabStyle, TextFieldStyle},
-    widgets::{
-        Blocker, Button, ButtonGroup, CloseMenu, DropMenu, Dropdown, Item, Menu, MenuBar, MenuItem,
-        ScrollBar, ScrollView, Select, SetMaxValue, SetMinValue, SetSelected, Slider,
-        SliderCallback, TabButton, TextField, TextFieldCallback, Toggle, ViewLayout,
-    },
-    BuilderContext, Color, Context, ControlBuilder, Gui, Id, RectFill,
-};
-use sprite_render::{GLSpriteRender, SpriteRender};
-use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
-};
 
 mod common;
 use common::{GiuiEventLoop, MyFonts};

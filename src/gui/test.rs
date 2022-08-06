@@ -13,7 +13,7 @@ impl Behaviour for TestClickCount {
         InputFlags::MOUSE
     }
 
-    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
+    fn on_mouse_event(&mut self, mouse: MouseInfo, _this: Id, _ctx: &mut Context) {
         self.list.lock().unwrap().push(mouse.click_count);
     }
 }
@@ -163,7 +163,7 @@ fn multi_touch() {
             InputFlags::MOUSE
         }
 
-        fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
+        fn on_mouse_event(&mut self, mouse: MouseInfo, _this: Id, _ctx: &mut Context) {
             let e = (mouse.id, mouse.event, mouse.buttons.left.pressed());
             self.list.lock().unwrap().push(e);
         }
@@ -248,7 +248,7 @@ fn multi_touch_one_control() {
             InputFlags::MOUSE
         }
 
-        fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
+        fn on_mouse_event(&mut self, mouse: MouseInfo, _this: Id, _ctx: &mut Context) {
             let e = (mouse.id, mouse.event, mouse.buttons.left.pressed());
             self.list.lock().unwrap().push(e);
         }

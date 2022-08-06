@@ -16,7 +16,7 @@ use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
+    event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy},
     platform::windows::WindowExtWindows,
     window::{Window, WindowBuilder, WindowId},
 };
@@ -66,7 +66,7 @@ fn fonts() -> Fonts {
 
 fn main() {
     // create winit's window and event_loop
-    let event_loop = EventLoop::with_user_event();
+    let event_loop = EventLoopBuilder::with_user_event().build();
     let window = WindowBuilder::new()
         .with_inner_size(PhysicalSize::<u32>::new(200, 200))
         .build(&event_loop)

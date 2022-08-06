@@ -8,7 +8,6 @@ use crate::{
     Control, ControlBuilder, ControlEntry, Controls, LayoutDirtyFlags, Rect,
 };
 use keyed_priority_queue::KeyedPriorityQueue;
-use std::fmt::format;
 use std::ops::{Deref, DerefMut};
 use std::{
     any::{Any, TypeId},
