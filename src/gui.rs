@@ -160,7 +160,6 @@ pub struct MouseInfo {
     /// Giui supports the use of multiple mouses.
     pub id: MouseId,
     pub event: MouseEvent,
-    // pub action: MouseAction,
     /// The position of the mouse, in pixels, relative to the top-right corner of the window
     pub pos: [f32; 2],
     /// The state of each button of the mouse.
@@ -184,7 +183,6 @@ impl Default for MouseInfo {
         Self {
             id: MOUSE_ID,
             event: MouseEvent::None,
-            // action: MouseAction::None,
             pos: [f32::NAN; 2],
             buttons: MouseButtons::default(),
             delta: None,
@@ -229,7 +227,6 @@ impl MouseInput {
         MouseInfo {
             id: self.id,
             event,
-            // action,
             pos: self.position.unwrap(),
             buttons: self.buttons.clone(),
             delta,
