@@ -8,6 +8,8 @@ use crate::{
     Control, ControlBuilder, ControlEntry, Controls, LayoutDirtyFlags, Rect,
 };
 use keyed_priority_queue::KeyedPriorityQueue;
+use std::fmt::format;
+use std::ops::{Deref, DerefMut};
 use std::{
     any::{Any, TypeId},
     collections::{HashMap, VecDeque},
@@ -24,6 +26,10 @@ use winit::{
 pub type MouseId = u64;
 /// The default mouse Id for the default mouse.
 const MOUSE_ID: MouseId = 0;
+const DOUBLE_CLICK_TIME: Duration = Duration::from_millis(500);
+
+#[cfg(test)]
+mod test;
 
 pub mod event {
     use super::{Id, MouseId};
@@ -89,7 +95,7 @@ enum LazyEvent {
     OnDeactive(Id),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MouseButton {
     Left,
     Right,
@@ -107,7 +113,7 @@ impl From<winit::event::MouseButton> for MouseButton {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MouseEvent {
     Enter,
     Exit,
@@ -202,7 +208,7 @@ pub(crate) struct MouseInput {
     pub buttons: MouseButtons,
     /// number of consecutives MouseDown's
     pub click_count: u8,
-    /// used to check for double clicks
+    /// used to check for double clicks.
     pub last_down: Option<Instant>,
     /// Tells if current_mouse control is locked, and will not change when the mouse stop hovering
     /// it. Useful for drag widgets like a slider.
@@ -233,6 +239,112 @@ impl MouseInput {
 
 type ScheduledEventTo = WithPriority<(Instant, u64), (Id, Box<dyn Any>)>;
 
+pub(crate) struct MouseInputs {
+    /// The number of inputs currently being used
+    used_len: usize,
+    /// A list of inputs for multi mouse support. MouseInputs in the range 0..inputs_len are
+    /// being currently in use. The remaning ones may be recycled or became used again (for
+    /// multitouch double-click support).
+    inputs: Vec<MouseInput>,
+}
+impl MouseInputs {
+    pub(crate) fn get_mouse(&mut self, id: MouseId) -> Option<&mut MouseInput> {
+        (*self).iter_mut().find(|x| x.id == id)
+    }
+
+    /// This reserves or reuse a existing MouseInput. This is necessary for implement double click
+    /// on touch devices.
+    ///
+    /// Returns true if the click_count must be preserved.
+    pub fn mouse_moved(&mut self, id: MouseId, mouse_x: f32, mouse_y: f32) -> bool {
+        if self.get_mouse(id).is_some() {
+            return false;
+        }
+
+        let reuse = self
+            .inputs
+            .iter()
+            .enumerate()
+            .skip(self.used_len)
+            .filter_map(|(i, x)| {
+                x.last_down
+                    .map_or(false, |x| x.elapsed() < DOUBLE_CLICK_TIME)
+                    .then(|| ())
+                    .and_then(|_| x.position.map(|x| (i, x)))
+            })
+            .min_by_key(|(_, [x, y])| {
+                (((mouse_x - x).powi(2) + (mouse_y - y).powi(2)) * 100.0) as u32
+            })
+            .map(|(i, _)| i);
+
+        if let Some(index) = reuse {
+            log::trace!("reused {}", index);
+            self.inputs.swap(self.used_len, index);
+            self.inputs[self.used_len].id = id;
+            self.used_len += 1;
+            return true;
+        }
+
+        let recycled = self.inputs[self.used_len..]
+            .iter()
+            .position(|x| {
+                x.last_down
+                    .map_or(true, |x| x.elapsed() >= DOUBLE_CLICK_TIME)
+            })
+            .map(|x| x + self.used_len);
+        match recycled {
+            Some(index) => {
+                log::trace!("recycled {}", index);
+                self.inputs.swap(self.used_len, index);
+                self.inputs[self.used_len] = MouseInput {
+                    id,
+                    ..MouseInput::default()
+                };
+            }
+            None => {
+                log::trace!("add {}", self.inputs.len());
+                let value = MouseInput {
+                    id,
+                    ..MouseInput::default()
+                };
+                self.inputs.push(value);
+            }
+        }
+        self.used_len += 1;
+        false
+    }
+
+    pub fn mouse_exit(&mut self, id: MouseId) {
+        let index = self.inputs[0..self.used_len]
+            .iter()
+            .position(|x| x.id == id)
+            .unwrap();
+        self.used_len -= 1;
+        self.inputs.swap(self.used_len, index);
+    }
+}
+impl Default for MouseInputs {
+    fn default() -> Self {
+        Self {
+            used_len: 0,
+            // inputs: vec![MouseInput::default()],
+            inputs: Vec::new(),
+        }
+    }
+}
+impl Deref for MouseInputs {
+    type Target = [MouseInput];
+
+    fn deref(&self) -> &Self::Target {
+        &self.inputs[0..self.used_len]
+    }
+}
+impl DerefMut for MouseInputs {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inputs[0..self.used_len]
+    }
+}
+
 pub struct Gui {
     pub(crate) controls: Controls,
     pub(crate) fonts: Fonts,
@@ -246,7 +358,7 @@ pub struct Gui {
     scheduled_events: KeyedPriorityQueue<u64, ScheduledEventTo>,
     lazy_events: VecDeque<LazyEvent>,
 
-    pub(crate) inputs: Vec<MouseInput>,
+    pub(crate) inputs: MouseInputs,
     /// The control currently receiving on_keyboard_event's.
     pub(crate) current_focus: Option<Id>,
 
@@ -264,7 +376,7 @@ impl Gui {
             dirty_layouts: Vec::new(),
             lazy_events: VecDeque::new(),
             change_cursor: None,
-            inputs: vec![MouseInput::default()],
+            inputs: MouseInputs::default(),
             current_focus: None,
             fonts,
             scale_factor,
@@ -647,7 +759,7 @@ impl Gui {
 
     /// Set the rect of the root control. Must be called when the window resize for example.
     ///
-    /// The given rect must be in the format [x1, y1, x2, y2].
+    /// The given rect must be in the format `[x1, y1, x2, y2]`.
     pub fn set_root_rect(&mut self, rect: [f32; 4]) {
         self.controls
             .get_mut(Id::ROOT_ID)
@@ -666,7 +778,7 @@ impl Gui {
         } else if let Some(event::RemoveControl { id }) = event.downcast_ref() {
             self.remove_control(*id);
         } else if let Some(&event::SetLockOver { lock, mouse_id }) = event.downcast_ref() {
-            let input = Gui::get_mouse(&mut self.inputs, mouse_id);
+            let input = self.inputs.get_mouse(mouse_id);
             input.map(|x| x.over_is_locked = lock);
         } else if let Some(event::RequestFocus { id }) = event.downcast_ref() {
             self.set_focus(Some(*id));
@@ -675,14 +787,6 @@ impl Gui {
         } else if let Some(cursor) = event.downcast_ref::<CursorIcon>() {
             self.change_cursor = Some(*cursor);
         }
-    }
-
-    pub(crate) fn get_mouse(
-        inputs: &mut Vec<MouseInput>,
-        mouse_id: u64,
-    ) -> Option<&mut MouseInput> {
-        let mouse_id = mouse_id;
-        inputs.iter_mut().find(|x| x.id == mouse_id)
     }
 
     // TODO: there should not be a public function which receive Box<...>
@@ -1011,7 +1115,10 @@ impl Gui {
     }
 
     pub fn mouse_moved(&mut self, id: MouseId, mouse_x: f32, mouse_y: f32) {
-        let input = match Gui::get_mouse(&mut self.inputs, id) {
+        log::trace!("mouse {} moved", id);
+        let preseve_click_count = self.inputs.mouse_moved(id, mouse_x, mouse_y);
+
+        let input = match self.inputs.get_mouse(id) {
             Some(x) => x,
             None => {
                 log::error!("moved mouse with unkown id {}.", id);
@@ -1064,7 +1171,7 @@ impl Gui {
             break;
         }
 
-        let input = Gui::get_mouse(&mut self.inputs, id).unwrap();
+        let input = self.inputs.get_mouse(id).unwrap();
         if input.current_scroll != curr_scroll {
             log::trace!(
                 "set current_scroll from {:?} to {:?}",
@@ -1083,7 +1190,7 @@ impl Gui {
                 let mouse = input.get_mouse_info(MouseEvent::Exit);
                 self.send_mouse_event_to(current_mouse, mouse);
             }
-            let input = Gui::get_mouse(&mut self.inputs, id).unwrap();
+            let input = self.inputs.get_mouse(id).unwrap();
             log::trace!(
                 "set current_mouse from {:?} to {:?}",
                 input.current_mouse,
@@ -1091,7 +1198,10 @@ impl Gui {
             );
             input.current_mouse = curr_mouse;
             if let Some(current_mouse) = input.current_mouse {
-                input.click_count = 0;
+                if !preseve_click_count {
+                    input.click_count = 0;
+                    log::trace!("click count = 0");
+                }
                 let mouse_enter = input.get_mouse_info(MouseEvent::Enter);
                 let mouse_moved = input.get_mouse_info(MouseEvent::Moved);
                 self.send_mouse_event_to(current_mouse, mouse_enter);
@@ -1101,7 +1211,8 @@ impl Gui {
     }
 
     pub fn mouse_down(&mut self, id: MouseId, button: MouseButton) {
-        let input = match Gui::get_mouse(&mut self.inputs, id) {
+        log::trace!("mouse {} down", id);
+        let input = match self.inputs.get_mouse(id) {
             Some(x) => x,
             None => {
                 log::error!("down mouse with unkown id {}.", id);
@@ -1125,11 +1236,10 @@ impl Gui {
         let current_mouse = input.current_mouse;
         self.set_focus(current_mouse);
 
-        let input = Gui::get_mouse(&mut self.inputs, id).unwrap();
+        let input = self.inputs.get_mouse(id).unwrap();
 
         if let Some(curr) = input.current_mouse {
             if let MouseButton::Left = button {
-                const DOUBLE_CLICK_TIME: Duration = Duration::from_millis(500);
                 let time = if let Some(last_click) = input.last_down {
                     last_click.elapsed()
                 } else {
@@ -1137,7 +1247,7 @@ impl Gui {
                 };
                 input.last_down = Some(Instant::now());
                 input.click_count = if time < DOUBLE_CLICK_TIME {
-                    // with saturating the program don't will crash after 256 consective clicks
+                    // with saturating the program will not crash after 256 consecutive clicks
                     input.click_count.saturating_add(1)
                 } else {
                     1
@@ -1149,7 +1259,8 @@ impl Gui {
     }
 
     pub fn mouse_up(&mut self, id: MouseId, button: MouseButton) {
-        let input = match Gui::get_mouse(&mut self.inputs, id) {
+        log::trace!("mouse {} up", id);
+        let input = match self.inputs.get_mouse(id) {
             Some(x) => x,
             None => {
                 log::error!("up mouse with unkown id {}.", id);
@@ -1170,7 +1281,7 @@ impl Gui {
     }
 
     fn mouse_scroll(&mut self, id: MouseId, delta: winit::event::MouseScrollDelta) {
-        let input = match Gui::get_mouse(&mut self.inputs, id) {
+        let input = match self.inputs.get_mouse(id) {
             Some(x) => x,
             None => {
                 log::error!("up mouse with unkown id {}.", id);
@@ -1197,19 +1308,6 @@ impl Gui {
     /// Called when the mouse enters the Gui. Could have being outside of the window, for example.
     pub fn mouse_enter(&mut self, id: MouseId) {
         log::trace!("mouse {} enters", id);
-        if id == MOUSE_ID {
-            // the default mouse aways exists.
-            return;
-        }
-        if Gui::get_mouse(&mut self.inputs, id).is_none() {
-            let value = MouseInput {
-                id,
-                ..MouseInput::default()
-            };
-            self.inputs.push(value)
-        } else {
-            log::error!("enter mouse with repeating id {}.", id)
-        }
     }
 
     /// Called when the mouse exit the Gui. Could have exit the window, for example.
@@ -1218,7 +1316,7 @@ impl Gui {
     pub fn mouse_exit(&mut self, id: MouseId) {
         log::trace!("mouse {} exit", id);
 
-        let input = match Gui::get_mouse(&mut self.inputs, id) {
+        let input = match self.inputs.get_mouse(id) {
             Some(x) => x,
             None => {
                 log::error!("exit mouse with unkown id {}.", id);
@@ -1233,14 +1331,7 @@ impl Gui {
             self.send_mouse_event_to(curr, mouse);
         }
 
-        if id == MOUSE_ID {
-            // don't remove the default mouse, because it is good to keep track of its position
-            // even outside of the window.
-            return;
-        }
-
-        let index = self.inputs.iter().position(|x| x.id == id).unwrap();
-        self.inputs.swap_remove(index);
+        self.inputs.mouse_exit(id);
     }
 
     // TODO: think more carefully in what functions must be public

@@ -300,7 +300,7 @@ impl<'a> Context<'a> {
     /// This means that, if called, if the next click is consecutive,
     /// it will have a click count of 2.
     pub fn reset_click_count_to_one(&mut self, mouse_id: crate::MouseId) {
-        let input = match Gui::get_mouse(&mut self.gui.inputs, mouse_id) {
+        let input = match self.gui.inputs.get_mouse(mouse_id) {
             Some(x) => x,
             None => {
                 log::error!(
