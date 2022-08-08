@@ -20,6 +20,27 @@ impl Behaviour for TestClickCount {
     }
 }
 
+struct TestMouseEvent {
+    list: Arc<Mutex<Vec<(u64, MouseEvent, bool)>>>,
+}
+impl Behaviour for TestMouseEvent {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+
+    fn on_mouse_event(&mut self, mouse: MouseInfo, _this: Id, _ctx: &mut Context) {
+        let e = (mouse.id, mouse.event, mouse.buttons.left.pressed());
+        self.list.lock().unwrap().push(e);
+    }
+}
+
+struct Mousable;
+impl Behaviour for Mousable {
+    fn input_flags(&self) -> InputFlags {
+        InputFlags::MOUSE
+    }
+}
+
 trait Take: Default {
     fn take(&mut self) -> Self {
         std::mem::take(self)
@@ -156,20 +177,6 @@ fn mouse_click_touch() {
 #[test]
 fn multi_touch() {
     init_logger();
-
-    struct TestMouseEvent {
-        list: Arc<Mutex<Vec<(u64, MouseEvent, bool)>>>,
-    }
-    impl Behaviour for TestMouseEvent {
-        fn input_flags(&self) -> InputFlags {
-            InputFlags::MOUSE
-        }
-
-        fn on_mouse_event(&mut self, mouse: MouseInfo, _this: Id, _ctx: &mut Context) {
-            let e = (mouse.id, mouse.event, mouse.buttons.left.pressed());
-            self.list.lock().unwrap().push(e);
-        }
-    }
 
     let mut gui = Gui::new(100.0, 100.0, 1.0, Fonts::new());
 
@@ -345,13 +352,6 @@ fn multi_touch_one_control() {
 fn drag_scroll_view() {
     init_logger();
 
-    struct Mousable;
-    impl Behaviour for Mousable {
-        fn input_flags(&self) -> InputFlags {
-            InputFlags::MOUSE
-        }
-    }
-
     let mut gui = Gui::new(100.0, 100.0, 1.0, Fonts::new());
 
     let [scroll_view, view, content, h_bar, h_handle, v_bar, v_handle] =
@@ -448,13 +448,6 @@ fn drag_scroll_view() {
 #[test]
 fn drag_list_view() {
     init_logger();
-
-    struct Mousable;
-    impl Behaviour for Mousable {
-        fn input_flags(&self) -> InputFlags {
-            InputFlags::MOUSE
-        }
-    }
 
     struct MyListBuilder;
     impl ListBuilder for MyListBuilder {
@@ -598,6 +591,122 @@ fn drag_list_view() {
             [10.0, 35.0, 90.0, 50.0],
             [10.0, 60.0, 90.0, 75.0],
             [10.0, 85.0, 90.0, 100.0]
+        ]
+    );
+}
+
+#[test]
+fn lock_cursor() {
+    init_logger();
+
+    let mut gui = Gui::new(100.0, 100.0, 1.0, Fonts::new());
+
+    let list = Arc::new(Mutex::new(Vec::new()));
+
+    let ids = (0..4)
+        .map(|i| {
+            let x = (i % 2) as f32;
+            let y = (i / 2) as f32;
+            let list = list.clone();
+            gui.create_control()
+                .margins([-10.0, -10.0, 10.0, 10.0])
+                .anchors([
+                    0.25 + 0.5 * x,
+                    0.25 + 0.5 * y,
+                    0.25 + 0.5 * x,
+                    0.25 + 0.5 * y,
+                ])
+                .behaviour(TestMouseEvent { list })
+                .build(&mut gui)
+        })
+        .collect::<Vec<Id>>();
+
+    let get_ids_rects = |ctx: &mut Context| {
+        ids.into_iter()
+            .map(|id| ctx.get_rect(id))
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(
+        get_ids_rects(&mut gui.get_context()),
+        &[
+            [15.0, 15.0, 35.0, 35.0],
+            [65.0, 15.0, 85.0, 35.0],
+            [15.0, 65.0, 35.0, 85.0],
+            [65.0, 65.0, 85.0, 85.0],
+        ]
+    );
+
+    gui.mouse_moved(0, 25.0, 25.0);
+    gui.mouse_moved(0, 75.0, 25.0);
+    gui.mouse_moved(0, 75.0, 75.0);
+    gui.mouse_moved(0, 25.0, 75.0);
+    gui.mouse_moved(0, 25.0, 25.0);
+
+    gui.get_context().lock_cursor(true, 0);
+
+    gui.mouse_moved(0, 25.0, 25.0);
+    gui.mouse_moved(0, 75.0, 25.0);
+    gui.mouse_moved(0, 75.0, 75.0);
+    gui.mouse_moved(0, 25.0, 75.0);
+    gui.mouse_moved(0, 25.0, 25.0);
+
+    gui.get_context().lock_cursor(false, 0);
+
+    gui.mouse_moved(0, 25.0, 25.0);
+    gui.mouse_moved(0, 75.0, 25.0);
+    gui.mouse_moved(0, 75.0, 75.0);
+    gui.mouse_moved(0, 25.0, 75.0);
+    gui.mouse_moved(0, 25.0, 25.0);
+
+    #[rustfmt::skip]
+    assert_eq!(
+        list.lock().unwrap().take().as_slice(),
+        &[
+            (0, MouseEvent::Enter, false),
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Exit, false),
+
+            (0, MouseEvent::Enter, false),
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Exit, false),
+
+            (0, MouseEvent::Enter, false),
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Exit, false),
+
+            (0, MouseEvent::Enter, false),
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Exit, false),
+
+            (0, MouseEvent::Enter, false),
+            (0, MouseEvent::Moved, false),
+
+
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Moved, false),
+
+
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Exit, false),
+
+            (0, MouseEvent::Enter, false),
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Exit, false),
+
+            (0, MouseEvent::Enter, false),
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Exit, false),
+
+            (0, MouseEvent::Enter, false),
+            (0, MouseEvent::Moved, false),
+            (0, MouseEvent::Exit, false),
+
+            (0, MouseEvent::Enter, false),
+            (0, MouseEvent::Moved, false),
         ]
     );
 }
