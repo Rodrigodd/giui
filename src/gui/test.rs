@@ -428,23 +428,26 @@ fn drag_scroll_view() {
         [0.0, 0.0, 200.0, 200.0]
     );
 
-    gui.create_control()
+    let id = gui
+        .create_control()
         .parent(content)
         .margins([40.0, 40.0, -140.0, -140.0])
         .behaviour(Mousable)
         .build(&mut gui);
 
-    gui.mouse_moved(0, 51.0, 51.0);
+    assert_eq!(gui.get_context().get_rect(id), [40.0, 40.0, 60.0, 60.0]);
+
+    gui.mouse_moved(0, 59.0, 59.0);
     gui.mouse_down(0, MouseButton::Left);
-    gui.mouse_moved(0, 1.0, 1.0);
+    gui.mouse_moved(0, 41.0, 41.0);
 
     assert_eq!(
         gui.get_context().get_rect(content),
-        [-50.0, -50.0, 150.0, 150.0]
+        [-18.0, -18.0, 182.0, 182.0]
     );
 
     // move outside of scroll
-    gui.mouse_moved(0, -49.0, -49.0);
+    gui.mouse_moved(0, -41.0, -41.0);
 
     assert_eq!(
         gui.get_context().get_rect(content),

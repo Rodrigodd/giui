@@ -348,10 +348,10 @@ impl Behaviour for ScrollView {
         InputFlags::MOUSE | InputFlags::SCROLL | InputFlags::DRAG
     }
 
-    fn on_drag(&mut self, delta: &mut [f32; 2], this: Id, ctx: &mut Context) {
-        log::trace!("ScrolView: drag {:?}", delta);
-        self.on_scroll_event(*delta, this, ctx);
-        *delta = [0.0, 0.0];
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
+        if mouse.event == MouseEvent::Moved && mouse.is_dragging {
+            self.on_scroll_event(mouse.delta.unwrap(), this, ctx);
+        }
     }
 
     fn on_scroll_event(&mut self, delta: [f32; 2], _: Id, ctx: &mut Context) {

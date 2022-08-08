@@ -9,6 +9,7 @@ use crate::{
     util::cmp_float, widgets::SetScrollPosition, Behaviour, BuilderContext, Context,
     ControlBuilder, Id, InputFlags, KeyboardEvent, Layout, LayoutContext, MinSizeContext,
 };
+use crate::{MouseEvent, MouseInfo};
 
 pub struct UpdateItems;
 /// When send to the behaviour [List], will bring a item to inside the view.
@@ -747,9 +748,10 @@ impl<C: ListBuilder> Behaviour for List<C> {
         InputFlags::MOUSE | InputFlags::SCROLL | InputFlags::DRAG
     }
 
-    fn on_drag(&mut self, delta: &mut [f32; 2], this: Id, ctx: &mut Context) {
-        self.on_scroll_event(*delta, this, ctx);
-        *delta = [0.0, 0.0];
+    fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
+        if mouse.event == MouseEvent::Moved && mouse.is_dragging {
+            self.on_scroll_event(mouse.delta.unwrap(), this, ctx);
+        }
     }
 
     fn on_scroll_event(&mut self, delta: [f32; 2], _this: Id, ctx: &mut Context) {

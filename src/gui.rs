@@ -171,6 +171,10 @@ pub struct MouseInfo {
     /// without a mouse exit between the two. Consecutive means that the click occurred within
     /// 500 ms after the previous one (without a mouse exit between).
     pub click_count: u8,
+    /// The mouse will be dragging if a MouseEvent::Down occur under a control with InputFlag::DRAG
+    /// and the mouse start moving. Dragging starts after moving a minimun distance from the
+    /// position of the down event.
+    pub is_dragging: bool,
 }
 impl MouseInfo {
     /// Returns `true` if the event is a MouseEvent::Up(MouseButton::Left) and click_count > 0.
@@ -187,6 +191,7 @@ impl Default for MouseInfo {
             buttons: MouseButtons::default(),
             delta: None,
             click_count: 0,
+            is_dragging: false,
         }
     }
 }
@@ -234,6 +239,7 @@ impl MouseInput {
             buttons: self.buttons.clone(),
             delta,
             click_count: self.click_count,
+            is_dragging: self.is_dragging,
         }
     }
 
@@ -1203,25 +1209,13 @@ impl Gui {
                 if dist >= MIN_DRAG_DIST_SQ {
                     log::trace!("dragging true");
                     input.is_dragging = true;
+                    curr_mouse = curr_drag;
                 }
             }
         }
         if curr_drag.is_none() {
             input.is_dragging = false;
             log::trace!("curr_drag is none, dragging = false");
-        }
-
-        if input.is_dragging {
-            log::trace!("is dragging");
-            let curr_drag = curr_drag.unwrap();
-            curr_mouse = Some(curr_drag);
-            let delta = input.get_delta().unwrap_or_else(|| {
-                // there is no way that last_position is None where a down event already
-                // happened. But not sure, so lets not panic here.
-                log::error!("get_delta in dragging is None");
-                [0.0; 2]
-            });
-            self.send_drag_event_to(curr_drag, delta);
         }
 
         // Generate events
@@ -1390,18 +1384,6 @@ impl Gui {
     // TODO: think more carefully in what functions must be public
     pub fn send_mouse_event_to(&mut self, id: Id, mouse: MouseInfo) {
         self.call_event(id, move |this, id, ctx| this.on_mouse_event(mouse, id, ctx));
-    }
-
-    fn send_drag_event_to(&mut self, curr: Id, mut delta: [f32; 2]) {
-        log::trace!("call on_drag for {}", curr);
-
-        let delta = &mut delta;
-
-        self.call_event_chain(curr, |this, id, ctx| {
-            log::trace!("drag with delta {:?} for {}", delta, id);
-            this.on_drag(delta, id, ctx);
-            *delta == [0.0, 0.0]
-        });
     }
 
     pub fn dirty_layout(&mut self, id: Id) {
@@ -1815,17 +1797,6 @@ pub trait Behaviour {
 
     fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {}
 
-    /// Called when the mouse move after a down event.
-    ///
-    /// Needs InputFlags::DRAG
-    ///
-    /// After handling the drag, [0.0, 0.0] must be write to `*delta`. Otherwise, the value is
-    /// considered not completely handled, and delta is passed to the next ancestor with
-    /// InpusFlags::DRAG. This is used for allowing dragging a horizontal scroll inside a vertical
-    /// scroll for examples, the horizontal scroll would only zero the x component, and the y
-    /// component would be passed to the ancestor.
-    fn on_drag(&mut self, delta: &mut [f32; 2], this: Id, ctx: &mut Context) {}
-
     fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {}
 
     fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {}
@@ -1890,10 +1861,6 @@ impl<T: Behaviour> Behaviour for std::rc::Rc<std::cell::RefCell<T>> {
 
     fn input_flags(&self) -> InputFlags {
         self.as_ref().borrow_mut().input_flags()
-    }
-
-    fn on_drag(&mut self, delta: &mut [f32; 2], this: Id, ctx: &mut Context) {
-        self.as_ref().borrow_mut().on_drag(delta, this, ctx)
     }
 
     fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {

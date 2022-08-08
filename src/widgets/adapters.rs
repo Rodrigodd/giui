@@ -55,10 +55,6 @@ where
         self.extends.on_event(event, this, ctx)
     }
 
-    fn on_drag(&mut self, delta: &mut [f32; 2], this: Id, ctx: &mut Context) {
-        self.extends.on_drag(delta, this, ctx)
-    }
-
     fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {
         self.extends.on_scroll_event(delta, this, ctx)
     }
