@@ -345,11 +345,17 @@ impl Behaviour for ScrollView {
     }
 
     fn input_flags(&self) -> InputFlags {
-        InputFlags::MOUSE | InputFlags::SCROLL
+        InputFlags::MOUSE | InputFlags::SCROLL | InputFlags::DRAG
+    }
+
+    fn on_drag(&mut self, delta: &mut [f32; 2], this: Id, ctx: &mut Context) {
+        log::trace!("ScrolView: drag {:?}", delta);
+        self.on_scroll_event(*delta, this, ctx);
+        *delta = [0.0, 0.0];
     }
 
     fn on_scroll_event(&mut self, delta: [f32; 2], _: Id, ctx: &mut Context) {
-        self.delta_x += delta[0];
+        self.delta_x -= delta[0];
         self.delta_y -= delta[1];
 
         ctx.dirty_layout(self.view);

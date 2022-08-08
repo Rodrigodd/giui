@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use instant::Duration;
 
+use crate::widgets::{List, ListBuilder, ListViewLayout, ScrollView, ViewLayout};
 use crate::{
     font::Fonts, Behaviour, Context, Gui, Id, InputFlags, MouseButton, MouseEvent, MouseInfo,
 };
@@ -340,16 +341,263 @@ fn multi_touch_one_control() {
     );
 }
 
-/*
- left: `[(1, Enter, false), (1, Moved, false), (1, Down(Left), true), (2, Enter, false),
-right: `[(1, Enter, false), (1, Moved, false), (1, Down(Left), true), (2, Enter, false),
+#[test]
+fn drag_scroll_view() {
+    init_logger();
 
-         (2, Moved, f alse), (2, Down(Left), true), (1, Enter, false), (1, Moved, false),
-         (2, Moved, f alse), (2, Down(Left), true), (1, Moved, true), (2, Moved, true),
+    struct Mousable;
+    impl Behaviour for Mousable {
+        fn input_flags(&self) -> InputFlags {
+            InputFlags::MOUSE
+        }
+    }
 
-         (2, Moved, true), (2, Up(Left), fa lse), (2, Exit, false), (1, Moved, false),
-         (2, Up(Left), false), (2, Exit, fals e), (1, Moved, true), (1, Up(Left), false),
+    let mut gui = Gui::new(100.0, 100.0, 1.0, Fonts::new());
 
-         (1, Up(Left), false), (1, Exit, false)]`,
-         (1, Exit, false)]`', src\gui\test.rs:330:5
-*/
+    let [scroll_view, view, content, h_bar, h_handle, v_bar, v_handle] =
+        [(); 7].map(|_| gui.reserve_id());
+
+    gui.create_control_reserved(scroll_view)
+        .behaviour_and_layout(ScrollView::new(
+            view,
+            content,
+            Some((h_bar, h_handle)),
+            Some((v_bar, v_handle)),
+        ))
+        .build(&mut gui);
+
+    gui.create_control_reserved(view)
+        .layout(ViewLayout::new(true, true))
+        .parent(scroll_view)
+        .build(&mut gui);
+
+    gui.create_control_reserved(content)
+        .parent(view)
+        .min_size([200.0, 200.0])
+        .build(&mut gui);
+
+    gui.create_control_reserved(h_bar)
+        .parent(scroll_view)
+        .build(&mut gui);
+    gui.create_control_reserved(h_handle)
+        .parent(h_bar)
+        .build(&mut gui);
+
+    gui.create_control_reserved(v_bar)
+        .parent(scroll_view)
+        .build(&mut gui);
+    gui.create_control_reserved(v_handle)
+        .parent(v_bar)
+        .build(&mut gui);
+
+    assert_eq!(
+        gui.get_context().get_rect(content),
+        [0.0, 0.0, 200.0, 200.0]
+    );
+
+    gui.mouse_moved(0, 50.0, 50.0);
+    gui.mouse_down(0, MouseButton::Left);
+    gui.mouse_moved(0, 50.0, 40.0);
+
+    assert_eq!(
+        gui.get_context().get_rect(content),
+        [0.0, -10.0, 200.0, 190.0]
+    );
+
+    gui.mouse_up(0, MouseButton::Left);
+    gui.mouse_down(0, MouseButton::Left);
+    gui.mouse_moved(0, 46.0, 40.0);
+
+    assert_eq!(
+        gui.get_context().get_rect(content),
+        [0.0, -10.0, 200.0, 190.0]
+    );
+
+    gui.mouse_moved(0, 31.0, 40.0);
+
+    assert_eq!(
+        gui.get_context().get_rect(content),
+        [-15.0, -10.0, 185.0, 190.0]
+    );
+
+    gui.mouse_moved(0, 46.0, 50.0);
+    gui.mouse_up(0, MouseButton::Left);
+
+    assert_eq!(
+        gui.get_context().get_rect(content),
+        [0.0, 0.0, 200.0, 200.0]
+    );
+
+    gui.create_control()
+        .parent(content)
+        .margins([40.0, 40.0, -140.0, -140.0])
+        .behaviour(Mousable)
+        .build(&mut gui);
+
+    gui.mouse_moved(0, 51.0, 51.0);
+
+    gui.mouse_down(0, MouseButton::Left);
+    gui.mouse_moved(0, 1.0, 1.0);
+
+    assert_eq!(
+        gui.get_context().get_rect(content),
+        [-50.0, -50.0, 150.0, 150.0]
+    );
+}
+
+#[test]
+fn drag_list_view() {
+    init_logger();
+
+    struct Mousable;
+    impl Behaviour for Mousable {
+        fn input_flags(&self) -> InputFlags {
+            InputFlags::MOUSE
+        }
+    }
+
+    struct MyListBuilder;
+    impl ListBuilder for MyListBuilder {
+        fn item_count(&mut self, _: &mut dyn crate::BuilderContext) -> usize {
+            usize::max_value()
+        }
+
+        fn create_item<'a>(
+            &mut self,
+            index: usize,
+            _list_id: Id,
+            cb: crate::ControlBuilder,
+            _ctx: &mut dyn crate::BuilderContext,
+        ) -> crate::ControlBuilder {
+            cb.min_size([15.0, 15.0])
+                // only for testing, changes nothing in the layout
+                .margins([index as f32; 4])
+        }
+    }
+
+    let mut gui = Gui::new(100.0, 100.0, 1.0, Fonts::new());
+
+    let [list, view, h_bar, h_handle, v_bar, v_handle] = [(); 6].map(|_| gui.reserve_id());
+
+    gui.create_control_reserved(list)
+        .behaviour_and_layout(List::new(
+            0.0,
+            10.0,
+            [10.0; 4],
+            view,
+            v_bar,
+            v_handle,
+            h_bar,
+            h_handle,
+            MyListBuilder,
+        ))
+        .build(&mut gui);
+
+    gui.create_control_reserved(view)
+        .layout(ListViewLayout::new(true, true))
+        .parent(list)
+        .build(&mut gui);
+
+    gui.create_control_reserved(h_bar)
+        .parent(list)
+        .build(&mut gui);
+    gui.create_control_reserved(h_handle)
+        .parent(h_bar)
+        .build(&mut gui);
+
+    gui.create_control_reserved(v_bar)
+        .parent(list)
+        .build(&mut gui);
+    gui.create_control_reserved(v_handle)
+        .parent(v_bar)
+        .build(&mut gui);
+
+    let get_items_rects = |ctx: &mut Context| {
+        let items = ctx.get_active_children(view);
+        items
+            .into_iter()
+            .map(|item| ctx.get_rect(item))
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(
+        &get_items_rects(&mut gui.get_context()),
+        &[
+            [10.0, 10.0, 90.0, 25.0],
+            [10.0, 35.0, 90.0, 50.0],
+            [10.0, 60.0, 90.0, 75.0],
+            [10.0, 85.0, 90.0, 100.0]
+        ]
+    );
+
+    gui.mouse_moved(0, 50.0, 50.0);
+    gui.mouse_down(0, MouseButton::Left);
+    gui.mouse_moved(0, 50.0, 40.0);
+
+    assert_eq!(
+        &get_items_rects(&mut gui.get_context()),
+        &[
+            [10.0, 0.0, 90.0, 15.0],
+            [10.0, 25.0, 90.0, 40.0],
+            [10.0, 50.0, 90.0, 65.0],
+            [10.0, 75.0, 90.0, 90.0],
+            [10.0, 100.0, 90.0, 115.0],
+        ]
+    );
+
+    gui.mouse_up(0, MouseButton::Left);
+    gui.mouse_down(0, MouseButton::Left);
+    gui.mouse_moved(0, 40.0, 40.0);
+
+    assert_eq!(
+        &get_items_rects(&mut gui.get_context()),
+        &[
+            [10.0, 0.0, 90.0, 15.0],
+            [10.0, 25.0, 90.0, 40.0],
+            [10.0, 50.0, 90.0, 65.0],
+            [10.0, 75.0, 90.0, 90.0],
+            [10.0, 100.0, 90.0, 115.0]
+        ]
+    );
+
+    gui.mouse_up(0, MouseButton::Left);
+    gui.mouse_down(0, MouseButton::Left);
+    gui.mouse_moved(0, 40.0, 36.0);
+
+    assert_eq!(
+        &get_items_rects(&mut gui.get_context()),
+        &[
+            [10.0, 0.0, 90.0, 15.0],
+            [10.0, 25.0, 90.0, 40.0],
+            [10.0, 50.0, 90.0, 65.0],
+            [10.0, 75.0, 90.0, 90.0],
+            [10.0, 100.0, 90.0, 115.0],
+        ]
+    );
+
+    gui.mouse_moved(0, 40.0, 21.0);
+
+    assert_eq!(
+        &get_items_rects(&mut gui.get_context()),
+        &[
+            [10.0, -15.0, 90.0, 0.0],
+            [10.0, 10.0, 90.0, 25.0],
+            [10.0, 35.0, 90.0, 50.0],
+            [10.0, 60.0, 90.0, 75.0],
+            [10.0, 85.0, 90.0, 100.0],
+        ]
+    );
+
+    gui.mouse_moved(0, 40.0, 46.0);
+    gui.mouse_up(0, MouseButton::Left);
+
+    assert_eq!(
+        &get_items_rects(&mut gui.get_context()),
+        &[
+            [10.0, 10.0, 90.0, 25.0],
+            [10.0, 35.0, 90.0, 50.0],
+            [10.0, 60.0, 90.0, 75.0],
+            [10.0, 85.0, 90.0, 100.0]
+        ]
+    );
+}

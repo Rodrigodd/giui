@@ -31,14 +31,6 @@ impl<F, B: Behaviour> Behaviour for OnKeyboardEvent<F, B>
 where
     F: FnMut(KeyboardEvent, Id, &mut Context) -> bool,
 {
-    fn input_flags(&self) -> crate::InputFlags {
-        crate::InputFlags::FOCUS | crate::InputFlags::MOUSE | self.extends.input_flags()
-    }
-
-    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
-        self.extends.on_keyboard_event(event, this, ctx) || (self.on_keyboard)(event, this, ctx)
-    }
-
     fn on_start(&mut self, this: Id, ctx: &mut Context) {
         self.extends.on_start(this, ctx)
     }
@@ -55,8 +47,16 @@ where
         self.extends.on_remove(this, ctx)
     }
 
+    fn input_flags(&self) -> crate::InputFlags {
+        crate::InputFlags::FOCUS | crate::InputFlags::MOUSE | self.extends.input_flags()
+    }
+
     fn on_event(&mut self, event: Box<dyn std::any::Any>, this: Id, ctx: &mut Context) {
         self.extends.on_event(event, this, ctx)
+    }
+
+    fn on_drag(&mut self, delta: &mut [f32; 2], this: Id, ctx: &mut Context) {
+        self.extends.on_drag(delta, this, ctx)
     }
 
     fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {
@@ -69,5 +69,9 @@ where
 
     fn on_focus_change(&mut self, focus: bool, this: Id, ctx: &mut Context) {
         self.extends.on_focus_change(focus, this, ctx)
+    }
+
+    fn on_keyboard_event(&mut self, event: KeyboardEvent, this: Id, ctx: &mut Context) -> bool {
+        self.extends.on_keyboard_event(event, this, ctx) || (self.on_keyboard)(event, this, ctx)
     }
 }

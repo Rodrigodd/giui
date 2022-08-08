@@ -209,6 +209,12 @@ pub(crate) struct MouseInput {
     pub click_count: u8,
     /// used to check for double clicks.
     pub last_down: Option<Instant>,
+    /// The position of the mouse in the last down event with the MouseButton::Left, in the
+    /// current_mouse control. This becames None after a up mouse event.
+    down_position: Option<[f32; 2]>,
+    /// The mouse will be dragging if it goes down and start moving. It starts after moving a
+    /// minimun distance from its down_position.
+    is_dragging: bool,
     /// Tells if current_mouse control is locked, and will not change when the mouse stop hovering
     /// it. Useful for drag widgets like a slider.
     over_is_locked: bool,
@@ -220,10 +226,7 @@ pub(crate) struct MouseInput {
 }
 impl MouseInput {
     fn get_mouse_info(&self, event: MouseEvent) -> MouseInfo {
-        let delta = self
-            .position
-            .zip(self.last_position)
-            .map(|(a, b)| [a[0] - b[0], a[1] - b[1]]);
+        let delta = self.get_delta();
         MouseInfo {
             id: self.id,
             event,
@@ -232,6 +235,12 @@ impl MouseInput {
             delta,
             click_count: self.click_count,
         }
+    }
+
+    fn get_delta(&self) -> Option<[f32; 2]> {
+        let [x, y] = self.position?;
+        let [lx, ly] = self.last_position?;
+        Some([x - lx, y - ly])
     }
 }
 
@@ -857,10 +866,12 @@ impl Gui {
         }
     }
 
-    pub fn call_event_chain<F: Fn(&mut dyn Behaviour, Id, &mut Context) -> bool>(
+    /// Call the given event for each ancestor of `id` (including `id`), until the event callback
+    /// returns true, which indicated that the event was finally handled.
+    pub fn call_event_chain<F: FnMut(&mut dyn Behaviour, Id, &mut Context) -> bool>(
         &mut self,
         id: Id,
-        event: F,
+        mut event: F,
     ) -> bool {
         let mut handled = false;
         self.call_event(id, |this, id, ctx| handled = event(this, id, ctx));
@@ -1123,6 +1134,9 @@ impl Gui {
 
         input.last_position = input.position;
         input.position = Some([mouse_x, mouse_y]);
+
+        // Handle over_is_locked
+
         if input.current_mouse.is_some() && input.over_is_locked {
             let mouse = input.get_mouse_info(MouseEvent::Moved);
             let curr = input.current_mouse.unwrap();
@@ -1130,8 +1144,11 @@ impl Gui {
             return;
         }
 
+        // Find the current hovering control
+
         let mut curr = Id::ROOT_ID;
         let mut curr_scroll = None;
+        let mut curr_drag = None;
         let mut curr_mouse = None;
         self.update_layout();
         'l: loop {
@@ -1145,6 +1162,9 @@ impl Gui {
             {
                 if flags.contains(InputFlags::SCROLL) {
                     curr_scroll = Some(curr);
+                }
+                if flags.contains(InputFlags::DRAG) {
+                    curr_drag = Some(curr);
                 }
                 if flags.contains(InputFlags::MOUSE) {
                     curr_mouse = Some(curr);
@@ -1175,6 +1195,42 @@ impl Gui {
             );
         }
         input.current_scroll = curr_scroll;
+
+        // Handle dragging
+
+        if !input.is_dragging && curr_drag.is_some() {
+            if let Some([x, y]) = input.down_position {
+                let [dx, dy] = [mouse_x - x, mouse_y - y];
+                let dist = dx * dx + dy * dy;
+                const MIN_DRAG_DIST_SQ: f32 = 5.0 * 5.0;
+                if dist >= MIN_DRAG_DIST_SQ {
+                    log::trace!("dragging true");
+                    input.is_dragging = true;
+                }
+            }
+        }
+        if curr_drag.is_none() {
+            input.is_dragging = false;
+            log::trace!("curr_drag is none, dragging = false");
+        }
+
+        if input.is_dragging {
+            log::trace!("is dragging");
+            let curr_drag = curr_drag.unwrap();
+            curr_mouse = Some(curr_drag);
+            let delta = input.get_delta().unwrap_or_else(|| {
+                // there is no way that last_position is None where a down event already
+                // happened. But not sure, so lets not panic here.
+                log::error!("get_delta in dragging is None");
+                [0.0; 2]
+            });
+            self.send_drag_event_to(curr_drag, delta);
+        }
+
+        // Generate events
+
+        let input = self.inputs.get_mouse(id).unwrap();
+
         if curr_mouse == input.current_mouse {
             if let Some(current_mouse) = input.current_mouse {
                 let mouse = input.get_mouse_info(MouseEvent::Moved);
@@ -1214,6 +1270,10 @@ impl Gui {
                 return;
             }
         };
+
+        if button == MouseButton::Left {
+            input.down_position = input.position;
+        }
 
         match button {
             MouseButton::Left => input.buttons.left = ButtonState::Pressed,
@@ -1262,6 +1322,12 @@ impl Gui {
                 return;
             }
         };
+
+        if button == MouseButton::Left {
+            input.down_position = None;
+            input.is_dragging = false;
+            log::trace!("dragging = false");
+        }
 
         match button {
             MouseButton::Left => input.buttons.left = ButtonState::Released,
@@ -1327,6 +1393,18 @@ impl Gui {
     // TODO: think more carefully in what functions must be public
     pub fn send_mouse_event_to(&mut self, id: Id, mouse: MouseInfo) {
         self.call_event(id, move |this, id, ctx| this.on_mouse_event(mouse, id, ctx));
+    }
+
+    fn send_drag_event_to(&mut self, curr: Id, mut delta: [f32; 2]) {
+        log::trace!("call on_drag for {}", curr);
+
+        let delta = &mut delta;
+
+        self.call_event_chain(curr, |this, id, ctx| {
+            log::trace!("drag with delta {:?} for {}", delta, id);
+            this.on_drag(delta, id, ctx);
+            *delta == [0.0, 0.0]
+        });
     }
 
     pub fn dirty_layout(&mut self, id: Id) {
@@ -1723,6 +1801,7 @@ bitflags! {
         const MOUSE = 0x1;
         const SCROLL = 0x2;
         const FOCUS = 0x4;
+        const DRAG = 0x8;
     }
 }
 
@@ -1738,6 +1817,17 @@ pub trait Behaviour {
     }
 
     fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {}
+
+    /// Called when the mouse move after a down event.
+    ///
+    /// Needs InputFlags::DRAG
+    ///
+    /// After handling the drag, [0.0, 0.0] must be write to `*delta`. Otherwise, the value is
+    /// considered not completely handled, and delta is passed to the next ancestor with
+    /// InpusFlags::DRAG. This is used for allowing dragging a horizontal scroll inside a vertical
+    /// scroll for examples, the horizontal scroll would only zero the x component, and the y
+    /// component would be passed to the ancestor.
+    fn on_drag(&mut self, delta: &mut [f32; 2], this: Id, ctx: &mut Context) {}
 
     fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {}
 
@@ -1805,6 +1895,10 @@ impl<T: Behaviour> Behaviour for std::rc::Rc<std::cell::RefCell<T>> {
         self.as_ref().borrow_mut().input_flags()
     }
 
+    fn on_drag(&mut self, delta: &mut [f32; 2], this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_drag(delta, this, ctx)
+    }
+
     fn on_scroll_event(&mut self, delta: [f32; 2], this: Id, ctx: &mut Context) {
         self.as_ref().borrow_mut().on_scroll_event(delta, this, ctx)
     }
@@ -1821,5 +1915,9 @@ impl<T: Behaviour> Behaviour for std::rc::Rc<std::cell::RefCell<T>> {
         self.as_ref()
             .borrow_mut()
             .on_keyboard_event(event, this, ctx)
+    }
+
+    fn on_remove(&mut self, this: Id, ctx: &mut Context) {
+        self.as_ref().borrow_mut().on_remove(this, ctx)
     }
 }

@@ -53,10 +53,10 @@ impl Layout for ListViewLayout {
         };
         let mut min_size = [0.0, 0.0];
         let content_min_size = ctx.get_min_size(content);
-        if !self.h {
+        if !self.scroll_horz {
             min_size[0] = content_min_size[0];
         }
-        if !self.v {
+        if !self.scroll_vert {
             min_size[1] = content_min_size[1];
         }
 
@@ -744,7 +744,12 @@ impl<C: ListBuilder> Behaviour for List<C> {
     }
 
     fn input_flags(&self) -> InputFlags {
-        InputFlags::MOUSE | InputFlags::SCROLL
+        InputFlags::MOUSE | InputFlags::SCROLL | InputFlags::DRAG
+    }
+
+    fn on_drag(&mut self, delta: &mut [f32; 2], this: Id, ctx: &mut Context) {
+        self.on_scroll_event(*delta, this, ctx);
+        *delta = [0.0, 0.0];
     }
 
     fn on_scroll_event(&mut self, delta: [f32; 2], _this: Id, ctx: &mut Context) {
