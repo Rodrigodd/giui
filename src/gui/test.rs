@@ -435,13 +435,20 @@ fn drag_scroll_view() {
         .build(&mut gui);
 
     gui.mouse_moved(0, 51.0, 51.0);
-
     gui.mouse_down(0, MouseButton::Left);
     gui.mouse_moved(0, 1.0, 1.0);
 
     assert_eq!(
         gui.get_context().get_rect(content),
         [-50.0, -50.0, 150.0, 150.0]
+    );
+
+    // move outside of scroll
+    gui.mouse_moved(0, -49.0, -49.0);
+
+    assert_eq!(
+        gui.get_context().get_rect(content),
+        [-100.0, -100.0, 100.0, 100.0]
     );
 }
 

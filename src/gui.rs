@@ -217,7 +217,7 @@ pub(crate) struct MouseInput {
     is_dragging: bool,
     /// Tells if current_mouse control is locked, and will not change when the mouse stop hovering
     /// it. Useful for drag widgets like a slider.
-    over_is_locked: bool,
+    hover_is_locked: bool,
     /// The control currently hovered by the mouse. Has receive a MouseEvent::Enter, and
     /// will receive a MouseEvent::Exit when this value chances.
     current_mouse: Option<Id>,
@@ -786,7 +786,7 @@ impl Gui {
             self.remove_control(*id);
         } else if let Some(&event::SetLockOver { lock, mouse_id }) = event.downcast_ref() {
             let input = self.inputs.get_mouse(mouse_id);
-            input.map(|x| x.over_is_locked = lock);
+            input.map(|x| x.hover_is_locked = lock);
         } else if let Some(event::RequestFocus { id }) = event.downcast_ref() {
             self.set_focus(Some(*id));
         } else if let Some(event::StartControl { id }) = event.downcast_ref() {
@@ -1135,55 +1135,52 @@ impl Gui {
         input.last_position = input.position;
         input.position = Some([mouse_x, mouse_y]);
 
-        // Handle over_is_locked
-
-        if input.current_mouse.is_some() && input.over_is_locked {
-            let mouse = input.get_mouse_info(MouseEvent::Moved);
-            let curr = input.current_mouse.unwrap();
-            self.send_mouse_event_to(curr, mouse);
-            return;
-        }
-
         // Find the current hovering control
 
-        let mut curr = Id::ROOT_ID;
         let mut curr_scroll = None;
         let mut curr_drag = None;
         let mut curr_mouse = None;
-        self.update_layout();
-        'l: loop {
-            if let Some(flags) = self
-                .controls
-                .get(curr)
-                .unwrap()
-                .behaviour
-                .as_ref()
-                .map(|x| x.input_flags())
-            {
-                if flags.contains(InputFlags::SCROLL) {
-                    curr_scroll = Some(curr);
-                }
-                if flags.contains(InputFlags::DRAG) {
-                    curr_drag = Some(curr);
-                }
-                if flags.contains(InputFlags::MOUSE) {
-                    curr_mouse = Some(curr);
-                }
-            }
-            // the interator is reversed because the last child block the previous ones
-            for child in self.get_active_children(curr).iter().rev() {
-                if self
+        if input.current_mouse.is_some() && input.hover_is_locked || input.is_dragging {
+            curr_scroll = input.current_scroll;
+            curr_mouse = input.current_mouse;
+            curr_drag = curr_mouse;
+        } else {
+            let mut curr = Id::ROOT_ID;
+            self.update_layout();
+            'l: loop {
+                if let Some(flags) = self
                     .controls
-                    .get(*child)
+                    .get(curr)
                     .unwrap()
-                    .rect
-                    .contains(mouse_x, mouse_y)
+                    .behaviour
+                    .as_ref()
+                    .map(|x| x.input_flags())
                 {
-                    curr = *child;
-                    continue 'l;
+                    if flags.contains(InputFlags::SCROLL) {
+                        curr_scroll = Some(curr);
+                    }
+                    if flags.contains(InputFlags::DRAG) {
+                        curr_drag = Some(curr);
+                    }
+                    if flags.contains(InputFlags::MOUSE) {
+                        curr_mouse = Some(curr);
+                    }
                 }
+                // the interator is reversed because the last child blocks the previous ones
+                for child in self.get_active_children(curr).iter().rev() {
+                    if self
+                        .controls
+                        .get(*child)
+                        .unwrap()
+                        .rect
+                        .contains(mouse_x, mouse_y)
+                    {
+                        curr = *child;
+                        continue 'l;
+                    }
+                }
+                break;
             }
-            break;
         }
 
         let input = self.inputs.get_mouse(id).unwrap();
