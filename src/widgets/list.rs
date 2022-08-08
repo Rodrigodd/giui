@@ -29,12 +29,20 @@ pub struct FocusItem {
 
 #[derive(Default)]
 pub struct ListViewLayout {
-    h: bool,
-    v: bool,
+    scroll_horz: bool,
+    scroll_vert: bool,
 }
 impl ListViewLayout {
-    pub fn new(h: bool, v: bool) -> Self {
-        Self { h, v }
+    /// Create new ListViewLayout.
+    ///
+    /// `scroll_horz` and `scroll_vert` tell, in its respective dimension, if the view should
+    /// scroll the content if its exceed the view size, or if view min_size must be equal the
+    /// min_size of the content.
+    pub fn new(scroll_horz: bool, scroll_vert: bool) -> Self {
+        Self {
+            scroll_horz,
+            scroll_vert,
+        }
     }
 }
 impl Layout for ListViewLayout {
@@ -143,7 +151,36 @@ pub struct List<C: ListBuilder> {
     builder: C,
 }
 impl<C: ListBuilder> List<C> {
-    /// v_scroll must be a descendant of this
+    /// Create a new List.
+    ///
+    /// The hiearchy of controls must be the following:
+    ///
+    /// ```text
+    /// scroll_view : List
+    /// ├─ view : ListViewLayout
+    /// │  ├─ <items will be generated here>...
+    /// │  ├─ ...
+    /// │  └─ ...
+    /// ├─ h_scroll_bar : ScrollBar
+    /// │  └─ h_scroll_bar_handle
+    /// └─ v_scroll_bar : ScrollBar
+    ///    └─ v_scroll_bar_handle
+    /// ```
+    ///
+    /// The scrollview will layout the `view`, `h_scroll_bar` and `v_scroll_bar` in a 4x4 grid,
+    /// with the bottom-right corner empty. `h_scroll_bar` and `v_scroll_bar` must have a
+    /// non-zero min_size to be visible.
+    ///
+    /// The List will create items using the given `ListBuilder`. Only the items visible will be
+    /// created. They will be vertical layouted under `view`, with the given `spacing`, and
+    /// `margins`. `margins` are in the form `[left, top, rigth, bottom]`. The `top` and `bottom`
+    /// margins are only applied for the first and last items, respectivaly.
+    ///
+    /// `v_scroll_bar` will be desactivated if there is not enough items to fill the screen.
+    /// `h_scroll_bar` will be desactivated if `view` width is greater than `content_width`.
+    ///
+    /// `h_scroll_bar` and `v_scroll_bar` will only be active if the min_size of `content` is
+    /// greater than `view` size in its respective dimension.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         content_width: f32,

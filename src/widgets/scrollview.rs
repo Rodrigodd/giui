@@ -189,8 +189,9 @@ pub struct ViewLayout {
 impl ViewLayout {
     /// Create new ViewLayout.
     ///
-    /// Paramenters tell if the view should scroll content that execed the view size, or view
-    /// min_size must respect the min width and min height of content.
+    /// `scroll_horz` and `scroll_vert` tell, in its respective dimension, if the view should
+    /// scroll the content if its exceed the view size, or if view min_size must be equal the
+    /// min_size of the content.
     pub fn new(scroll_horz: bool, scroll_vert: bool) -> Self {
         Self {
             scroll_horz,
@@ -228,7 +229,31 @@ pub struct ScrollView {
     v_scroll_bar_and_handle: Option<(Id, Id)>,
 }
 impl ScrollView {
-    /// v_scroll must be a descendant of this
+    /// Create a new ScrollView.
+    ///
+    /// The hiearchy of controls must be the following:
+    ///
+    /// ```text
+    /// scroll_view : ScrollView
+    /// ├─ view : ViewLayout
+    /// │  └─ content
+    /// ├─ h_bar : ScrollBar
+    /// │  └─ h_bar_handle
+    /// └─ v_bar : ScrollBar
+    ///    └─ v_bar_handle
+    /// ```
+    ///
+    /// The scrollview will layout the `view`, `h_bar` and `v_bar` in a 4x4 grid, with the
+    /// bottom-right corner empty. `h_bar` and `v_bar` must have a non-zero min_size to be visible.
+    ///
+    /// `view` will layout `content` to be scrollable. If `content` min_size is smaller than
+    /// `view` size in a dimension, the `content` will occupy the entire `view`, in that dimension.
+    ///
+    /// `h_bar` and `v_bar` will only be active if the min_size of `content` is greater than
+    /// `view` size in its respective dimension.
+    ///
+    /// If `h_scroll_bar_and_handle` or `v_scroll_bar_and_handle` are None, ScrollView will not
+    /// scroll the content in its respective dimension, and will instead inherit its min_size.
     pub fn new(
         view: Id,
         content: Id,
