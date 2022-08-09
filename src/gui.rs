@@ -1265,6 +1265,9 @@ impl Gui {
                     if flags.contains(InputFlags::MOUSE) {
                         curr_mouse = Some(curr);
                     }
+                    if flags.contains(InputFlags::BLOCK_MOUSE) {
+                        break 'l;
+                    }
                 }
                 // the interator is reversed because the last child blocks the previous ones
                 for child in self.get_active_children(curr).iter().rev() {
@@ -1871,10 +1874,12 @@ impl Gui {
 
 bitflags! {
     pub struct InputFlags: u8 {
-        const MOUSE = 0x1;
-        const SCROLL = 0x2;
-        const FOCUS = 0x4;
-        const DRAG = 0x8;
+        const MOUSE = 0x01;
+        const SCROLL = 0x02;
+        const FOCUS = 0x04;
+        const DRAG = 0x08;
+        /// This indicates that this control will block child controls from getting a mouse event.
+        const BLOCK_MOUSE = 0x10;
     }
 }
 
