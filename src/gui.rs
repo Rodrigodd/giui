@@ -3,7 +3,7 @@ use std::{
     collections::{HashMap, VecDeque},
     num::NonZeroU32,
     ops::{Deref, DerefMut},
-    sync::atomic::AtomicU64,
+    sync::atomic::{AtomicU32, AtomicU64, Ordering},
     time::Duration,
 };
 
@@ -358,6 +358,26 @@ impl DerefMut for MouseInputs {
     }
 }
 
+pub trait Animation {
+    /// Update the animation.
+    ///
+    /// Is called every frame. `t` varies linearly between 0.0 and 1.0 over time. `length` is the
+    /// total duration of the animation in seconds. This method is first called with `t = 0.0` and
+    /// always ends with `t = 1.0` (unless cancelled), which can be used for initialization and
+    /// finish. `dt` is the variation of `t` from the last call to now.
+    fn on_update(&self, t: f32, dt: f32, length: f32, ctx: &mut Context);
+}
+
+pub type AnimationId = u32;
+
+struct ScheduledAnimation {
+    id: AnimationId,
+    last_t: f32,
+    length: f32,
+    start: Option<Instant>,
+    callback: Box<dyn Animation>,
+}
+
 pub struct Gui {
     pub(crate) controls: Controls,
     pub(crate) fonts: Fonts,
@@ -367,13 +387,14 @@ pub struct Gui {
     redraw: bool,
     // controls that need to update the layout
     dirty_layouts: Vec<Id>,
-    // controls that 'on_start' need be called
-    scheduled_events: KeyedPriorityQueue<u64, ScheduledEventTo>,
     lazy_events: VecDeque<LazyEvent>,
 
     pub(crate) inputs: MouseInputs,
     /// The control currently receiving on_keyboard_event's.
     pub(crate) current_focus: Option<Id>,
+
+    scheduled_events: KeyedPriorityQueue<u64, ScheduledEventTo>,
+    animations: Vec<ScheduledAnimation>,
 
     change_cursor: Option<CursorIcon>,
     scale_factor: f64,
@@ -381,17 +402,18 @@ pub struct Gui {
 impl Gui {
     pub fn new(width: f32, height: f32, scale_factor: f64, fonts: Fonts) -> Self {
         Self {
-            modifiers: ModifiersState::empty(),
             controls: Controls::new(width, height),
+            fonts,
+            modifiers: ModifiersState::empty(),
             resources: HashMap::new(),
             redraw: true,
-            scheduled_events: KeyedPriorityQueue::default(),
             dirty_layouts: Vec::new(),
             lazy_events: VecDeque::new(),
-            change_cursor: None,
             inputs: MouseInputs::default(),
             current_focus: None,
-            fonts,
+            scheduled_events: KeyedPriorityQueue::default(),
+            animations: Vec::new(),
+            change_cursor: None,
             scale_factor,
         }
     }
@@ -411,6 +433,46 @@ impl Gui {
         self.get_from_type_id(TypeId::of::<T>())
             .downcast_ref()
             .expect("The type for get<T> must be T")
+    }
+
+    /// Add a new animation.
+    ///
+    /// The returned `AnimationId` can be used to remove the added animation with
+    /// [`Gui::remove_animation`]. This id is unique.
+    pub fn add_animation<A: 'static + Animation>(
+        &mut self,
+        length: f32,
+        animation: A,
+    ) -> AnimationId {
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+
+        log::trace!("animation add {}", id);
+        self.animations.push(ScheduledAnimation {
+            id,
+            last_t: 0.0,
+            length,
+            start: None,
+            callback: Box::new(animation),
+        });
+
+        id
+    }
+
+    /// Remove the animation with the given `id`.
+    ///
+    /// The id is the one returned by [`Gui::add_animation`] when the animation to be removed was
+    /// added. If the animation doesn't exist (already finished or id is invalid), this will do
+    /// nothing.
+    pub fn remove_animation(&mut self, id: AnimationId) {
+        log::trace!("animation remove {}", id);
+        let pos = self.animations.iter().position(|x| x.id == id);
+        pos.map(|i| self.animations.remove(i));
+    }
+
+    /// The number of animations in Self::animations
+    pub(crate) fn animation_count(&self) -> usize {
+        self.animations.len()
     }
 
     /// Get a reference to the value of type T that is owned by the Gui.
@@ -687,10 +749,11 @@ impl Gui {
     }
 
     pub fn render_is_dirty(&self) -> bool {
-        if self.redraw {
+        let redraw = self.redraw || !self.animations.is_empty();
+        if redraw {
             log::debug!("render is dirty");
         }
-        self.redraw
+        redraw
     }
 
     pub fn cursor_change(&mut self) -> Option<CursorIcon> {
@@ -716,6 +779,36 @@ impl Gui {
         }
     }
 
+    fn update_animations(&mut self) {
+        // take owership temporary
+        let mut animations = std::mem::take(&mut self.animations);
+
+        animations.retain_mut(|anim| {
+            let mut t = match anim.start {
+                Some(start) => start.elapsed().as_secs_f32() / anim.length,
+                None => {
+                    anim.start = Some(Instant::now());
+                    0.0
+                }
+            };
+
+            if t >= 1.0 {
+                t = 1.0;
+            }
+
+            log::trace!("animation play {}, t = {}", anim.id, t);
+            anim.callback
+                .on_update(t, t - anim.last_t, anim.length, &mut self.get_context());
+
+            anim.last_t = t;
+
+            t < 1.0
+        });
+
+        // return animations to self
+        self.animations = animations;
+    }
+
     #[inline]
     pub fn get_context(&mut self) -> Context {
         self.lazy_update();
@@ -725,6 +818,7 @@ impl Gui {
     #[inline]
     pub fn get_render_context(&mut self) -> RenderContext {
         self.lazy_update();
+        self.update_animations();
         self.redraw = false;
         RenderContext::new(self)
     }
@@ -817,7 +911,7 @@ impl Gui {
         instant: Instant,
     ) -> u64 {
         static ORDER_OF_INSERTION: AtomicU64 = AtomicU64::new(0);
-        let event_id = ORDER_OF_INSERTION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let event_id = ORDER_OF_INSERTION.fetch_add(1, Ordering::Relaxed);
         let event = WithPriority::new((instant, event_id), (id, event));
         self.scheduled_events.push(event_id, event);
         event_id

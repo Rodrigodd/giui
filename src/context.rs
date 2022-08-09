@@ -6,8 +6,8 @@ use std::{
 use winit::{event::ModifiersState, window::CursorIcon};
 
 use crate::{
-    control::BuilderContext, event, font::Fonts, graphics::Graphic, time::Instant, Control,
-    ControlBuilder, Controls, Gui, Id, Rect,
+    control::BuilderContext, event, font::Fonts, graphics::Graphic, time::Instant, Animation,
+    AnimationId, Control, ControlBuilder, Controls, Gui, Id, Rect,
 };
 
 // contains a reference to all the controls, except the behaviour of one control
@@ -144,6 +144,27 @@ impl<'a> Context<'a> {
 
     pub fn cancel_scheduled_event(&mut self, event_id: u64) {
         self.gui.cancel_scheduled_event(event_id);
+    }
+
+    /// Add a new animation.
+    ///
+    /// The returned `AnimationId` can be used to remove the added animation with
+    /// [`Context::remove_animation`]. This id is unique.
+    pub fn add_animation<A: 'static + Animation>(
+        &mut self,
+        length: f32,
+        animation: A,
+    ) -> AnimationId {
+        self.gui.add_animation(length, animation)
+    }
+
+    /// Remove the animation with the given `id`.
+    ///
+    /// The id is the one returned by [`Context::add_animation`] when the animation to be removed
+    /// was added. If the animation doesn't exist (already finished or id is invalid), this will do
+    /// nothing.
+    pub fn remove_animation(&mut self, id: AnimationId) {
+        self.gui.remove_animation(id)
     }
 
     pub fn set_cursor(&mut self, cursor: CursorIcon) {
@@ -718,6 +739,11 @@ impl<'a> RenderContext<'a> {
             fonts,
             render_dirty: false,
         }
+    }
+
+    /// Returns true if there is currently a animation playing in the Gui.
+    pub fn is_animating(&self) -> bool {
+        self.gui.animation_count() > 0
     }
 
     pub fn scale_factor(&self) -> f64 {

@@ -412,6 +412,8 @@ impl GuiRender {
 
         if is_animating {
             self.last_anim_draw = Some(Instant::now());
+        } else {
+            is_animating = ctx.is_animating()
         }
 
         (&self.last_sprites, is_animating)
