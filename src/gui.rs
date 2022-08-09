@@ -1411,12 +1411,6 @@ impl Gui {
             }
         };
 
-        if button == MouseButton::Left {
-            input.down_position = None;
-            input.is_dragging = false;
-            log::trace!("dragging = false");
-        }
-
         match button {
             MouseButton::Left => input.buttons.left = ButtonState::Released,
             MouseButton::Right => input.buttons.right = ButtonState::Released,
@@ -1426,6 +1420,13 @@ impl Gui {
         if let Some(curr) = input.current_mouse {
             let mouse = input.get_mouse_info(MouseEvent::Up(button));
             self.send_mouse_event_to(curr, mouse);
+        }
+
+        let input = self.inputs.get_mouse(id).unwrap();
+        if button == MouseButton::Left {
+            input.down_position = None;
+            input.is_dragging = false;
+            log::trace!("dragging = false");
         }
     }
 

@@ -4,7 +4,7 @@ use std::{any::Any, collections::BTreeMap};
 
 use winit::event::VirtualKeyCode;
 
-use super::ScrollBar;
+use super::{FinishScrollMomentum, ScrollBar, ScrollDelta, ScrollMomentum};
 use crate::{
     util::cmp_float, widgets::SetScrollPosition, Behaviour, BuilderContext, Context,
     ControlBuilder, Id, InputFlags, KeyboardEvent, Layout, LayoutContext, MinSizeContext,
@@ -150,6 +150,8 @@ pub struct List<C: ListBuilder> {
     // CreatedItem is in last_created_items?
     focused: Option<CreatedItem>,
     builder: C,
+
+    momentum_scroll: ScrollMomentum,
 }
 impl<C: ListBuilder> List<C> {
     /// Create a new List.
@@ -215,6 +217,7 @@ impl<C: ListBuilder> List<C> {
             last_created_items: BTreeMap::new(),
             created_items: BTreeMap::new(),
             builder,
+            momentum_scroll: ScrollMomentum::default(),
         }
     }
 
@@ -600,6 +603,25 @@ impl<C: ListBuilder> List<C> {
             // log::trace!("end at {}", self.end_y);
         }
     }
+
+    fn add_delta(&mut self, delta: [f32; 2], ctx: &mut Context) {
+        if !cmp_float(delta[0], 0.0) {
+            self.delta_x += delta[0];
+            ctx.dirty_layout(self.view);
+        }
+
+        // if items are all displayed, there is no need for vertical scroll
+        if cmp_float(self.start_y, 0.0)
+            && cmp_float(self.end_y, self.builder.item_count(ctx) as f32)
+        {
+            return;
+        }
+
+        if !cmp_float(delta[1], 0.0) {
+            self.delta_y -= delta[1];
+            ctx.dirty_layout(self.view);
+        }
+    }
 }
 impl<C: ListBuilder> Behaviour for List<C> {
     fn on_start(&mut self, _this: Id, ctx: &mut Context) {
@@ -670,6 +692,7 @@ impl<C: ListBuilder> Behaviour for List<C> {
 
     fn on_event(&mut self, event: Box<dyn Any>, this: Id, ctx: &mut Context) {
         if let Some(event) = event.downcast_ref::<SetScrollPosition>() {
+            self.momentum_scroll.cancel_scroll(ctx);
             if !event.vertical {
                 let total_size = self.content_width - ctx.get_size(self.view)[0];
                 self.delta_x = event.value.max(0.0) * total_size;
@@ -680,6 +703,10 @@ impl<C: ListBuilder> Behaviour for List<C> {
             }
             ctx.dirty_layout(self.view);
             ctx.dirty_layout(this);
+        } else if let Some(event) = event.downcast_ref::<ScrollDelta>() {
+            self.add_delta(event.delta, ctx)
+        } else if event.is::<FinishScrollMomentum>() {
+            self.momentum_scroll.is_scrolling = false;
         } else if event.is::<UpdateItems>() {
             // TODO: I add this set_y here, to force a update, but i don't know if this will go
             // wrong!!
@@ -745,32 +772,20 @@ impl<C: ListBuilder> Behaviour for List<C> {
     }
 
     fn input_flags(&self) -> InputFlags {
-        InputFlags::MOUSE | InputFlags::SCROLL | InputFlags::DRAG
+        let mut flags = InputFlags::MOUSE | InputFlags::SCROLL | InputFlags::DRAG;
+        if self.momentum_scroll.is_scrolling {
+            flags |= InputFlags::BLOCK_MOUSE
+        }
+        flags
     }
 
     fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
-        if mouse.event == MouseEvent::Moved && mouse.is_dragging {
-            self.on_scroll_event(mouse.delta.unwrap(), this, ctx);
-        }
+        self.momentum_scroll.on_mouse_event(mouse, this, ctx)
     }
 
     fn on_scroll_event(&mut self, delta: [f32; 2], _this: Id, ctx: &mut Context) {
-        if !cmp_float(delta[0], 0.0) {
-            self.delta_x += delta[0];
-            ctx.dirty_layout(self.view);
-        }
-
-        // if items are all displayed, there is no need for vertical scroll
-        if cmp_float(self.start_y, 0.0)
-            && cmp_float(self.end_y, self.builder.item_count(ctx) as f32)
-        {
-            return;
-        }
-
-        if !cmp_float(delta[1], 0.0) {
-            self.delta_y -= delta[1];
-            ctx.dirty_layout(self.view);
-        }
+        self.momentum_scroll.cancel_scroll(ctx);
+        self.add_delta(delta, ctx);
     }
 
     fn on_keyboard_event(&mut self, event: KeyboardEvent, _this: Id, ctx: &mut Context) -> bool {

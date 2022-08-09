@@ -1,17 +1,24 @@
+use std::collections::VecDeque;
 use std::{any::Any, rc::Rc};
 
+use instant::{Duration, Instant};
 use winit::event::VirtualKeyCode;
 
 use crate::{
     style::ButtonStyle, Behaviour, Context, Id, InputFlags, KeyboardEvent, Layout, LayoutContext,
     MinSizeContext, MouseButton, MouseEvent, MouseInfo,
 };
+use crate::{Animation, AnimationId};
 
 pub struct SetScrollPosition {
     /// If true, it is setting the vertical scroll. Otherwise the horizontal.
     pub vertical: bool,
     /// A value between 0 and 1. 0 means at the top, 1 means at the bottom.
     pub value: f32,
+}
+
+pub struct ScrollDelta {
+    pub delta: [f32; 2],
 }
 
 pub struct ScrollBar {
@@ -220,6 +227,133 @@ impl Layout for ViewLayout {
     fn update_layouts(&mut self, _this: Id, _ctx: &mut LayoutContext) {}
 }
 
+const MEAN_SIZE: usize = 5;
+
+pub struct FinishScrollMomentum;
+
+/// Encapsulate the behaviour of dragging a scroll container that preserves the drag momentum.
+///
+/// Is used by composition. The owner Behaviour must have `InputFlags::DRAG`, delegate the
+/// `on_mouse_event` to this struct, and responde to [`ScrollDelta`] event.
+#[derive(Default)]
+pub struct ScrollMomentum {
+    drag_anim: Option<AnimationId>,
+    position: VecDeque<([f32; 2], Instant)>,
+    /// true while a animation is running.
+    pub is_scrolling: bool,
+}
+impl ScrollMomentum {
+    fn get_mean_velocity(&mut self) -> Option<[f32; 2]> {
+        if self.position.len() < 2 {
+            return None;
+        }
+
+        let first = self.position.front().unwrap();
+        let last = self.position.back().unwrap();
+
+        let (lpos, lt) = first;
+        let (pos, t) = last;
+
+        // log::trace!("positions: {:?}", {
+        //     let now = Instant::now();
+        //     self.position
+        //         .iter()
+        //         .map(|x| (x.0[1], now.duration_since(x.1)))
+        //         .collect::<Vec<_>>()
+        // });
+
+        let dpos = [pos[0] - lpos[0], pos[1] - lpos[1]];
+        let dt = t
+            .checked_duration_since(*lt)
+            .unwrap_or(Duration::ZERO)
+            .as_secs_f32();
+
+        Some([dpos[0] / dt, dpos[1] / dt])
+    }
+
+    pub fn cancel_scroll(&mut self, ctx: &mut Context) {
+        self.drag_anim.take().map(|id| ctx.remove_animation(id));
+        self.is_scrolling = false;
+    }
+
+    fn add_position(&mut self, pos: [f32; 2]) {
+        let now = Instant::now();
+        if self.position.len() > MEAN_SIZE {
+            self.position.pop_front();
+        }
+
+        // remove old positions
+        while let Some((_, time)) = self.position.front() {
+            if now.duration_since(*time) < Duration::from_millis(50) {
+                break;
+            }
+            self.position.pop_front();
+        }
+
+        self.position.push_back((pos, now));
+    }
+
+    pub fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
+        if MouseEvent::Moved == mouse.event {
+            self.add_position(mouse.pos);
+        }
+        match mouse.event {
+            MouseEvent::Moved if mouse.is_dragging => {
+                self.cancel_scroll(ctx);
+
+                ctx.send_event_to(
+                    this,
+                    ScrollDelta {
+                        delta: mouse.delta.unwrap(),
+                    },
+                );
+            }
+            MouseEvent::Down(MouseButton::Left) => {
+                self.cancel_scroll(ctx);
+                self.position.clear();
+            }
+            MouseEvent::Enter if mouse.is_dragging => {
+                self.cancel_scroll(ctx);
+                self.position.clear();
+            }
+            MouseEvent::Up(MouseButton::Left) if mouse.is_dragging => {
+                struct ScrollAnim {
+                    id: Id,
+                    speed: [f32; 2],
+                }
+                impl Animation for ScrollAnim {
+                    fn on_update(&self, t: f32, dt: f32, _: f32, ctx: &mut Context) {
+                        if t == 1.0 {
+                            ctx.send_event_to(self.id, FinishScrollMomentum);
+                        }
+                        ctx.send_event_to(
+                            self.id,
+                            ScrollDelta {
+                                delta: [
+                                    dt * self.speed[0] * (1.0 - t),
+                                    dt * self.speed[1] * (1.0 - t),
+                                ],
+                            },
+                        )
+                    }
+                }
+
+                self.add_position(mouse.pos);
+
+                if let Some(speed) = self.get_mean_velocity() {
+                    let drag_acel = 1000.0; // px/s^2
+                    let mag = (speed[0] * speed[0] + speed[1] * speed[1]).sqrt();
+                    let length = mag / drag_acel; // s
+                    let id = ctx.add_animation(length, ScrollAnim { id: this, speed });
+                    self.drag_anim = Some(id);
+                    self.is_scrolling = true;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 pub struct ScrollView {
     pub delta_x: f32,
     pub delta_y: f32,
@@ -227,6 +361,8 @@ pub struct ScrollView {
     content: Id,
     h_scroll_bar_and_handle: Option<(Id, Id)>,
     v_scroll_bar_and_handle: Option<(Id, Id)>,
+
+    momentum_scroll: ScrollMomentum,
 }
 impl ScrollView {
     /// Create a new ScrollView.
@@ -267,9 +403,17 @@ impl ScrollView {
             content,
             h_scroll_bar_and_handle,
             v_scroll_bar_and_handle,
+            momentum_scroll: ScrollMomentum::default(),
         }
     }
+
+    fn add_delta(&mut self, delta: [f32; 2], ctx: &mut Context) {
+        self.delta_x -= delta[0];
+        self.delta_y -= delta[1];
+        ctx.dirty_layout(self.view);
+    }
 }
+
 impl Behaviour for ScrollView {
     fn on_start(&mut self, _this: Id, ctx: &mut Context) {
         debug_assert!({
@@ -333,6 +477,7 @@ impl Behaviour for ScrollView {
 
     fn on_event(&mut self, event: Box<dyn Any>, _: Id, ctx: &mut Context) {
         if let Some(event) = event.downcast_ref::<SetScrollPosition>() {
+            self.momentum_scroll.cancel_scroll(ctx);
             if !event.vertical {
                 let total_size = ctx.get_size(self.content)[0] - ctx.get_size(self.view)[0];
                 self.delta_x = event.value * total_size;
@@ -341,24 +486,29 @@ impl Behaviour for ScrollView {
                 self.delta_y = event.value * total_size;
             }
             ctx.dirty_layout(self.view);
+        } else if let Some(event) = event.downcast_ref::<ScrollDelta>() {
+            self.add_delta(event.delta, ctx);
+        } else if event.is::<FinishScrollMomentum>() {
+            self.momentum_scroll.is_scrolling = false;
         }
     }
 
     fn input_flags(&self) -> InputFlags {
-        InputFlags::MOUSE | InputFlags::SCROLL | InputFlags::DRAG
+        let mut flags = InputFlags::MOUSE | InputFlags::SCROLL | InputFlags::DRAG;
+        if self.momentum_scroll.is_scrolling {
+            flags |= InputFlags::BLOCK_MOUSE
+        }
+        flags
     }
 
     fn on_mouse_event(&mut self, mouse: MouseInfo, this: Id, ctx: &mut Context) {
-        if mouse.event == MouseEvent::Moved && mouse.is_dragging {
-            self.on_scroll_event(mouse.delta.unwrap(), this, ctx);
-        }
+        self.momentum_scroll.on_mouse_event(mouse, this, ctx)
     }
 
     fn on_scroll_event(&mut self, delta: [f32; 2], _: Id, ctx: &mut Context) {
-        self.delta_x -= delta[0];
-        self.delta_y -= delta[1];
+        self.momentum_scroll.cancel_scroll(ctx);
 
-        ctx.dirty_layout(self.view);
+        self.add_delta(delta, ctx);
     }
 
     fn on_keyboard_event(&mut self, event: KeyboardEvent, _this: Id, ctx: &mut Context) -> bool {
