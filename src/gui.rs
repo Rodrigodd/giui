@@ -527,9 +527,15 @@ impl Gui {
             fn get_from_type_id(&self, type_id: TypeId) -> &dyn Any {
                 self.get_from_type_id(type_id)
             }
+
+            fn scale_factor(&self) -> f64 {
+                self.scale_factor
+            }
+
             fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
                 self.get_graphic(id).unwrap()
             }
+
             fn controls(&self) -> &Controls {
                 &self.controls
             }
@@ -1712,6 +1718,7 @@ impl Gui {
                         &mut self.controls,
                         &mut self.resources,
                         &self.fonts,
+                        self.scale_factor,
                     );
                     layout.update_layouts(id, &mut ctx);
                     let LayoutContext { events, dirtys, .. } = ctx;
@@ -1846,6 +1853,7 @@ impl Gui {
                         &mut self.controls,
                         &mut self.resources,
                         &self.fonts,
+                        self.scale_factor,
                     );
                     layout.update_layouts(parent, &mut ctx);
                     let LayoutContext { events, dirtys, .. } = ctx;

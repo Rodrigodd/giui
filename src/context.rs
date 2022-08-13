@@ -25,9 +25,15 @@ impl BuilderContext for Context<'_> {
     fn get_from_type_id(&self, type_id: TypeId) -> &dyn Any {
         self.gui.get_from_type_id(type_id)
     }
+
+    fn scale_factor(&self) -> f64 {
+        self.gui.scale_factor()
+    }
+
     fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
         self.get_graphic_mut(id)
     }
+
     fn controls(&self) -> &Controls {
         &self.gui.controls
     }
@@ -445,6 +451,7 @@ pub struct LayoutContext<'a> {
     controls: &'a mut Controls,
     resources: &'a mut HashMap<TypeId, Box<dyn Any>>,
     fonts: &'a Fonts,
+    scale_factor: f64,
     pub(crate) dirtys: Vec<Id>,
     pub(crate) events: Vec<Box<dyn Any>>,
 }
@@ -456,11 +463,17 @@ impl BuilderContext for LayoutContext<'_> {
             .expect("The type need to be added with Gui::set before hand.");
         &**value
     }
+
+    fn scale_factor(&self) -> f64 {
+        self.scale_factor
+    }
+
     fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic {
         let control = self.controls.get_mut(id).unwrap();
         control.rect.dirty_render_dirty_flags();
         &mut self.controls.get_mut(id).unwrap().graphic
     }
+
     fn controls(&self) -> &Controls {
         self.controls
     }
@@ -499,12 +512,14 @@ impl<'a> LayoutContext<'a> {
         controls: &'a mut Controls,
         resources: &'a mut HashMap<TypeId, Box<dyn Any>>,
         fonts: &'a Fonts,
+        scale_factor: f64,
     ) -> Self {
         Self {
             this,
             controls,
             resources,
             fonts,
+            scale_factor,
             dirtys: Vec::new(),
             events: Vec::new(),
         }

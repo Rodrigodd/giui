@@ -28,6 +28,11 @@ pub trait BuilderContext {
         self.controls_mut().reserve()
     }
 
+    /// The factor in which the UI is scaled when rendering.
+    ///
+    /// The same as [`Gui::scale_factor`].
+    fn scale_factor(&self) -> f64;
+
     fn get_graphic_mut(&mut self, id: Id) -> &mut Graphic;
 
     fn get_all_children(&self, id: Id) -> &[Id] {
@@ -179,6 +184,10 @@ impl ControlBuilder {
                 }
                 fn build(&mut self, id: Id, control: Control) {
                     self.0.build(id, control)
+                }
+
+                fn scale_factor(&self) -> f64 {
+                    unimplemented!()
                 }
 
                 fn get_graphic_mut(&mut self, _: Id) -> &mut Graphic {
