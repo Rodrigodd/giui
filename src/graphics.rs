@@ -168,12 +168,27 @@ impl Graphic {
     }
 }
 
+/// A Graphic for a non-resizable Texture.
+///
+/// If the size of a Control is bigger than the size of the icon, the icon texture will not be
+/// stretch, but will instead preserve its size and be centered in the Control.
 #[derive(Clone, Debug)]
 pub struct Icon {
+    /// The id of the texture.
     pub texture: u32,
+    /// The sectin of the texture that this Graphics render.
+    ///
+    /// The uv_rect is given in the format `[x, y, width, height]`, in relatives values from 0.0 to
+    /// 1.0: 0.0 is margin left, 1.0 is margin right, etc.
     pub uv_rect: [f32; 4],
+    /// The size of the icon.
+    ///
+    /// If the size of a Control is bigger than this size, the icon texture will not be stretch,
+    /// but will instead preserve its size and be centered in the Control.
     pub size: [f32; 2],
+    /// The color that the texture is multiplied by.
     pub color: Color,
+    /// If the color have change since the last render.
     pub color_dirty: bool,
 }
 impl Icon {
@@ -267,9 +282,16 @@ impl AnimatedIcon {
 }
 #[derive(Debug)]
 pub struct Texture {
+    /// The id of the texture.
     pub texture: u32,
+    /// The sectin of the texture that this Graphics render.
+    ///
+    /// The uv_rect is given in the format `[x, y, width, height]`, in relatives values from 0.0 to
+    /// 1.0: 0.0 is margin left, 1.0 is margin right, etc.
     pub uv_rect: [f32; 4],
+    /// The color that the texture is multiplied by.
     pub color: Color,
+    /// If the color have change since the last render.
     pub color_dirty: bool,
 }
 impl Clone for Texture {
