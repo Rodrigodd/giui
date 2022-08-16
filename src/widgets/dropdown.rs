@@ -92,15 +92,15 @@ impl Behaviour for MenuItem {
     }
 }
 
-pub struct Blocker<F: Fn(Id, &mut Context)> {
+pub struct Blocker<F: FnMut(Id, &mut Context)> {
     on_down: F,
 }
-impl<F: Fn(Id, &mut Context)> Blocker<F> {
+impl<F: FnMut(Id, &mut Context)> Blocker<F> {
     pub fn new(on_down: F) -> Self {
         Self { on_down }
     }
 }
-impl<F: Fn(Id, &mut Context)> Behaviour for Blocker<F> {
+impl<F: FnMut(Id, &mut Context)> Behaviour for Blocker<F> {
     fn input_flags(&self) -> InputFlags {
         InputFlags::MOUSE
     }
