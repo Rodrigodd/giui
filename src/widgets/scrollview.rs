@@ -298,13 +298,13 @@ impl ScrollMomentum {
             self.add_position(mouse.pos);
         }
         match mouse.event {
-            MouseEvent::Moved if mouse.is_dragging => {
+            MouseEvent::Moved if mouse.is_dragging() => {
                 self.cancel_scroll(ctx);
 
                 ctx.send_event_to(
                     this,
                     ScrollDelta {
-                        delta: mouse.delta.unwrap(),
+                        delta: mouse.drag_delta(),
                     },
                 );
             }
@@ -312,11 +312,11 @@ impl ScrollMomentum {
                 self.cancel_scroll(ctx);
                 self.position.clear();
             }
-            MouseEvent::Enter if mouse.is_dragging => {
+            MouseEvent::Enter if mouse.is_dragging() => {
                 self.cancel_scroll(ctx);
                 self.position.clear();
             }
-            MouseEvent::Up(MouseButton::Left) if mouse.is_dragging => {
+            MouseEvent::Up(MouseButton::Left) if mouse.is_dragging() => {
                 struct ScrollAnim {
                     id: Id,
                     speed: [f32; 2],
@@ -340,7 +340,14 @@ impl ScrollMomentum {
 
                 self.add_position(mouse.pos);
 
-                if let Some(speed) = self.get_mean_velocity() {
+                if let Some(mut speed) = self.get_mean_velocity() {
+                    if !mouse.is_dragging_x {
+                        speed[0] = 0.0;
+                    }
+                    if !mouse.is_dragging_y {
+                        speed[1] = 0.0;
+                    }
+
                     let drag_acel = 1000.0; // px/s^2
                     let mag = (speed[0] * speed[0] + speed[1] * speed[1]).sqrt();
                     let length = mag / drag_acel; // s

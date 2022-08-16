@@ -164,22 +164,56 @@ pub struct MouseInfo {
     pub pos: [f32; 2],
     /// The state of each button of the mouse.
     pub buttons: MouseButtons,
-    /// The different beetween this mouse position, and the position in the last event. The last
-    /// position may be outside of this control.
+    /// The different beetween this mouse position, and the position in the last event.
+    ///
+    /// The last position may be outside of this control.
     pub delta: Option<[f32; 2]>,
-    /// Number of consecutives mouse click. A mouse click is mouse down followed by a mouse up,
-    /// without a mouse exit between the two. Consecutive means that the click occurred within
-    /// 500 ms after the previous one (without a mouse exit between).
+    /// Number of consecutives mouse click.
+    ///
+    /// A mouse click is mouse down followed by a mouse up, without a mouse exit between the two.
+    /// Consecutive means that the click occurred within 500 ms after the previous one (without a
+    /// mouse exit between).
     pub click_count: u8,
+    /// If the mouse is dragging in the x diretion.
+    ///
     /// The mouse will be dragging if a MouseEvent::Down occur under a control with InputFlag::DRAG
-    /// and the mouse start moving. Dragging starts after moving a minimun distance from the
-    /// position of the down event.
-    pub is_dragging: bool,
+    /// and the mouse start moving. Dragging starts after moving a minimum distance in the x
+    /// direction from the position of the down event.
+    pub is_dragging_x: bool,
+    /// If the mouse is dragging in the y diretion.
+    ///
+    /// The mouse will be dragging if a MouseEvent::Down occur under a control with InputFlag::DRAG
+    /// and the mouse start moving. Dragging starts after moving a minimum distance in the y
+    /// direction from the position of the down event.
+    pub is_dragging_y: bool,
 }
 impl MouseInfo {
     /// Returns `true` if the event is a MouseEvent::Up(MouseButton::Left) and click_count > 0.
     pub fn click(&self) -> bool {
         self.click_count > 0 && matches!(self.event, MouseEvent::Up(MouseButton::Left))
+    }
+
+    /// Returns `self.is_dragging_x || self.is_dragging_y`.
+    pub fn is_dragging(&self) -> bool {
+        self.is_dragging_x || self.is_dragging_y
+    }
+
+    /// Return the amount the mouse has dragged, since the last mouse event.
+    ///
+    /// Has the same value was `self.delta` but with the x or y component zeroed if
+    /// `self.is_dragging_x` or `self.is_dragging_y` is false, respectively.
+    pub fn drag_delta(&self) -> [f32; 2] {
+        if let Some(mut delta) = self.delta {
+            if !self.is_dragging_x {
+                delta[0] = 0.0;
+            }
+            if !self.is_dragging_y {
+                delta[1] = 0.0;
+            }
+            delta
+        } else {
+            [0.0, 0.0]
+        }
     }
 }
 impl Default for MouseInfo {
@@ -191,7 +225,8 @@ impl Default for MouseInfo {
             buttons: MouseButtons::default(),
             delta: None,
             click_count: 0,
-            is_dragging: false,
+            is_dragging_x: false,
+            is_dragging_y: false,
         }
     }
 }
@@ -217,9 +252,13 @@ pub(crate) struct MouseInput {
     /// The position of the mouse in the last down event with the MouseButton::Left, in the
     /// current_mouse control. This becames None after a up mouse event.
     down_position: Option<[f32; 2]>,
+    /// If the mouse is draggin in x direction.
+    ///
     /// The mouse will be dragging if it goes down and start moving. It starts after moving a
-    /// minimun distance from its down_position.
-    is_dragging: bool,
+    /// minimun distance in the x direction from its down_position.
+    is_dragging_x: bool,
+    /// If the mouse is draggin in y direction. See [`is_dragging_y`] for more information.
+    is_dragging_y: bool,
     /// Tells if current_mouse control is locked, and will not change when the mouse stop hovering
     /// it. Useful for drag widgets like a slider.
     hover_is_locked: bool,
@@ -239,7 +278,8 @@ impl MouseInput {
             buttons: self.buttons.clone(),
             delta,
             click_count: self.click_count,
-            is_dragging: self.is_dragging,
+            is_dragging_x: self.is_dragging_x,
+            is_dragging_y: self.is_dragging_y,
         }
     }
 
@@ -1246,7 +1286,10 @@ impl Gui {
         let mut curr_scroll = None;
         let mut curr_drag = None;
         let mut curr_mouse = None;
-        if input.current_mouse.is_some() && input.hover_is_locked || input.is_dragging {
+        if input.current_mouse.is_some() && input.hover_is_locked
+            || input.is_dragging_y
+            || input.is_dragging_x
+        {
             curr_scroll = input.current_scroll;
             curr_mouse = input.current_mouse;
             curr_drag = curr_mouse;
@@ -1304,21 +1347,34 @@ impl Gui {
 
         // Handle dragging
 
-        if !input.is_dragging && curr_drag.is_some() {
-            if let Some([x, y]) = input.down_position {
-                let [dx, dy] = [mouse_x - x, mouse_y - y];
-                let dist = dx * dx + dy * dy;
-                const MIN_DRAG_DIST_SQ: f32 = 5.0 * 5.0;
-                if dist >= MIN_DRAG_DIST_SQ {
-                    log::trace!("dragging true");
-                    input.is_dragging = true;
-                    curr_mouse = curr_drag;
+        const MIN_DRAG_DIST: f32 = 20.0;
+
+        if curr_drag.is_none() {
+            input.is_dragging_x = false;
+            input.is_dragging_y = false;
+            log::trace!("curr_drag is none, dragging = false");
+        } else {
+            if !input.is_dragging_x {
+                if let Some([x, _]) = input.down_position {
+                    let dy = mouse_x - x;
+                    if dy.abs() >= MIN_DRAG_DIST {
+                        log::trace!("dragging true");
+                        input.is_dragging_x = true;
+                        curr_mouse = curr_drag;
+                    }
                 }
             }
-        }
-        if curr_drag.is_none() {
-            input.is_dragging = false;
-            log::trace!("curr_drag is none, dragging = false");
+
+            if !input.is_dragging_y {
+                if let Some([_, y]) = input.down_position {
+                    let dx = mouse_y - y;
+                    if dx.abs() >= MIN_DRAG_DIST {
+                        log::trace!("dragging true");
+                        input.is_dragging_y = true;
+                        curr_mouse = curr_drag;
+                    }
+                }
+            }
         }
 
         // Generate events
@@ -1431,7 +1487,8 @@ impl Gui {
         let input = self.inputs.get_mouse(id).unwrap();
         if button == MouseButton::Left {
             input.down_position = None;
-            input.is_dragging = false;
+            input.is_dragging_x = false;
+            input.is_dragging_y = false;
             log::trace!("dragging = false");
         }
     }
