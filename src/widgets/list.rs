@@ -5,11 +5,11 @@ use std::{any::Any, collections::BTreeMap};
 use winit::event::VirtualKeyCode;
 
 use super::{FinishScrollMomentum, ScrollBar, ScrollDelta, ScrollMomentum};
+use crate::MouseInfo;
 use crate::{
     util::cmp_float, widgets::SetScrollPosition, Behaviour, BuilderContext, Context,
     ControlBuilder, Id, InputFlags, KeyboardEvent, Layout, LayoutContext, MinSizeContext,
 };
-use crate::{MouseEvent, MouseInfo};
 
 pub struct UpdateItems;
 /// When send to the behaviour [List], will bring a item to inside the view.
