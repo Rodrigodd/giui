@@ -606,7 +606,7 @@ impl<C: ListBuilder> List<C> {
 
     fn add_delta(&mut self, delta: [f32; 2], ctx: &mut Context) {
         if !cmp_float(delta[0], 0.0) {
-            self.delta_x += delta[0];
+            self.delta_x -= delta[0];
             ctx.dirty_layout(self.view);
         }
 
