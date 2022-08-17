@@ -37,6 +37,10 @@ pub trait StyleLoaderCallback {
     fn load_texture(&mut self, name: String) -> (u32, u32, u32);
     /// Loads and font and return its FontId.
     fn load_font(&mut self, name: String) -> FontId;
+    /// Modify each loaded Graphic.
+    fn modify_graphic(&mut self, graphic: &mut Graphic) {
+        let _ = graphic;
+    }
 }
 
 pub struct StyleLoader<'l> {
@@ -55,6 +59,10 @@ impl<'l> StyleLoader<'l> {
     /// Loads and font and return its FontId.
     fn load_font(&mut self, name: String) -> FontId {
         self.callback.load_font(name)
+    }
+    /// Modify each loaded Graphic.
+    fn modify_graphic(&mut self, graphic: &mut Graphic) {
+        self.callback.modify_graphic(graphic)
     }
 }
 
@@ -255,5 +263,9 @@ impl<'de, 'a, 'b> DeserializeSeed<'de> for GraphicLoader<'a, 'b> {
                 loader: self.loader,
             },
         )
+        .map(|mut graphic| {
+            self.loader.modify_graphic(&mut graphic);
+            graphic
+        })
     }
 }
