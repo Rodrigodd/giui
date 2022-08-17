@@ -117,6 +117,18 @@ pub trait ListBuilder {
     /// In the case where the items need to be updated sometimes, this can be used to mark all
     /// items as updated at once, intead of keeping a update flag for each item.
     fn finished_layout(&mut self) {}
+
+    /// The width that the content of the List.
+    ///
+    /// If this is greater than the width of the view, the content will scroll horizontally. The
+    /// width of the items will be the view width if this `content_width` is smaller than the
+    /// view width, otherwise will be equal to the `content_width`.
+    ///
+    /// If this returns `0.0` (the default implementation), the list will never scroll
+    /// horizontally.
+    fn content_width(&mut self) -> f32 {
+        0.0
+    }
 }
 
 pub struct List<C: ListBuilder> {
@@ -186,7 +198,6 @@ impl<C: ListBuilder> List<C> {
     /// greater than `view` size in its respective dimension.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        content_width: f32,
         spacing: f32,
         margins: [f32; 4],
         view: Id,
@@ -200,7 +211,7 @@ impl<C: ListBuilder> List<C> {
             // TODO: spacing and margins must be paramenters
             space: spacing,
             margins,
-            content_width,
+            content_width: 0.0,
             delta_x: 0.0,
             delta_y: 0.0,
             last_delta_x: f32::NAN,
@@ -856,8 +867,10 @@ impl<C: ListBuilder> Layout for List<C> {
     }
 
     fn update_layouts(&mut self, this: Id, ctx: &mut LayoutContext) {
+        self.content_width = self.builder.content_width();
+
         let this_rect = ctx.get_rect(this);
-        // let content_size = ctx.get_min_size(self.content);
+
         let this_width = this_rect[2] - this_rect[0];
 
         // assume that the vertical bar will be used
