@@ -322,7 +322,7 @@ impl ScrollMomentum {
                     speed: [f32; 2],
                 }
                 impl Animation for ScrollAnim {
-                    fn on_update(&self, t: f32, dt: f32, _: f32, ctx: &mut Context) {
+                    fn on_update(&mut self, t: f32, dt: f32, _: f32, ctx: &mut Context) {
                         if t == 1.0 {
                             ctx.send_event_to(self.id, FinishScrollMomentum);
                         }

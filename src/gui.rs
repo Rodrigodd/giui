@@ -405,7 +405,12 @@ pub trait Animation {
     /// total duration of the animation in seconds. This method is first called with `t = 0.0` and
     /// always ends with `t = 1.0` (unless cancelled), which can be used for initialization and
     /// finish. `dt` is the variation of `t` from the last call to now.
-    fn on_update(&self, t: f32, dt: f32, length: f32, ctx: &mut Context);
+    fn on_update(&mut self, t: f32, dt: f32, length: f32, ctx: &mut Context);
+}
+impl<F: FnMut(f32, f32, f32, &mut Context)> Animation for F {
+    fn on_update(&mut self, t: f32, dt: f32, length: f32, ctx: &mut Context) {
+        (self)(t, dt, length, ctx)
+    }
 }
 
 pub type AnimationId = u32;
