@@ -10,15 +10,19 @@ use crate::{
     AnimationId, Control, ControlBuilder, Controls, Gui, Id, Rect,
 };
 
+pub enum Event {
+    Event(Box<dyn Any>),
+    EventTo(Id, Box<dyn Any>),
+    Dirty(Id),
+}
+
 // contains a reference to all the controls, except the behaviour of one control
 pub struct Context<'a> {
     gui: &'a mut Gui,
     // modifiers: ModifiersState,
     // controls: &'a mut Controls,
     fonts: &'a Fonts,
-    pub(crate) events: Vec<Box<dyn Any>>,
-    pub(crate) events_to: Vec<(Id, Box<dyn Any>)>,
-    pub(crate) dirtys: Vec<Id>,
+    pub(crate) events: Vec<Event>,
     pub(crate) render_dirty: bool,
 }
 impl BuilderContext for Context<'_> {
@@ -57,13 +61,10 @@ impl<'a> Drop for Context<'a> {
     fn drop(&mut self) {
         let Context {
             events,
-            events_to,
-            dirtys,
             render_dirty,
             ..
         } = self;
-        self.gui
-            .context_drop(events, events_to, dirtys, *render_dirty);
+        self.gui.context_drop(events, *render_dirty);
     }
 }
 impl<'a> Context<'a> {
@@ -73,8 +74,6 @@ impl<'a> Context<'a> {
             gui,
             fonts,
             events: Vec::new(),
-            events_to: Vec::new(),
-            dirtys: Vec::new(),
             render_dirty: false,
         }
     }
@@ -82,20 +81,16 @@ impl<'a> Context<'a> {
     /// Destructs the Context in its fields, without Dropping. Drop would automatically call
     /// Gui::context_drop, but I may need to call it manually.
     ///
-    /// Returns `(events, events_to, dirtys, render_dirty)`.
-    pub(crate) fn destructs(
-        mut self,
-    ) -> (Vec<Box<dyn Any>>, Vec<(Id, Box<dyn Any>)>, Vec<Id>, bool) {
+    /// Returns `(events, , render_dirty)`.
+    pub(crate) fn destructs(mut self) -> (Vec<Event>, bool) {
         use std::mem;
         let events = mem::take(&mut self.events);
-        let events_to = mem::take(&mut self.events_to);
-        let dirtys = mem::take(&mut self.dirtys);
         let render_dirty = self.render_dirty;
 
-        // this will forget 3 Vec's, but they don't have allocations.
+        // this will forget a Vec, but it doesn't have a allocation.
         mem::forget(self);
 
-        (events, events_to, dirtys, render_dirty)
+        (events, render_dirty)
     }
 
     /// Set the value of the type T that is owned by the Gui. Any value set before will be dropped
@@ -132,10 +127,10 @@ impl<'a> Context<'a> {
     }
 
     pub fn send_event<T: 'static>(&mut self, event: T) {
-        self.events.push(Box::new(event));
+        self.events.push(Event::Event(Box::new(event)));
     }
     pub fn send_event_to<T: 'static>(&mut self, id: Id, event: T) {
-        self.events_to.push((id, Box::new(event)));
+        self.events.push(Event::EventTo(id, Box::new(event)));
     }
 
     pub fn send_event_to_scheduled<T: 'static>(
@@ -200,9 +195,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn dirty_layout(&mut self, id: Id) {
-        if !self.dirtys.iter().any(|x| *x == id) {
-            self.dirtys.push(id);
-        }
+        self.events.push(Event::Dirty(id));
     }
 
     pub fn get_rect(&self, id: Id) -> [f32; 4] {
@@ -311,7 +304,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn set_focus(&mut self, id: Id) {
-        self.events.push(Box::new(event::RequestFocus { id }));
+        self.send_event(event::RequestFocus { id });
     }
 
     pub fn get_focus(&mut self) -> Option<Id> {
@@ -341,18 +334,18 @@ impl<'a> Context<'a> {
 
     /// This only took effect when Controls is dropped
     pub fn active(&mut self, id: Id) {
-        self.events.push(Box::new(event::ActiveControl { id }));
+        self.send_event(event::ActiveControl { id });
     }
 
     /// This only took effect when Controls is dropped
     pub fn deactive(&mut self, id: Id) {
-        self.events.push(Box::new(event::DeactiveControl { id }));
+        self.send_event(event::DeactiveControl { id });
     }
 
     /// Destroy the control, drop it, invalidating all of its referencing Id's
     /// This only took effect when Controls is dropped
     pub fn remove(&mut self, id: Id) {
-        self.events.push(Box::new(event::RemoveControl { id }));
+        self.send_event(event::RemoveControl { id });
     }
 
     pub fn move_to_front(&mut self, id: Id) {

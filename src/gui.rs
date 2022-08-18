@@ -876,22 +876,18 @@ impl Gui {
 
     pub(crate) fn context_drop(
         &mut self,
-        events: &mut Vec<Box<dyn Any>>,
-        events_to: &mut Vec<(Id, Box<dyn Any>)>,
-        dirtys: &mut Vec<Id>,
+        events: &mut Vec<crate::context::Event>,
         render_dirty: bool,
     ) {
         if render_dirty {
             self.redraw = true;
         }
         for event in events.drain(..) {
-            self.send_event(event);
-        }
-        for (id, event) in events_to.drain(..) {
-            self.send_event_to(id, event);
-        }
-        for dirty in dirtys.drain(..) {
-            self.dirty_layout(dirty);
+            match event {
+                crate::Event::Event(event) => self.send_event(event),
+                crate::Event::EventTo(id, event) => self.send_event_to(id, event),
+                crate::Event::Dirty(id) => self.dirty_layout(id),
+            }
         }
     }
 
@@ -988,9 +984,9 @@ impl Gui {
             let mut ctx = Context::new(self);
             event(this.as_mut(), id, &mut ctx);
             // The behaviour must be returned before doing the context drop.
-            let (mut events, mut events_to, mut dirtys, render_dirty) = ctx.destructs();
+            let (mut events, render_dirty) = ctx.destructs();
             self.controls.get_mut(id).unwrap().behaviour = Some(this);
-            self.context_drop(&mut events, &mut events_to, &mut dirtys, render_dirty);
+            self.context_drop(&mut events, render_dirty);
         }
     }
 
@@ -1011,9 +1007,9 @@ impl Gui {
             let mut ctx = Context::new(self);
             event(this.as_mut(), id, &mut ctx);
             // The behaviour must be returned before doing the context drop.
-            let (mut events, mut events_to, mut dirtys, render_dirty) = ctx.destructs();
+            let (mut events, render_dirty) = ctx.destructs();
             self.controls.get_mut(id).unwrap().behaviour = Some(this);
-            self.context_drop(&mut events, &mut events_to, &mut dirtys, render_dirty);
+            self.context_drop(&mut events, render_dirty);
         }
     }
 
@@ -1938,7 +1934,7 @@ impl Gui {
             parents.extend(self.get_active_children(parent).iter().rev());
         }
         // self.start_control(id) calls dirty the id, but because all layouts are updated, this
-        // dirties layouts can be clear
+        // dirty_layouts can be clear
         self.dirty_layouts.clear();
     }
 }

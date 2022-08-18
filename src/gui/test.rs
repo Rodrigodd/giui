@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use instant::Duration;
@@ -718,4 +720,124 @@ fn lock_cursor() {
             (0, MouseEvent::Moved, false),
         ]
     );
+}
+
+#[test]
+fn events() {
+    init_logger();
+
+    let mut gui = Gui::new(100.0, 100.0, 1.0, Fonts::new());
+
+    let a = gui.create_control().active(false).build(&mut gui);
+    let b = gui.create_control().active(true).build(&mut gui);
+
+    assert!(!gui.get_context().is_active(a));
+    assert!(gui.get_context().is_active(b));
+
+    struct MyBehavior {
+        a: Id,
+        b: Id,
+    }
+    impl Behaviour for MyBehavior {
+        fn input_flags(&self) -> InputFlags {
+            InputFlags::MOUSE
+        }
+        fn on_mouse_event(&mut self, mouse: MouseInfo, _this: Id, ctx: &mut Context) {
+            match mouse.event {
+                MouseEvent::Moved => {
+                    ctx.active(self.a);
+                    ctx.deactive(self.b);
+                }
+                MouseEvent::Down(_) => ctx.remove(self.a),
+                _ => (),
+            }
+        }
+    }
+
+    gui.create_control()
+        .behaviour(MyBehavior { a, b })
+        .build(&mut gui);
+
+    gui.mouse_moved(0, 50.0, 50.0);
+
+    assert!(gui.get_context().is_active(a));
+    assert!(!gui.get_context().is_active(b));
+
+    gui.mouse_down(0, MouseButton::Left);
+
+    gui.get_context();
+    assert!(gui.controls.get(a).is_none())
+}
+
+#[test]
+fn event_order() {
+    init_logger();
+
+    let mut gui = Gui::new(100.0, 100.0, 1.0, Fonts::new());
+
+    struct MyEvent;
+
+    struct A {
+        b: Id,
+        list: Rc<RefCell<Vec<u8>>>,
+    }
+    impl Behaviour for A {
+        fn input_flags(&self) -> InputFlags {
+            InputFlags::MOUSE
+        }
+        fn on_mouse_event(&mut self, mouse: MouseInfo, _this: Id, ctx: &mut Context) {
+            match mouse.event {
+                MouseEvent::Moved => {
+                    self.list.borrow_mut().push(0);
+                    ctx.send_event_to(self.b, MyEvent);
+                    ctx.remove(self.b);
+                }
+                _ => (),
+            }
+        }
+
+        fn on_remove(&mut self, _this: Id, _ctx: &mut Context) {
+            self.list.borrow_mut().push(2);
+        }
+    }
+
+    struct B {
+        a: Id,
+        list: Rc<RefCell<Vec<u8>>>,
+    }
+    impl Behaviour for B {
+        fn on_event(&mut self, event: Box<dyn std::any::Any>, _this: Id, ctx: &mut Context) {
+            if event.is::<MyEvent>() {
+                self.list.borrow_mut().push(1);
+                ctx.remove(self.a);
+            }
+        }
+
+        fn on_remove(&mut self, _this: Id, _ctx: &mut Context) {
+            self.list.borrow_mut().push(3);
+        }
+    }
+
+    let list: Rc<RefCell<Vec<_>>> = Rc::new(RefCell::new(Vec::new()));
+
+    let a = gui.reserve_id();
+    let b = gui
+        .create_control()
+        .behaviour(B {
+            a,
+            list: list.clone(),
+        })
+        .build(&mut gui);
+    gui.create_control_reserved(a)
+        .behaviour(A {
+            b,
+            list: list.clone(),
+        })
+        .build(&mut gui);
+
+    gui.mouse_moved(0, 50.0, 50.0);
+
+    gui.get_context();
+
+    assert_eq!(list.borrow_mut().as_slice(), &[0, 1, 2, 3]);
 }
