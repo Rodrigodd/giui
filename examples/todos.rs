@@ -308,7 +308,6 @@ fn list(
 
     cb.behaviour_and_layout(List::new(
         10.0,
-        10.0,
         [10.0; 4],
         view,
         v_scroll_bar,

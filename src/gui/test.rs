@@ -484,7 +484,6 @@ fn drag_list_view() {
 
     gui.create_control_reserved(list)
         .behaviour_and_layout(List::new(
-            0.0,
             10.0,
             [10.0; 4],
             view,
