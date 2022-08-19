@@ -313,6 +313,9 @@ impl<'a> Context<'a> {
         (&mut control.rect, &mut control.graphic)
     }
 
+    /// Return if the control with the given Id is active.
+    ///
+    /// If the control was removed,  or the Id is invalid, returns false.
     pub fn is_active(&self, id: Id) -> bool {
         self.gui.controls.get(id).map_or(false, |x| x.active)
     }
