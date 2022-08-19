@@ -818,6 +818,11 @@ impl Gui {
         self.lazy_update();
     }
 
+    /// Remove all animations.
+    pub fn clear_animations(&mut self) {
+        self.animations.clear();
+    }
+
     pub fn render_is_dirty(&self) -> bool {
         let redraw = self.redraw || !self.animations.is_empty();
         if redraw {
