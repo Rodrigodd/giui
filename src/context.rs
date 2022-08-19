@@ -6,14 +6,22 @@ use std::{
 use winit::{event::ModifiersState, window::CursorIcon};
 
 use crate::{
-    control::BuilderContext, event, font::Fonts, graphics::Graphic, time::Instant, Animation,
-    AnimationId, Control, ControlBuilder, Controls, Gui, Id, Rect,
+    control::BuilderContext, event, font::Fonts, graphics::Graphic, next_animation_id,
+    time::Instant, Animation, AnimationId, Control, ControlBuilder, Controls, Gui, Id, Rect,
 };
 
 pub enum Event {
     Event(Box<dyn Any>),
     EventTo(Id, Box<dyn Any>),
     Dirty(Id),
+    AddAnimation {
+        id: AnimationId,
+        length: f32,
+        animation: Box<dyn Animation>,
+    },
+    RemoveAnimation {
+        id: AnimationId,
+    },
 }
 
 // contains a reference to all the controls, except the behaviour of one control
@@ -156,7 +164,13 @@ impl<'a> Context<'a> {
         length: f32,
         animation: A,
     ) -> AnimationId {
-        self.gui.add_animation(length, animation)
+        let id = next_animation_id();
+        self.events.push(Event::AddAnimation {
+            id,
+            length,
+            animation: Box::new(animation),
+        });
+        id
     }
 
     /// Remove the animation with the given `id`.
@@ -165,7 +179,7 @@ impl<'a> Context<'a> {
     /// was added. If the animation doesn't exist (already finished or id is invalid), this will do
     /// nothing.
     pub fn remove_animation(&mut self, id: AnimationId) {
-        self.gui.remove_animation(id)
+        self.events.push(Event::RemoveAnimation { id });
     }
 
     pub fn set_cursor(&mut self, cursor: CursorIcon) {

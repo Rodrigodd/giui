@@ -402,9 +402,9 @@ pub trait Animation {
     /// Update the animation.
     ///
     /// Is called every frame. `t` varies linearly between 0.0 and 1.0 over time. `length` is the
-    /// total duration of the animation in seconds. This method is first called with `t = 0.0` and
-    /// always ends with `t = 1.0` (unless cancelled), which can be used for initialization and
-    /// finish. `dt` is the variation of `t` from the last call to now.
+    /// total duration of the animation in seconds. This method is first called with `t = 0.0`
+    /// immediately upon addition and always ends with `t = 1.0` (unless cancelled), which can be
+    /// used for initialization and finish. `dt` is the variation of `t` from the last call to now.
     fn on_update(&mut self, t: f32, dt: f32, length: f32, ctx: &mut Context);
 }
 impl<F: FnMut(f32, f32, f32, &mut Context)> Animation for F {
@@ -414,6 +414,12 @@ impl<F: FnMut(f32, f32, f32, &mut Context)> Animation for F {
 }
 
 pub type AnimationId = u32;
+
+pub(crate) fn next_animation_id() -> u32 {
+    static COUNTER: AtomicU32 = AtomicU32::new(0);
+    let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+    id
+}
 
 struct ScheduledAnimation {
     id: AnimationId,
@@ -489,16 +495,29 @@ impl Gui {
         length: f32,
         animation: A,
     ) -> AnimationId {
-        static COUNTER: AtomicU32 = AtomicU32::new(0);
-        let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let id = next_animation_id();
+        self.add_animation_with_id(id, length, Box::new(animation));
+        id
+    }
 
+    /// Add a animation with the given Id and immedially call it with `t = 0.0`.
+    fn add_animation_with_id(
+        &mut self,
+        id: AnimationId,
+        length: f32,
+        mut animation: Box<dyn Animation>,
+    ) -> AnimationId {
         log::trace!("animation add {}", id);
+
+        // Immedialy update the animation.
+        animation.on_update(0.0, 0.0, length, &mut self.get_context());
+
         self.animations.push(ScheduledAnimation {
             id,
             last_t: 0.0,
             length,
             start: None,
-            callback: Box::new(animation),
+            callback: animation,
         });
 
         id
@@ -887,6 +906,16 @@ impl Gui {
                 crate::Event::Event(event) => self.send_event(event),
                 crate::Event::EventTo(id, event) => self.send_event_to(id, event),
                 crate::Event::Dirty(id) => self.dirty_layout(id),
+                crate::Event::AddAnimation {
+                    id,
+                    length,
+                    animation,
+                } => {
+                    self.add_animation_with_id(id, length, animation);
+                }
+                crate::Event::RemoveAnimation { id } => {
+                    self.remove_animation(id);
+                }
             }
         }
     }
