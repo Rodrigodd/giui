@@ -13,12 +13,18 @@ pub struct FitGraphic;
 impl Layout for FitGraphic {
     fn compute_min_size(&mut self, this: Id, ctx: &mut MinSizeContext) -> [f32; 2] {
         let fonts = ctx.get_fonts();
-        let min_size = ctx
-            .get_graphic(this)
-            .unwrap()
-            .compute_min_size(fonts)
-            .unwrap_or([0.0, 0.0]);
-        min_size
+        // The min size of non text graphics don't scale with scale_factor
+        let s = ctx.scale_factor() as f32;
+
+        use crate::graphics::Graphic;
+        match ctx.get_graphic(this) {
+            Some(Graphic::Text(text)) => text.compute_min_size(fonts).unwrap_or([0.0, 0.0]),
+            Some(graphic) => graphic
+                .compute_min_size(fonts)
+                .map(|[w, h]| [w / s, h / s])
+                .unwrap_or([0.0, 0.0]),
+            None => return [0.0, 0.0],
+        }
     }
 }
 
