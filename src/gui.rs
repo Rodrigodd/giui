@@ -1764,7 +1764,8 @@ impl Gui {
 
         {
             let mut layout = self.controls.get_mut(id).unwrap().layout.take().unwrap();
-            let mut ctx = MinSizeContext::new(id, &mut self.controls, &self.fonts);
+            let mut ctx =
+                MinSizeContext::new(id, &mut self.controls, &self.fonts, self.scale_factor);
             let mut min_size = layout.compute_min_size(id, &mut ctx);
             self.controls.get_mut(id).unwrap().layout = Some(layout);
             let user_min_size = self.controls.get(id).unwrap().rect.user_min_size;
@@ -1784,7 +1785,12 @@ impl Gui {
                         .layout
                         .take()
                         .unwrap();
-                    let mut ctx = MinSizeContext::new(parent, &mut self.controls, &self.fonts);
+                    let mut ctx = MinSizeContext::new(
+                        parent,
+                        &mut self.controls,
+                        &self.fonts,
+                        self.scale_factor,
+                    );
                     let mut min_size = layout.compute_min_size(parent, &mut ctx);
                     self.controls.get_mut(parent).unwrap().layout = Some(layout);
                     let user_min_size = self.controls.get(parent).unwrap().rect.user_min_size;
@@ -1917,7 +1923,8 @@ impl Gui {
                 .layout
                 .take()
                 .unwrap();
-            let mut ctx = MinSizeContext::new(parent, &mut self.controls, &self.fonts);
+            let mut ctx =
+                MinSizeContext::new(parent, &mut self.controls, &self.fonts, self.scale_factor);
             let mut min_size = layout.compute_min_size(parent, &mut ctx);
             self.controls.get_mut(parent).unwrap().layout = Some(layout);
             let user_min_size = self.controls.get(parent).unwrap().rect.user_min_size;

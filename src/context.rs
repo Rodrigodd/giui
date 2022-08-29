@@ -388,18 +388,29 @@ pub struct MinSizeContext<'a> {
     this: Id,
     controls: &'a mut Controls,
     fonts: &'a Fonts,
+    scale_factor: f64,
 }
 impl<'a> MinSizeContext<'a> {
-    pub(crate) fn new(this: Id, controls: &'a mut Controls, fonts: &'a Fonts) -> Self {
+    pub(crate) fn new(
+        this: Id,
+        controls: &'a mut Controls,
+        fonts: &'a Fonts,
+        scale_factor: f64,
+    ) -> Self {
         Self {
             this,
             controls,
             fonts,
+            scale_factor,
         }
     }
 
     pub fn get_fonts(&mut self) -> &'a Fonts {
         self.fonts
+    }
+
+    pub fn scale_factor(&self) -> f64 {
+        self.scale_factor
     }
 
     pub fn get_layouting(&self, id: Id) -> Option<&Rect> {
@@ -588,7 +599,8 @@ impl<'a> LayoutContext<'a> {
                     .layout
                     .take()
                     .unwrap();
-                let mut ctx = MinSizeContext::new(parent, &mut self.controls, &self.fonts);
+                let mut ctx =
+                    MinSizeContext::new(parent, &mut self.controls, &self.fonts, self.scale_factor);
                 let min_size = layout.compute_min_size(parent, &mut ctx);
                 self.controls_mut().get_mut(parent).unwrap().layout = Some(layout);
                 min_size
