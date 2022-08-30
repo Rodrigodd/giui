@@ -365,8 +365,17 @@ impl<'a> Context<'a> {
         self.send_event(event::RemoveControl { id });
     }
 
+    /// Move the Control with the given Id, to the last position in the children vector of its
+    /// parent, making it render in front of all of its siblings.
     pub fn move_to_front(&mut self, id: Id) {
         self.gui.controls.move_to_front(id);
+        self.dirty_layout(id);
+    }
+
+    /// Move the Control with the given Id, to the first position in the children vector of its
+    /// parent, making it render behind all of its siblings.
+    pub fn move_to_back(&mut self, id: Id) {
+        self.gui.controls.move_to_back(id);
         self.dirty_layout(id);
     }
 
