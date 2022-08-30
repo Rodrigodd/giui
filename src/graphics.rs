@@ -110,6 +110,11 @@ impl Graphic {
         }
     }
 
+    pub fn with_alpha(mut self, new_alpha: u8) -> Self {
+        self.set_alpha(new_alpha);
+        self
+    }
+
     pub fn need_rebuild(&self) -> bool {
         match self {
             Graphic::Panel(_) => false,
