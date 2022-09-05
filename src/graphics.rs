@@ -51,6 +51,78 @@ impl From<Text> for Graphic {
     }
 }
 impl Graphic {
+    pub fn flip_x(&mut self) {
+        let flip_uv_rect_x = |uv_rect: &mut [f32; 4]| {
+            uv_rect[0] += uv_rect[2];
+            uv_rect[2] *= -1.0;
+        };
+        match self {
+            Graphic::Texture(Texture { uv_rect, .. }) | Graphic::Icon(Icon { uv_rect, .. }) => {
+                flip_uv_rect_x(uv_rect);
+            }
+            Graphic::AnimatedIcon(AnimatedIcon { frames, .. }) => {
+                for frame in frames.iter_mut() {
+                    flip_uv_rect_x(frame)
+                }
+            }
+            Graphic::Panel(Panel {
+                uv_rects, border, ..
+            }) => {
+                for frame in uv_rects.iter_mut() {
+                    flip_uv_rect_x(frame)
+                }
+
+                border.swap(0, 2);
+                uv_rects.swap(0, 2);
+                uv_rects.swap(3, 5);
+                uv_rects.swap(6, 8);
+            }
+            Graphic::Text(_) => {}
+            Graphic::None => {}
+        }
+    }
+
+    pub fn flip_y(&mut self) {
+        let flip_uv_rect_y = |uv_rect: &mut [f32; 4]| {
+            uv_rect[1] += uv_rect[3];
+            uv_rect[3] *= -1.0;
+        };
+        match self {
+            Graphic::Texture(Texture { uv_rect, .. }) | Graphic::Icon(Icon { uv_rect, .. }) => {
+                flip_uv_rect_y(uv_rect);
+            }
+            Graphic::AnimatedIcon(AnimatedIcon { frames, .. }) => {
+                for frame in frames.iter_mut() {
+                    flip_uv_rect_y(frame)
+                }
+            }
+            Graphic::Panel(Panel {
+                uv_rects, border, ..
+            }) => {
+                for frame in uv_rects.iter_mut() {
+                    flip_uv_rect_y(frame)
+                }
+
+                border.swap(1, 3);
+                uv_rects.swap(0, 6);
+                uv_rects.swap(1, 7);
+                uv_rects.swap(2, 8);
+            }
+            Graphic::Text(_) => {}
+            Graphic::None => {}
+        }
+    }
+
+    pub fn with_flip_x(mut self) -> Self {
+        self.flip_x();
+        self
+    }
+
+    pub fn with_flip_y(mut self) -> Self {
+        self.flip_y();
+        self
+    }
+
     pub fn with_color(mut self, new_color: Color) -> Self {
         self.set_color(new_color);
         self
@@ -88,6 +160,7 @@ impl Graphic {
             Graphic::None => {}
         }
     }
+
     pub fn set_alpha(&mut self, new_alpha: u8) {
         match self {
             Graphic::Panel(Panel {
