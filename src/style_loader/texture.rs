@@ -94,7 +94,7 @@ impl<'de, 'a, 'b: 'a> serde::de::Visitor<'de> for TextureVisitor<'a, 'b> {
         }
         let texture = texture.ok_or_else(|| de::Error::missing_field("texture"))?;
         let (texture, width, height) = self.loader.load_texture(texture);
-        let uv_rect = uv_rect.ok_or_else(|| de::Error::missing_field("uv_rect"))?;
+        let uv_rect = uv_rect.unwrap_or([0, 0, width as i32, height as i32]);
         let uv_rect = [
             uv_rect[0] as f32 / width as f32,
             uv_rect[1] as f32 / height as f32,
