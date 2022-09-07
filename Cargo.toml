@@ -30,7 +30,7 @@ ab_glyph = "0.2"
 harfbuzz_rs = { version = "2", optional = true }
 unicode-linebreak = "0.1"
 unicode-segmentation = "1"
-winit = "0.26"
+winit = "0.27.2"
 bitflags = "1"
 copypasta = "0.8"
 serde = { version = "1", features = ["derive"] }
