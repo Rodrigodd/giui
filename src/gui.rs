@@ -825,9 +825,6 @@ impl Gui {
 
     pub fn render_is_dirty(&self) -> bool {
         let redraw = self.redraw || !self.animations.is_empty();
-        if redraw {
-            log::debug!("render is dirty");
-        }
         redraw
     }
 
