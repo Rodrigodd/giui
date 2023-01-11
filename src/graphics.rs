@@ -1,7 +1,7 @@
 pub use crate::text::{Text, TextStyle};
 use crate::{font::Fonts, Color};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Sprite {
     pub texture: u32,
     pub color: Color,

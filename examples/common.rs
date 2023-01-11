@@ -3,7 +3,7 @@ use giui::{
     render::{GuiRender, GuiRenderer},
     Gui,
 };
-use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
+use sprite_render::{Camera, GlSpriteRender, SpriteInstance, SpriteRender, TextureId};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -47,6 +47,7 @@ pub struct MyFonts {
     pub notosans: FontId,
     pub consolas: FontId,
     pub white_texture: u32,
+    pub font_texture: u32,
 }
 
 fn resize(
@@ -95,13 +96,17 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
         .unwrap();
 
     // create the render and camera, and a texture for the glyphs rendering
-    #[cfg(not(target_os = "android"))]
-    let mut render: Box<dyn SpriteRender> = Box::new(GLSpriteRender::new(&window, true).unwrap());
-    #[cfg(target_os = "android")]
-    let mut render: Box<dyn SpriteRender> = Box::new(());
+    let mut render: Box<dyn SpriteRender> = Box::new(GlSpriteRender::new(&window, true).unwrap());
 
-    let font_texture = render.new_texture(128, 128, &[], false);
-    let white_texture = render.new_texture(1, 1, &[255, 255, 255, 255], false);
+    let font_texture = sprite_render::Texture::new(128, 128)
+        .create(render.as_mut())
+        .unwrap_or(TextureId(0))
+        .0;
+    let white_texture = sprite_render::Texture::new(1, 1)
+        .data(&[255, 255, 255, 255])
+        .create(render.as_mut())
+        .unwrap_or(TextureId(0))
+        .0;
 
     let mut camera = {
         let size = window.inner_size();
@@ -112,12 +117,14 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
 
     // load a font
     let mut fonts = Fonts::new();
-    let my_fonts = MyFonts {
+    #[allow(unused_mut)] // used on Android only
+    let mut my_fonts = MyFonts {
         notosans: fonts.add(Font::new(include_bytes!(
             "../examples/NotoSans-Regular.ttf"
         ))),
         consolas: fonts.add(Font::new(include_bytes!("../examples/cour.ttf"))),
         white_texture,
+        font_texture,
     };
 
     // create the gui, and the gui_render
@@ -171,12 +178,19 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
             }
             #[cfg(target_os = "android")]
             Event::Resumed => {
-                render = Box::new(sprite_render::GlesSpriteRender::new(&window, true).unwrap());
+                render.resume(&window);
 
-                let font_texture = render.new_texture(128, 128, &[], false);
-                let white_texture = render.new_texture(1, 1, &[255, 255, 255, 255], false);
+                my_fonts.font_texture = sprite_render::Texture::new(128, 128)
+                    .create(render.as_mut())
+                    .unwrap()
+                    .0;
+                my_fonts.white_texture = sprite_render::Texture::new(1, 1)
+                    .data(&[255, 255, 255, 255])
+                    .create(render.as_mut())
+                    .unwrap()
+                    .0;
 
-                gui_render.set_font_texture(font_texture, [128, 128]);
+                gui_render.set_font_texture(my_fonts.font_texture, [128, 128]);
 
                 app = Some(T::init(
                     &mut gui,
@@ -187,7 +201,7 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
             }
             #[cfg(target_os = "android")]
             Event::Suspended => {
-                render = Box::new(());
+                render.suspend();
                 gui.clear_controls();
             }
             Event::WindowEvent {
@@ -232,21 +246,26 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
                         for byte in data_tex.iter() {
                             data.extend([0xff, 0xff, 0xff, *byte].iter());
                         }
-                        self.0.update_texture(
-                            font_texture,
-                            &data,
-                            Some([rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]]),
-                        );
+                        self.0
+                            .update_texture(
+                                TextureId(font_texture),
+                                Some(&data),
+                                Some([rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]]),
+                            )
+                            .unwrap();
                     }
                     fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]) {
-                        self.0
-                            .resize_texture(font_texture, new_size[0], new_size[1], &[]);
+                        sprite_render::Texture::new(new_size[0], new_size[1])
+                            .id(sprite_render::TextureId(font_texture))
+                            .create(self.0)
+                            .unwrap();
                     }
                 }
                 let mut ctx = gui.get_render_context();
                 let (sprites, is_anim) = gui_render.render(&mut ctx, Render(&mut *render));
                 is_animating = is_anim;
                 let mut renderer = render.render(window_id);
+
                 renderer.clear_screen(&[0.0, 0.0, 0.0, 1.0]);
                 renderer.draw_sprites(
                     &mut camera,
@@ -261,17 +280,16 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
                                 uv_rect: x.uv_rect,
                                 color: x.color.to_array(),
                                 pos: [x.rect[0] + width / 2.0, x.rect[1] + height / 2.0],
-                                texture: x.texture,
+                                texture: TextureId(x.texture),
                             }
                         })
                         .collect::<Vec<_>>(),
                 );
+                renderer.finish();
 
                 if is_animating {
                     *control = ControlFlow::Poll;
                 }
-
-                renderer.finish();
             }
             _ => {}
         }

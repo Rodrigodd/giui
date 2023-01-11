@@ -55,22 +55,38 @@ impl common::GiuiEventLoop<()> for Main {
         let texture = {
             let data = image::load_from_memory(include_bytes!("panel.png")).unwrap();
             let data = data.to_rgba8();
-            render.new_texture(data.width(), data.height(), data.as_ref(), true)
+            sprite_render::Texture::new(data.width(), data.height())
+                .data(data.as_ref())
+                .create(render)
+                .unwrap()
+                .0
         };
         let tab_texture = {
             let data = image::load_from_memory(include_bytes!("tab.png")).unwrap();
             let data = data.to_rgba8();
-            render.new_texture(data.width(), data.height(), data.as_ref(), true)
+            sprite_render::Texture::new(data.width(), data.height())
+                .data(data.as_ref())
+                .create(render)
+                .unwrap()
+                .0
         };
         let icon_texture = {
             let data = image::load_from_memory(include_bytes!("icons.png")).unwrap();
             let data = data.to_rgba8();
-            render.new_texture(data.width(), data.height(), data.as_ref(), true)
+            sprite_render::Texture::new(data.width(), data.height())
+                .data(data.as_ref())
+                .create(render)
+                .unwrap()
+                .0
         };
         let marker_texture = {
             let data = image::load_from_memory(include_bytes!("check.png")).unwrap();
             let data = data.to_rgba8();
-            render.new_texture(data.width(), data.height(), data.as_ref(), true)
+            sprite_render::Texture::new(data.width(), data.height())
+                .data(data.as_ref())
+                .create(render)
+                .unwrap()
+                .0
         };
 
         let painel: Graphic = Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into();
@@ -1013,7 +1029,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
             .parent(page_area)
             .layout(RatioLayout::new(1.0, (0, 0)))
             .build(gui);
-        let font_texture = 1; // TODO
+        let font_texture = style.fonts.font_texture;
         let graphic = Texture::new(font_texture, [0.0, 0.0, 1.0, 1.0]);
         gui.create_control()
             .graphic(graphic)
