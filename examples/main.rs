@@ -14,7 +14,7 @@ use giui::{
     },
     Color, Context, ControlBuilder, Gui, Id, RectFill,
 };
-use sprite_render::SpriteRender;
+use sprite_render::{SpriteRender, TextureId};
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoopProxy},
@@ -44,50 +44,65 @@ fn main() {
     common::run::<(), Main>(800, 600);
 }
 
+#[repr(u32)]
+enum Textures {
+    Painel,
+    Tab,
+    Icons,
+    Marker,
+}
+
 struct Main;
 impl common::GiuiEventLoop<()> for Main {
-    fn init(
-        gui: &mut Gui,
-        render: &mut dyn SpriteRender,
-        fonts: MyFonts,
-        proxy: EventLoopProxy<()>,
-    ) -> Self {
-        let texture = {
+    fn create_textures(&mut self, render: &mut dyn SpriteRender) {
+        let texture = Textures::Painel as u32;
+        let tab_texture = Textures::Tab as u32;
+        let icon_texture = Textures::Icons as u32;
+        let marker_texture = Textures::Marker as u32;
+
+        {
             let data = image::load_from_memory(include_bytes!("panel.png")).unwrap();
             let data = data.to_rgba8();
             sprite_render::Texture::new(data.width(), data.height())
+                .id(TextureId(texture))
                 .data(data.as_ref())
                 .create(render)
-                .unwrap()
-                .0
-        };
-        let tab_texture = {
+                .unwrap();
+        }
+        {
             let data = image::load_from_memory(include_bytes!("tab.png")).unwrap();
             let data = data.to_rgba8();
             sprite_render::Texture::new(data.width(), data.height())
+                .id(TextureId(tab_texture))
                 .data(data.as_ref())
                 .create(render)
-                .unwrap()
-                .0
-        };
-        let icon_texture = {
+                .unwrap();
+        }
+        {
             let data = image::load_from_memory(include_bytes!("icons.png")).unwrap();
             let data = data.to_rgba8();
             sprite_render::Texture::new(data.width(), data.height())
+                .id(TextureId(icon_texture))
                 .data(data.as_ref())
                 .create(render)
-                .unwrap()
-                .0
-        };
-        let marker_texture = {
+                .unwrap();
+        }
+        {
             let data = image::load_from_memory(include_bytes!("check.png")).unwrap();
             let data = data.to_rgba8();
             sprite_render::Texture::new(data.width(), data.height())
+                .id(TextureId(marker_texture))
                 .data(data.as_ref())
                 .create(render)
-                .unwrap()
-                .0
-        };
+                .unwrap();
+        }
+    }
+
+    fn init(gui: &mut Gui, fonts: MyFonts, proxy: EventLoopProxy<()>) -> Self {
+        let texture = Textures::Painel as u32;
+        let tab_texture = Textures::Tab as u32;
+        let icon_texture = Textures::Icons as u32;
+        let marker_texture = Textures::Marker as u32;
 
         let painel: Graphic = Panel::new(texture, [0.0, 0.0, 0.5, 0.5], [10.0; 4]).into();
         let white: Graphic = Texture::new(texture, [0.2, 0.2, 0.2, 0.2]).into();

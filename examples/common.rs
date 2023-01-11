@@ -15,12 +15,8 @@ use winit::{
 fn main() {
     struct HelloWord;
     impl GiuiEventLoop<()> for HelloWord {
-        fn init(
-            gui: &mut Gui,
-            _render: &mut dyn SpriteRender,
-            fonts: MyFonts,
-            _proxy: EventLoopProxy<()>,
-        ) -> Self {
+        fn create_textures(&mut self, _render: &mut dyn SpriteRender) {}
+        fn init(gui: &mut Gui, fonts: MyFonts, _proxy: EventLoopProxy<()>) -> Self {
             use giui::graphics::{Text, TextStyle};
             let _text = gui
                 .create_control()
@@ -75,14 +71,35 @@ fn resize(
 }
 
 pub trait GiuiEventLoop<T> {
-    fn init(
-        gui: &mut Gui,
-        render: &mut dyn SpriteRender,
-        fonts: MyFonts,
-        proxy: EventLoopProxy<T>,
-    ) -> Self;
+    fn create_textures(&mut self, render: &mut dyn SpriteRender);
+
+    fn init(gui: &mut Gui, fonts: MyFonts, proxy: EventLoopProxy<T>) -> Self;
+
     #[allow(unused_variables)]
     fn on_event(&mut self, event: &Event<T>, control: &mut ControlFlow) {}
+}
+
+fn create_textures<U: 'static, T: GiuiEventLoop<U> + 'static>(
+    app: &mut T,
+    gui_render: &mut GuiRender,
+    render: &mut dyn SpriteRender,
+    my_fonts: &mut MyFonts,
+) {
+    sprite_render::Texture::new(128, 128)
+        .id(TextureId(my_fonts.font_texture))
+        .create(render)
+        .unwrap()
+        .0;
+    sprite_render::Texture::new(1, 1)
+        .id(TextureId(my_fonts.white_texture))
+        .data(&[255, 255, 255, 255])
+        .create(render)
+        .unwrap()
+        .0;
+
+    gui_render.set_font_texture(my_fonts.font_texture, [128, 128]);
+
+    app.create_textures(render);
 }
 
 pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -> ! {
@@ -98,15 +115,8 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
     // create the render and camera, and a texture for the glyphs rendering
     let mut render: Box<dyn SpriteRender> = Box::new(GlSpriteRender::new(&window, true).unwrap());
 
-    let font_texture = sprite_render::Texture::new(128, 128)
-        .create(render.as_mut())
-        .unwrap_or(TextureId(0))
-        .0;
-    let white_texture = sprite_render::Texture::new(1, 1)
-        .data(&[255, 255, 255, 255])
-        .create(render.as_mut())
-        .unwrap_or(TextureId(0))
-        .0;
+    let font_texture = 1000;
+    let white_texture = 1001;
 
     let mut camera = {
         let size = window.inner_size();
@@ -117,7 +127,6 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
 
     // load a font
     let mut fonts = Fonts::new();
-    #[allow(unused_mut)] // used on Android only
     let mut my_fonts = MyFonts {
         notosans: fonts.add(Font::new(include_bytes!(
             "../examples/NotoSans-Regular.ttf"
@@ -134,15 +143,10 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
     let proxy = event_loop.create_proxy();
 
     // populate the gui with controls.
-    let mut app: Option<T> = if cfg!(target_os = "android") {
-        None
+    let mut app: T = T::init(&mut gui, my_fonts.clone(), proxy.clone());
+    if cfg!(target_os = "android") {
     } else {
-        Some(T::init(
-            &mut gui,
-            &mut *render,
-            my_fonts.clone(),
-            proxy.clone(),
-        ))
+        create_textures(&mut app, &mut gui_render, render.as_mut(), &mut my_fonts);
     };
 
     // resize everthing to the screen size
@@ -159,7 +163,7 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
 
     // winit event loop
     event_loop.run(move |event, _, control| {
-        app.as_mut().map(|x| x.on_event(&event, control));
+        app.on_event(&event, control);
         match event {
             Event::NewEvents(_) => {
                 *control = match gui.handle_scheduled_event() {
@@ -179,30 +183,11 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
             #[cfg(target_os = "android")]
             Event::Resumed => {
                 render.resume(&window);
-
-                my_fonts.font_texture = sprite_render::Texture::new(128, 128)
-                    .create(render.as_mut())
-                    .unwrap()
-                    .0;
-                my_fonts.white_texture = sprite_render::Texture::new(1, 1)
-                    .data(&[255, 255, 255, 255])
-                    .create(render.as_mut())
-                    .unwrap()
-                    .0;
-
-                gui_render.set_font_texture(my_fonts.font_texture, [128, 128]);
-
-                app = Some(T::init(
-                    &mut gui,
-                    &mut *render,
-                    my_fonts.clone(),
-                    proxy.clone(),
-                ));
+                create_textures(&mut app, &mut gui_render, render.as_mut(), &mut my_fonts);
             }
             #[cfg(target_os = "android")]
             Event::Suspended => {
                 render.suspend();
-                gui.clear_controls();
             }
             Event::WindowEvent {
                 event, window_id, ..
@@ -246,19 +231,16 @@ pub fn run<U: 'static, T: GiuiEventLoop<U> + 'static>(width: u32, height: u32) -
                         for byte in data_tex.iter() {
                             data.extend([0xff, 0xff, 0xff, *byte].iter());
                         }
-                        self.0
-                            .update_texture(
-                                TextureId(font_texture),
-                                Some(&data),
-                                Some([rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]]),
-                            )
-                            .unwrap();
+                        let _ = self.0.update_texture(
+                            TextureId(font_texture),
+                            Some(&data),
+                            Some([rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]]),
+                        );
                     }
                     fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]) {
-                        sprite_render::Texture::new(new_size[0], new_size[1])
+                        let _ = sprite_render::Texture::new(new_size[0], new_size[1])
                             .id(sprite_render::TextureId(font_texture))
-                            .create(self.0)
-                            .unwrap();
+                            .create(self.0);
                     }
                 }
                 let mut ctx = gui.get_render_context();
