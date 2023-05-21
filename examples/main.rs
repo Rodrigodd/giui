@@ -1139,7 +1139,7 @@ fn build_gui(gui: &mut Gui, proxy: EventLoopProxy<()>, style: Style) {
         let window = gui
             .create_control()
             .anchors([0.0, 0.0, 0.0, 0.0])
-            .margins([20.0, 20.0, 20.0, 20.0])
+            .margins([150.0, 200.0, 150.0, 200.0])
             .behaviour(widgets::Window::new())
             .layout(VBoxLayout::new(0.0, [0.0, 0.0, 0.0, 0.0], -1))
             .graphic(style.painel.clone())
