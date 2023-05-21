@@ -2,6 +2,20 @@
 
 A normal GUI crate made by myself.
 
+# Run an example
+
+<p float="left" align="middle">
+  <img alt="Preview of the example running" align="middle" src="examples/preview.png" width="75%" />
+</p>
+You need to enable the feature of a backend to run an example:
+
+```shell
+cargo run --example main
+```
+
+NOTE: most examples are currently broken, and don't compile. But the one show
+above is working.
+
 # Features
 
 - Render agnostic:
