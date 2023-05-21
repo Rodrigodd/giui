@@ -5,7 +5,7 @@ use giui::{
     text::{Span, SpannedString},
     Gui,
 };
-use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
+use sprite_render::{Camera, GlSpriteRender, SpriteInstance, SpriteRender, TextureId};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -15,7 +15,7 @@ use winit::{
 
 fn resize(
     gui: &mut Gui,
-    render: &mut GLSpriteRender,
+    render: &mut GlSpriteRender,
     camera: &mut Camera,
     size: PhysicalSize<u32>,
     window: WindowId,
@@ -39,15 +39,23 @@ fn main() {
         .unwrap();
 
     // create the render and camera, and a texture for the glyphs rendering
-    let mut render = GLSpriteRender::new(&window, true).unwrap();
+    let mut render = GlSpriteRender::new(&window, true).unwrap();
     let mut camera = {
         let size = window.inner_size();
         let width = size.width;
         let height = size.height;
         Camera::new(width, height, height as f32)
     };
-    let font_texture = render.new_texture(128, 128, &[], false);
-    let white_texture = render.new_texture(1, 1, &[255, 255, 255, 255], false);
+
+    let font_texture = sprite_render::Texture::new(128, 128)
+        .create(&mut render)
+        .unwrap()
+        .0;
+    let white_texture = sprite_render::Texture::new(1, 1)
+        .data(&[255, 255, 255, 255])
+        .create(&mut render)
+        .unwrap()
+        .0;
 
     // load a font
     let mut fonts = Fonts::new();
@@ -136,7 +144,7 @@ fn main() {
             }
             Event::RedrawRequested(window_id) => {
                 // render the gui
-                struct Render<'a>(&'a mut GLSpriteRender);
+                struct Render<'a>(&'a mut GlSpriteRender);
                 impl<'a> GuiRenderer for Render<'a> {
                     fn update_font_texture(
                         &mut self,
@@ -148,15 +156,16 @@ fn main() {
                         for byte in data_tex.iter() {
                             data.extend([0xff, 0xff, 0xff, *byte].iter());
                         }
-                        self.0.update_texture(
-                            font_texture,
-                            &data,
+                        let _ = self.0.update_texture(
+                            TextureId(font_texture),
+                            Some(&data),
                             Some([rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]]),
                         );
                     }
                     fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]) {
-                        self.0
-                            .resize_texture(font_texture, new_size[0], new_size[1], &[]);
+                        let _ = sprite_render::Texture::new(new_size[0], new_size[1])
+                            .id(sprite_render::TextureId(font_texture))
+                            .create(self.0);
                     }
                 }
                 let mut ctx = gui.get_render_context();
@@ -177,7 +186,7 @@ fn main() {
                                 uv_rect: x.uv_rect,
                                 color: x.color.to_array(),
                                 pos: [x.rect[0] + width / 2.0, x.rect[1] + height / 2.0],
-                                texture: x.texture,
+                                texture: TextureId(x.texture),
                             }
                         })
                         .collect::<Vec<_>>(),

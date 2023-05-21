@@ -12,7 +12,7 @@ use giui::{
     widgets::Button,
     Gui,
 };
-use sprite_render::{Camera, GLSpriteRender, SpriteInstance, SpriteRender};
+use sprite_render::{Camera, GlSpriteRender, SpriteInstance, SpriteRender, Texture, TextureId};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{Event, WindowEvent},
@@ -40,7 +40,7 @@ enum UserEvent {
 
 fn resize(
     gui: &mut Gui,
-    render: &mut GLSpriteRender,
+    render: &mut GlSpriteRender,
     camera: &mut Camera,
     size: PhysicalSize<u32>,
     window: WindowId,
@@ -73,19 +73,27 @@ fn main() {
         .unwrap();
 
     // create the render and camera, and a texture for the glyphs rendering
-    let mut render = GLSpriteRender::new(&window, true).unwrap();
+    let mut render = GlSpriteRender::new(&window, true).unwrap();
     let mut camera = {
         let size = window.inner_size();
         let width = size.width;
         let height = size.height;
         Camera::new(width, height, height as f32)
     };
-    let font_texture = render.new_texture(128, 128, &[], false);
-    let white_texture = render.new_texture(1, 1, &[255, 255, 255, 255], false);
+    let font_texture = Texture::new(128, 128).create(&mut render).unwrap().0;
+    let white_texture = Texture::new(1, 1)
+        .data(&[255, 255, 255, 255])
+        .create(&mut render)
+        .unwrap()
+        .0;
     let texture = {
         let data = image::open("examples/panel.png").unwrap();
         let data = data.to_rgba8();
-        render.new_texture(data.width(), data.height(), data.as_ref(), true)
+        Texture::new(data.width(), data.height())
+            .data(data.as_ref())
+            .create(&mut render)
+            .unwrap()
+            .0
     };
 
     // create the gui, and the gui_render
@@ -161,8 +169,12 @@ fn main() {
                     };
                 }
 
-                let font_texture = render.new_texture(128, 128, &[], false);
-                let white_texture = render.new_texture(1, 1, &[255, 255, 255, 255], false);
+                let font_texture = Texture::new(128, 128).create(&mut render).unwrap().0;
+                let white_texture = Texture::new(1, 1)
+                    .data(&[255, 255, 255, 255])
+                    .create(&mut render)
+                    .unwrap()
+                    .0;
                 let window = window_builder.build(event_loop).unwrap();
                 render.add_window(&window);
                 let size = window.inner_size();
@@ -254,7 +266,7 @@ fn main() {
                 } = windows.get_mut(&window_id).unwrap();
 
                 // render the gui
-                struct Render<'a>(&'a mut GLSpriteRender);
+                struct Render<'a>(&'a mut GlSpriteRender);
                 impl<'a> GuiRenderer for Render<'a> {
                     fn update_font_texture(
                         &mut self,
@@ -266,15 +278,16 @@ fn main() {
                         for byte in data_tex.iter() {
                             data.extend([0xff, 0xff, 0xff, *byte].iter());
                         }
-                        self.0.update_texture(
-                            font_texture,
-                            &data,
+                        let _ = self.0.update_texture(
+                            TextureId(font_texture),
+                            Some(data.as_slice()),
                             Some([rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]]),
                         );
                     }
                     fn resize_font_texture(&mut self, font_texture: u32, new_size: [u32; 2]) {
-                        self.0
-                            .resize_texture(font_texture, new_size[0], new_size[1], &[]);
+                        let _ = Texture::new(new_size[0], new_size[1])
+                            .id(TextureId(font_texture))
+                            .create(self.0);
                     }
                 }
                 let mut ctx = gui.get_render_context();
@@ -294,7 +307,7 @@ fn main() {
                                 uv_rect: x.uv_rect,
                                 color: x.color.to_array(),
                                 pos: [x.rect[0] + width / 2.0, x.rect[1] + height / 2.0],
-                                texture: x.texture,
+                                texture: TextureId(x.texture),
                             }
                         })
                         .collect::<Vec<_>>(),
