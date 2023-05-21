@@ -8,6 +8,12 @@ repository = "https://github.com/Rodrigodd/giui"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# For running the example in android
+# [[example]]
+# name = "main"
+# crate-type = ["cdylib"]
+# path = "examples/main.rs"
+
 [workspace]
 members = ["./giui-derive"]
 
