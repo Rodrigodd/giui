@@ -103,12 +103,21 @@ impl AbFont for Font {
         self.inner.codepoint_ids()
     }
 
+    #[allow(deprecated)]
     fn glyph_raster_image(
         &self,
         glyph_id: ab_glyph::GlyphId,
         pixel_size: u16,
     ) -> Option<ab_glyph::GlyphImage<'_>> {
         self.inner.glyph_raster_image(glyph_id, pixel_size)
+    }
+
+    fn glyph_raster_image2(
+        &self,
+        id: ab_glyph::GlyphId,
+        pixel_size: u16,
+    ) -> Option<ab_glyph::v2::GlyphImage> {
+        self.inner.glyph_raster_image2(id, pixel_size)
     }
 }
 
