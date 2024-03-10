@@ -697,7 +697,7 @@ impl Gui {
     }
 
     pub fn active_control(&mut self, id: Id) {
-        if let Some(mut control) = self.controls.get_mut(id) {
+        if let Some(control) = self.controls.get_mut(id) {
             if control.active {
                 return;
             }
@@ -743,7 +743,7 @@ impl Gui {
     }
 
     pub fn deactive_control(&mut self, id: Id) {
-        if let Some(mut control) = self.controls.get_mut(id) {
+        if let Some(control) = self.controls.get_mut(id) {
             if !control.active {
                 return;
             }
